@@ -7,7 +7,7 @@ edition = "2024"
 
 [dependencies]
 brotli = "7.0.0"
-flate2 = "1.1.0"
+flate2 = "1.1.2"
 zstd = "0.13.3"
 buffer = { path = "../buffer" }
 bytes = { workspace = true }
