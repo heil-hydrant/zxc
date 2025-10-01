@@ -11,9 +11,9 @@ members = [ "buffer"
 [workspace.dependencies]
 bytes = "*"
 criterion = "*"
-serde = { version = "1.0.219", features = ["derive", "rc"] }
-serde_json = "1.0.140"
-thiserror = { version = "2.0.12" }
+serde = { version = "1.0.228", features = ["derive", "rc"] }
+serde_json = "1.0.145"
+thiserror = { version = "2.0.17" }
 tracing = { version = "0.1.41"}
 
 # [profile.release]
