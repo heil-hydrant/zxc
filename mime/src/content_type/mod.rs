@@ -68,10 +68,10 @@ impl ContentType {
             }
         }
 
-        if let Some(ct) = current_ct {
-            if matches!(ct, ContentType::Unknown) {
-                return None;
-            }
+        if let Some(ct) = current_ct
+            && matches!(ct, ContentType::Unknown)
+        {
+            return None;
         }
         current_ct
     }

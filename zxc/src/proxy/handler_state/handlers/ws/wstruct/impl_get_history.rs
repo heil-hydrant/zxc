@@ -4,7 +4,7 @@ use crate::proxy::handler_state::transition::write_history::{
 };
 
 impl<T, E> GetHistory for WsStruct<T, E> {
-    fn get_history(&self) -> HistoryEnum {
+    fn get_history(&self) -> HistoryEnum<'_> {
         let ws_his = WsHistory::new(
             self.log_id,
             &self.role,

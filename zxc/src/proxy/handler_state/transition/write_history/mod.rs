@@ -7,7 +7,7 @@ use crate::history::message::from_commander::CommanderToHistory;
 use crate::proxy::handler_state::{ProxyState, ProxyStateError};
 
 pub trait GetHistory {
-    fn get_history(&self) -> HistoryEnum;
+    fn get_history(&self) -> HistoryEnum<'_>;
 }
 
 pub trait SendHistory {

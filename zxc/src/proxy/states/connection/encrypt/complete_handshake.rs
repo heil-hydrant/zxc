@@ -118,10 +118,8 @@ where
         let recvd_config = Option::<Arc<ServerConfig>>::try_from(res)?;
 
         let server_config = match recvd_config {
-            Some(config) => {
-                config
-                // 7. If no config
-            }
+            Some(config) => config,
+            // 7. If no config
             _ => {
                 let owned_cert_chain = cert_chain
                     .iter()

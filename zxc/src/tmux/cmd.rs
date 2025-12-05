@@ -1,6 +1,6 @@
 use std::env;
 use std::fs::metadata;
-use std::io::{Error, ErrorKind};
+use std::io::Error;
 use std::process::Command;
 
 use super::constants::*;
@@ -12,9 +12,8 @@ use super::constants::*;
 #[inline(always)]
 pub fn create_session(cmd: &mut Command) -> Result<(), Error> {
     // get users home dir
-    let home = env::var("HOME").map_err(|e| {
-        Error::new(ErrorKind::Other, format!("Get Home Dir| {}", e))
-    })?;
+    let home = env::var("HOME")
+        .map_err(|e| Error::other(format!("Get Home Dir| {}", e)))?;
     let config = format!("{}/.config/zxc/tmux.conf", home);
     // check if config file exists
     metadata(&config)?;

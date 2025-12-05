@@ -124,10 +124,10 @@ fn parse_scheme_host<'a>(
     id: &str,
 ) -> Result<(Option<&'a str>, Option<&'a str>), std::io::Error> {
     let mut parts = lines.split(" | ");
-    if let Some(sid) = parts.next() {
-        if sid == id {
-            return Ok((parts.next(), parts.next()));
-        }
+    if let Some(sid) = parts.next()
+        && sid == id
+    {
+        return Ok((parts.next(), parts.next()));
     }
     Ok((None, None))
 }

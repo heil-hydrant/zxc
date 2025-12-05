@@ -131,10 +131,10 @@ pub async fn build_addon_dest(
     }
     trace!("top| {}", &path.to_string_lossy());
     path.push(ADDONS);
-    if let Err(e) = create_dir(&path).await {
-        if !matches!(e.kind(), ErrorKind::AlreadyExists) {
-            return Err(DirError::CreateDir(e));
-        }
+    if let Err(e) = create_dir(&path).await
+        && !matches!(e.kind(), ErrorKind::AlreadyExists)
+    {
+        return Err(DirError::CreateDir(e));
     }
     let incremental = incremental(&path, prefix, false)
         .await

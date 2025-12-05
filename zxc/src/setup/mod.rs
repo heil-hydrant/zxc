@@ -1,5 +1,5 @@
 use std::fs::read_dir;
-use std::io::{Error, ErrorKind};
+use std::io::Error;
 mod logging;
 pub use logging::*;
 
@@ -26,7 +26,7 @@ pub fn get_largest_file_index() -> Result<usize, Error> {
             }
         })
         .max()
-        .ok_or(Error::new(ErrorKind::Other, "Failed to get largest index"))
+        .ok_or_else(|| Error::other("Failed to get largest index"))
 }
 
 #[cfg(test)]

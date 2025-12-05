@@ -51,7 +51,7 @@ impl AdditionalHandlerInfo {
         self.server_info.address()
     }
 
-    pub fn sni(&self) -> &ServerName {
+    pub fn sni(&self) -> &ServerName<'_> {
         self.server_info.sni()
     }
 }

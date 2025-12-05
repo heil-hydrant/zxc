@@ -33,19 +33,18 @@ impl DomainList {
 
     pub fn contains(&self, host: &String) -> bool {
         // 1. Check wildcard list
-        if let Some(wild_list) = &self.wildcard {
-            if wild_list
+        if let Some(wild_list) = &self.wildcard
+            && wild_list
                 .iter()
                 .any(|r| r.is_match(host.as_bytes()))
-            {
-                return true;
-            }
+        {
+            return true;
         }
         // 2. check string list
-        if let Some(str_list) = &self.str {
-            if str_list.binary_search(host).is_ok() {
-                return true;
-            }
+        if let Some(str_list) = &self.str
+            && str_list.binary_search(host).is_ok()
+        {
+            return true;
         }
         false
     }

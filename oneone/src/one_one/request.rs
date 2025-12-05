@@ -9,7 +9,7 @@ impl OneOne<Request> {
         matches!(self.header_struct.infoline().method(), CONNECT)
     }
 
-    pub fn method_as_string(&self) -> Cow<str> {
+    pub fn method_as_string(&self) -> Cow<'_, str> {
         String::from_utf8_lossy(self.header_struct.infoline().method())
     }
 
@@ -20,7 +20,7 @@ impl OneOne<Request> {
             .into()
     }
 
-    pub fn uri_as_string(&self) -> Cow<str> {
+    pub fn uri_as_string(&self) -> Cow<'_, str> {
         self.header_struct
             .infoline()
             .uri_as_string()

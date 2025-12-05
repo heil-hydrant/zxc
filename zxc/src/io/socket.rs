@@ -1,7 +1,7 @@
 use buffer::{Cursor, Event};
 use thiserror::Error;
 use tokio::io::{
-    AsyncReadExt, {self},
+    AsyncReadExt, {self}
 };
 use tokio::net::TcpStream;
 use tracing::trace;

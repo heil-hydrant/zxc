@@ -43,10 +43,10 @@ pub fn write_local_config(
     if let Some(parsed) = args {
         match toml::to_string(&parsed) {
             Ok(config) => {
-                if !config.is_empty() {
-                    if let Err(e) = fs::write(CONFIG_FILE_NAME, config) {
-                        eprintln!("write config| {}", e);
-                    }
+                if !config.is_empty()
+                    && let Err(e) = fs::write(CONFIG_FILE_NAME, config)
+                {
+                    eprintln!("write config| {}", e);
                 }
             }
             Err(e) => {

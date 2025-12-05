@@ -29,24 +29,24 @@ fn main() {
     if let Value::Object(map) = result {
         for entry in map.iter() {
             let extension = &entry.1["extensions"];
-            if !extension.is_null() {
-                if let Value::Array(arr) = extension {
-                    let result = arr
-                        .iter()
-                        .map(|x| x.as_str().unwrap())
-                        .collect::<Vec<&str>>();
-                    match entry.0.split_once('/').unwrap().0 {
-                        "application" => app_vec.extend(result),
-                        "audio" => audio_vec.extend(result),
-                        "font" => font_vec.extend(result),
-                        "image" => image_vec.extend(result),
-                        "message" => message_vec.extend(result),
-                        "model" => model_vec.extend(result),
-                        "text" => text_vec.extend(result),
-                        "video" => video_vec.extend(result),
-                        _ => (),
-                    };
-                }
+            if !extension.is_null()
+                && let Value::Array(arr) = extension
+            {
+                let result = arr
+                    .iter()
+                    .map(|x| x.as_str().unwrap())
+                    .collect::<Vec<&str>>();
+                match entry.0.split_once('/').unwrap().0 {
+                    "application" => app_vec.extend(result),
+                    "audio" => audio_vec.extend(result),
+                    "font" => font_vec.extend(result),
+                    "image" => image_vec.extend(result),
+                    "message" => message_vec.extend(result),
+                    "model" => model_vec.extend(result),
+                    "text" => text_vec.extend(result),
+                    "video" => video_vec.extend(result),
+                    _ => (),
+                };
             }
         }
 

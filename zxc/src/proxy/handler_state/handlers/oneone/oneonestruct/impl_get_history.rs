@@ -6,7 +6,7 @@ use crate::proxy::handler_state::transition::write_history::{
 };
 
 impl<T, E> GetHistory for OneOneStruct<T, E, Request> {
-    fn get_history(&self) -> HistoryEnum {
+    fn get_history(&self) -> HistoryEnum<'_> {
         let req = self.frame.as_ref().unwrap(); // safe to unwrap
         let method = req.method_as_string();
         let uri = req.uri_as_string();
@@ -18,7 +18,7 @@ impl<T, E> GetHistory for OneOneStruct<T, E, Request> {
 }
 
 impl<T, E> GetHistory for OneOneStruct<T, E, Response> {
-    fn get_history(&self) -> HistoryEnum {
+    fn get_history(&self) -> HistoryEnum<'_> {
         let res = self.frame.as_ref().unwrap(); // safe to unwrap
         let status_code = res.status_code();
         let content_length = res.content_length();

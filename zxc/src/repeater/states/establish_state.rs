@@ -13,6 +13,7 @@ use crate::repeater::conn::RepeaterConn;
 use crate::repeater::error::RepeaterError;
 
 // Initial Repeater States, upto connection establishment + encryption
+#[allow(clippy::large_enum_variant)]
 pub enum RepeaterConnState {
     EstablishServerConn(RepeaterConn<ZStream>),
     NeedConnector(RepeaterConn<TcpStream>),

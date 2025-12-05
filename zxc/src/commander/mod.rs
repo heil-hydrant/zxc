@@ -535,32 +535,28 @@ pub async fn run_commander(mut comm: Commander, token: CancellationToken) {
     loop {
         tokio::select! {
             soldier_msg = comm.comm_soldiers.recv() => {
-                if let Some(smsg) = soldier_msg {
-                    if let Err(e) = comm.handle_soldier(smsg).await {
+                if let Some(smsg) = soldier_msg
+                    && let Err(e) = comm.handle_soldier(smsg).await {
                         error!("soldier| {:?}", e);
                     }
-                }
             }
             interceptor_msg = comm.comm_interceptor.from_interceptor.recv() => {
-                if let Some(imsg) = interceptor_msg {
-                    if let Err(e) = comm.handle_interceptor(imsg).await {
+                if let Some(imsg) = interceptor_msg
+                    && let Err(e) = comm.handle_interceptor(imsg).await {
                         error!("interceptor| {:?}", e);
                     }
-                }
             }
             history_msg = comm.comm_history.from_history.recv() => {
-                if let Some(msg) = history_msg {
-                    if let Err(e) = comm.handle_history(msg).await {
+                if let Some(msg) = history_msg
+                    && let Err(e) = comm.handle_history(msg).await {
                         error!("history| {:?}", e);
                     }
-                }
             }
             repeater_msg = comm.comm_repeater.from_repeater.recv() => {
-                if let Some(msg) = repeater_msg {
-                    if let Err(e) = comm.forward(msg).await {
+                if let Some(msg) = repeater_msg
+                    && let Err(e) = comm.forward(msg).await {
                         error!("repeater| {:?}", e);
                     }
-                }
             }
             _ = token.cancelled() => {
                 trace!("cancelled");

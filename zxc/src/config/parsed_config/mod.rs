@@ -197,7 +197,7 @@ impl Config {
         if self
             .excluded_content_types
             .as_ref()
-            .is_some_and(|ect| ect.iter().any(|e| ct == *e))
+            .is_some_and(|ect| ect.contains(&ct))
         {
             trace!("in excluded content types| {}", ct);
             return true;

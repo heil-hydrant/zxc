@@ -77,7 +77,7 @@ impl Request {
         &mut self.uri
     }
 
-    pub fn uri_as_string(&self) -> Cow<str> {
+    pub fn uri_as_string(&self) -> Cow<'_, str> {
         String::from_utf8_lossy(&self.uri)
     }
 }

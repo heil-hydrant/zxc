@@ -79,13 +79,12 @@ impl From<&HeaderMap> for Option<BodyHeader> {
                 }
 
                 // 6. Content-Type
-                if key.eq_ignore_ascii_case(CONTENT_TYPE) {
-                    if let Some((main_type, _)) =
+                if key.eq_ignore_ascii_case(CONTENT_TYPE)
+                    && let Some((main_type, _)) =
                         header.value_as_str().split_once('/')
-                    {
-                        body_headers.content_type =
-                            Some(ContentType::from(main_type));
-                    }
+                {
+                    body_headers.content_type =
+                        Some(ContentType::from(main_type));
                 }
             });
 
