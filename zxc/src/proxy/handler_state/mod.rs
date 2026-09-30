@@ -7,30 +7,12 @@ use std::fmt::Display;
 
 use bytes::BytesMut;
 use role::GetRole;
-use transition::can_communicate::CanCommunicate;
-use transition::drop_msg::DropMsg;
-use transition::frame_to_payload::FrameToPayload;
-use transition::read_modified_file::add_raw::AddRaw;
-use transition::read_modified_file::read_mod_file;
-use transition::resume_intercept::update_resume_info::UpdateResumeInfo;
-use transition::rewrite::Rewrite;
-use transition::update_frame::bytes_to_frame::BytesToFrame;
-use transition::update_frame::should_rewrite::ShouldRewrite;
-use transition::update_frame::update_frame_state;
-use transition::write_history::{GetHistory, SendHistory, write_history};
-use transition::write_log::file_ops::FileOps;
-use transition::write_log::log::Log;
-use transition::write_log::update_log_extension::UpdateLogExt;
-use transition::write_log::write_log;
+
+use transition::*;
 pub mod additional_handler_info;
 
 use self::error::ProxyStateError;
 use self::read_write::ReadWrite;
-use self::transition::intercept::*;
-use self::transition::resume_intercept::resume_intercept;
-use self::transition::rewrite::rewrite_log;
-use self::transition::should_intercept::*;
-use self::transition::should_log::*;
 use super::server_info::json::ServerInfoJson;
 use crate::async_step::AsyncStep;
 use crate::commander::Protocol;
@@ -57,23 +39,6 @@ pub enum ProxyState<T> {
     SwitchProtocol(T, Protocol),     // http only
     ServerClose(T, ProxyStateError), // http only
 }
-
-/* Description:
- *      AsyncStep trait implementation for Proxy State Transition.
- *      Each transition requires a trait.
- *      Generic type T implements required traits.
- *      Trait Bound is used to perform state transition.
- *      Each transition is mapped to their respective errors.
- *
- * Args:
- *      self
- *
- * Returns:
- *      Ok(Self)
- *
- * Error:
- *      ProxyStateError
- */
 
 impl<T> AsyncStep for ProxyState<T>
 where

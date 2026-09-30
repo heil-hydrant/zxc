@@ -15,7 +15,7 @@ impl<T, E, U> From<(Connection<T, E>, U)> for Connection<T, U> {
             writer: stream,
             buf: conn.buf,
             commander: conn.commander,
-            frame: conn.frame,
+            request: conn.request,
             id: conn.id,
             reader: conn.reader,
         }

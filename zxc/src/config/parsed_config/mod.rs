@@ -1,8 +1,8 @@
 mod filter;
 use filter::DomainFilter;
 use filter::domain_list::DomainList;
-use mime::ContentType;
-use mime::from_extension::EXTENSION_MAP;
+use mime_plz::ContentType;
+use mime_plz::from_extension::EXTENSION_MAP;
 use tracing::trace;
 
 use super::GlobalConfig;

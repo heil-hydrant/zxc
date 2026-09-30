@@ -7,8 +7,10 @@ use super::*;
  *      Since request file is already stored in Response struct reuse it.
  */
 
-impl<T, E> From<OneOneStruct<T, E, Response>> for OneOneStruct<E, T, Request> {
-    fn from(mut response: OneOneStruct<T, E, Response>) -> Self {
+impl<T, E> From<OneOneStruct<T, E, OneResponseLine>>
+    for OneOneStruct<E, T, OneRequestLine>
+{
+    fn from(mut response: OneOneStruct<T, E, OneResponseLine>) -> Self {
         response.buf.clear();
         Self {
             buf: response.buf,

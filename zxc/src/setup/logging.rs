@@ -1,8 +1,9 @@
 use std::fs::{File, create_dir};
 use std::io::{self, Write};
 use std::sync::{LockResult, Mutex, MutexGuard};
+use time::macros::format_description;
 
-use time::{UtcOffset, format_description};
+use time::UtcOffset;
 use tracing::subscriber::set_global_default;
 use tracing::{Level, Metadata};
 use tracing_subscriber::field::MakeExt;
@@ -73,7 +74,7 @@ impl<'a> MakeWriter<'a> for BasicLogger {
 
 // Setup logging
 pub fn setup_logging(debug: bool) -> Result<(), Box<dyn std::error::Error>> {
-    let time_format = format_description::parse("[hour]:[minute]:[second]")?;
+    let time_format = format_description!("[hour]:[minute]:[second]");
     let time_offset =
         UtcOffset::current_local_offset().unwrap_or(UtcOffset::UTC);
     let timer = OffsetTime::new(time_offset, time_format);

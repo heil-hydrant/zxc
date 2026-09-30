@@ -10,6 +10,8 @@ pub enum CertError {
     Rcgen(#[from] rcgen::Error),
     #[error("rustls| {0}")]
     Rustls(#[from] rustls::Error),
+    #[error("openssl| {0}")]
+    Openssl(#[from] openssl::error::ErrorStack),
 }
 
 #[derive(Debug, Error)]

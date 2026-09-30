@@ -34,9 +34,8 @@ where
 {
     conn.update_extension();
     conn.frame_to_payload();
-    trace!("path| {}", conn.path().display());
     let file = create_and_write_file(conn.path(), conn.log_data()).await?;
     conn.attach_file(file);
-    trace!("Y");
+    trace!("[+] message logged| {}", conn.path().display());
     Ok(ProxyState::ShouldIntercept(conn))
 }

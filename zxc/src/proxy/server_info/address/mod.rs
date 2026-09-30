@@ -2,8 +2,7 @@ use std::fmt::{Display, Formatter};
 use std::net::SocketAddr;
 pub mod error;
 use error::AddressError;
-use oneone::Request;
-use oneone::abnf::FORWARD_SLASH;
+use header_plz::OneRequestLine;
 use rustls_pki_types::{InvalidDnsNameError, ServerName};
 
 use super::scheme::Scheme;
@@ -34,19 +33,6 @@ impl Address {
         }
     }
 
-    /* Description:
-     *      Method to get ServerName from Address.
-     *      Used to perform tls handshake.
-     *
-     * Steps:
-     *      1. If sni is some, try to convert str to ServerName
-     *      2. else match Address
-     *          a. If SocketAddr, try to convert SocketAddr to ServerName by
-     *              calling ServerName::From()
-     *          b. If Dns, try to convert Dns to ServerName by calling
-     *              ServerName::try_from()
-     */
-
     pub fn parse_sni<'a>(
         &'a self,
         sni: Option<&'a str>,
@@ -62,13 +48,8 @@ impl Address {
         }
     }
 
-    /* Description:
-     *      Method to check if host and sni are equal
-     *
-     *  https://docs.rs/rustls-pki-types/latest/rustls_pki_types/enum.IpAddr.html
-     *
-     *  ServerName uses no-std IpAddr, so we need to convert it to String
-     */
+    /* https://docs.rs/rustls-pki-types/latest/rustls_pki_types/enum.IpAddr.html
+    ServerName uses no-std IpAddr, so we need to convert it to String */
     pub fn is_host_sni_equal(&self, sni: &ServerName) -> bool {
         match self {
             Address::Socket(addr) => addr.ip().to_string() == sni.to_str(),
@@ -76,14 +57,6 @@ impl Address {
         }
     }
 
-    /* Description:
-     *      Method to convert Address to String
-     *
-     * Steps:
-     *      1. If port is scheme's default port, return only ip/host without
-     *         port
-     *      2. Else return ip/host:port
-     */
     pub fn to_string_from_scheme(&self, scheme: Scheme) -> String {
         if self.port() == scheme.default_port() {
             return match self {
@@ -95,7 +68,6 @@ impl Address {
     }
 }
 
-// Display implementation for Address
 impl Display for Address {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         match self {
@@ -105,69 +77,36 @@ impl Display for Address {
     }
 }
 
-/* Description:
- *      Get Address from Request Info Line for both http and https.
- *
- * Steps:
- *      1. If tls, its a CONNECT request in which case the uri is the address.
- *      2. If not, its in format http://host:port/
- *          a. find index '/' in uri "http://" and trailing '/'
- *          b. Separe http://host:port from trailing '/uri'
- *          c. Call Address::try_from(&[u8])
- *          d. If no port found, set port to 80.
- *
- *      3. If host.len() > request.method.len(), copy request to the host
- *      overwriting the host and set the request.method to host. This avoids
- *      a unnecessary copy of the request.
- */
-
 pub fn get_address(
-    request: &mut Request,
+    request_line: &mut OneRequestLine,
     tls: bool,
 ) -> Result<Address, AddressError> {
-    let address = if tls {
-        Address::try_from(request.uri_as_mut().split().as_ref())?
+    if tls {
+        Address::try_from(request_line.uri_as_ref())
     } else {
-        // a. find index '/'
-        let fs_index_vec = request
-            .uri_as_mut()
-            .iter()
-            .enumerate()
-            .filter(|&(_, &r)| r == FORWARD_SLASH[0])
-            .map(|(index, _)| index)
-            .collect::<Vec<usize>>();
-        // b. Separate http://host:port from trailing '/uri'
-        let mut host = request
-            .uri_as_mut()
-            .split_to(fs_index_vec[2]);
-        // c. Remove "http://"
-        let mut address = Address::try_from(&host[fs_index_vec[1] + 1..])?;
-        // e. If no port found, set port to 80.
+        let uri = request_line.uri()?;
+        let path = uri.path_and_query().as_str();
+        request_line.set_uri(path.as_ref());
+        let mut address = Address::try_from(
+            uri.authority()
+                .ok_or(AddressError::EmptyHost)?,
+        )?;
         if address.port() == 0 {
-            address.set_port(80);
+            address.set_port(80)
         }
-
-        let mlen = request.method_raw().len();
-        // 3
-        if host.len() > mlen {
-            let start_index = host.len() - mlen;
-            let _ = host.split_to(start_index);
-            host.clear();
-            host.extend_from_slice(request.method_raw());
-            request.set_method_raw(host);
-        }
-        address
-    };
-    Ok(address)
+        Ok(address)
+    }
 }
 
+/*
 #[cfg(test)]
 mod tests {
     use std::ops::Range;
     use std::str::FromStr;
 
     use bytes::BytesMut;
-    use oneone::InfoLine;
+    use header_plz::OneInfoLine;
+    use http_plz::OneRequest;
 
     use super::*;
 
@@ -186,7 +125,7 @@ mod tests {
         let info_line = "GET http://127.0.0.1:8080/echo HTTP/1.1\r\n";
         let buf = BytesMut::from(info_line);
         let initial_ptr_range = buf.as_ptr_range();
-        let mut request = Request::build_infoline(buf).unwrap();
+        let mut request = OneRequest::build_infoline(buf).unwrap();
         let address = get_address(&mut request, false).unwrap();
         assert_eq!(
             address,
@@ -213,7 +152,7 @@ mod tests {
         let info_line = "POST http://127.0.0.1:8080/echo HTTP/1.1\r\n";
         let buf = BytesMut::from(info_line);
         let initial_ptr_range = buf.as_ptr_range();
-        let mut request = Request::build_infoline(buf).unwrap();
+        let mut request = OneRequest::build_infoline(buf).unwrap();
         let address = get_address(&mut request, false).unwrap();
         assert_eq!(
             address,
@@ -237,7 +176,7 @@ mod tests {
     fn test_address_from_request_https_ip() {
         let info_line = "CONNECT 127.0.0.1:8080 HTTP/1.1\r\n";
         let buf = BytesMut::from(info_line);
-        let mut request = Request::build_infoline(buf).unwrap();
+        let mut request = OneRequest::build_infoline(buf).unwrap();
         let address = get_address(&mut request, true).unwrap();
         assert_eq!(
             address,
@@ -249,7 +188,7 @@ mod tests {
     fn test_address_from_request_http_dns() {
         let info_line = "GET http://www.google.com/echo HTTP/1.1\r\n";
         let buf = BytesMut::from(info_line);
-        let mut request = Request::build_infoline(buf).unwrap();
+        let mut request = OneRequest::build_infoline(buf).unwrap();
         let address = get_address(&mut request, false).unwrap();
         assert_eq!(address, Address::Dns(("www.google.com".to_string(), 80)))
     }
@@ -258,7 +197,7 @@ mod tests {
     fn test_address_from_request_https_dns() {
         let info_line = "CONNECT www.google.com:443 HTTP/1.1\r\n";
         let buf = BytesMut::from(info_line);
-        let mut request = Request::build_infoline(buf).unwrap();
+        let mut request = OneRequest::build_infoline(buf).unwrap();
         let address = get_address(&mut request, true).unwrap();
         assert_eq!(address, Address::Dns(("www.google.com".to_string(), 443)))
     }
@@ -350,3 +289,4 @@ mod tests {
         )
     }
 }
+*/

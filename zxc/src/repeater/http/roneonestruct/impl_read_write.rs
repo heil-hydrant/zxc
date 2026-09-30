@@ -1,5 +1,4 @@
-use oneone::Response;
-use protocol_traits::Frame;
+use header_plz::OneResponseLine;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tracing::trace;
 
@@ -17,30 +16,20 @@ where
     type Error = OneOneRWError;
     type State = RepeaterState<Self>;
 
-    /* Transition:
-     *      Receive -> WriteResponse
-     *
-     * Error:
-     *      OneOneRWError::Read
-     */
-
     async fn read(mut self) -> Result<RepeaterState<Self>, OneOneRWError> {
         let frame =
-            read_http::<T, Response>(&mut self.stream, &mut self.buf).await?;
-        self.payload = Some(frame.into_data());
-        trace!("Y");
+            read_http::<T, OneResponseLine>(&mut self.stream, &mut self.buf)
+                .await?;
+        self.payload = Some(frame.into_bytes());
+        trace!("read");
         Ok(RepeaterState::WriteResponse(self))
     }
-
-    /* Transition:
-     *      WriteResponse -> Receive
-     */
 
     async fn write(mut self) -> Result<RepeaterState<Self>, OneOneRWError> {
         write_and_flush(&mut self.stream, self.payload.as_ref().unwrap())
             .await
             .map_err(OneOneRWError::Write)?;
-        trace!("Y");
+        trace!("write");
         Ok(RepeaterState::Receive(self))
     }
 }

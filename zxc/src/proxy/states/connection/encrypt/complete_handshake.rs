@@ -156,7 +156,7 @@ where
             reader: stream,
             writer: self.writer,
             buf: self.buf,
-            frame: self.frame,
+            request: self.request,
         })
     }
 }

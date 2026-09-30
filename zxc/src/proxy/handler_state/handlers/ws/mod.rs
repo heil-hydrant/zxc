@@ -6,7 +6,7 @@ use std::marker::Send;
 
 use tokio::io::{AsyncRead, AsyncWrite};
 use tracing::{Instrument, Level, span, trace};
-use wstruct::*;
+pub use wstruct::*;
 
 use crate::async_step::async_run;
 use crate::proxy::handler_state::ProxyState;

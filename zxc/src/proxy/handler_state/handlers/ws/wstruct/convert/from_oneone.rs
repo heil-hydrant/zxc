@@ -1,6 +1,6 @@
 use bytes::BytesMut;
 use futures_util::StreamExt;
-use oneone::Response;
+use header_plz::OneResponseLine;
 use tokio::fs::create_dir;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_tungstenite::WebSocketStream;
@@ -61,7 +61,7 @@ use crate::proxy::handler_state::handlers::oneonestruct::OneOneStruct;
  *          HistorySend [3]
  */
 
-impl<T, E> ToWs<T, E> for OneOneStruct<T, E, Response>
+impl<T, E> ToWs<T, E> for OneOneStruct<T, E, OneResponseLine>
 where
     T: AsyncRead + AsyncWrite + Unpin,
     E: AsyncRead + AsyncWrite + Unpin,

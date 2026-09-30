@@ -1,10 +1,10 @@
 use super::*;
 
 //  Connection + Receiver<CommanderResponse> + ServerInfo =>
-//          OneOneStruct<Request>
+//          OneOneStruct<OneRequestLine>
 
 impl<T, E> From<(Connection<T, E>, Receiver<CommanderResponse>, ServerInfo)>
-    for OneOneStruct<T, E, Request>
+    for OneOneStruct<T, E, OneRequestLine>
 where
     T: AsyncReadExt + AsyncWriteExt + Unpin,
     E: AsyncReadExt + AsyncWriteExt + Unpin,
@@ -23,7 +23,7 @@ where
             commander_recvr,
             payload: None,
             file: None,
-            frame: conn.frame,
+            frame: conn.request,
             id: conn.id,
             path: None,
             reader: conn.reader,

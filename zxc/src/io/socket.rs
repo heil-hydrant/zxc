@@ -1,7 +1,7 @@
-use buffer::{Cursor, Event};
+use buffer_plz::{Cursor, Event};
 use thiserror::Error;
 use tokio::io::{
-    AsyncReadExt, {self}
+    AsyncReadExt, {self},
 };
 use tokio::net::TcpStream;
 use tracing::trace;
@@ -16,22 +16,6 @@ pub struct ConnectError {
     address: String,
     error: io::Error,
 }
-
-/* Description:
- *      Given an address, establish a connection
- *
- * Args:
- *      address: &Address
- *
- * Steps:
- *      Get SocketAddr / DNS and connect
- *
- * Returns:
- *      Ok(TcpStream)
- *
- * Error:
- *      io::Error
- */
 
 impl From<(&Address, io::Error)> for ConnectError {
     fn from((address, error): (&Address, io::Error)) -> Self {
@@ -51,11 +35,6 @@ pub async fn establish_connection(
     };
     result.map_err(|e| ConnectError::from((address, e)))
 }
-
-/* Description:
- *      Given a generic type that implements AsyncReadExt and a buffer
- *      (Cursor), read the buffer from the generic type.
- */
 
 pub async fn fill_buffer<'a, 'b, T>(
     stream: &mut T,

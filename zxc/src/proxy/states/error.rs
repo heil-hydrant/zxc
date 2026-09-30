@@ -1,7 +1,6 @@
 use std::convert::Infallible;
 use std::io::{self, ErrorKind};
 
-use oneone::HttpReadError;
 use openssl::error::ErrorStack;
 use rustls_pki_types::InvalidDnsNameError;
 use thiserror::Error;
@@ -87,14 +86,6 @@ impl StateError {
             }
             Self::ServerEncrypt(ServerEncryptError::Io(e)) => {
                 e.kind() == ErrorKind::ConnectionReset
-            }
-            Self::InitialRead(e) => {
-                matches!(
-                    e,
-                    &OneOneRWError::HttpError(
-                        HttpReadError::HeaderNotEnoughData,
-                    )
-                )
             }
             Self::Handler(e) => {
                 matches!(e, ProxyStateError::Drop)

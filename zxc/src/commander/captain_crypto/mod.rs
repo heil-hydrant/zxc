@@ -6,14 +6,15 @@ use std::sync::Arc;
 use ca::*;
 use error::*;
 use openssl::hash::DigestBytes;
-use rcgen::{CertificateParams, KeyPair};
+use openssl::x509::X509;
+use rcgen::{CertificateParams, Issuer, KeyPair};
 use rustls_pki_types::PrivateKeyDer;
 use tokio_rustls::TlsConnector;
 use tokio_rustls::rustls::client::WebPkiServerVerifier;
 use tokio_rustls::rustls::client::danger::ServerCertVerifier;
 use tokio_rustls::rustls::pki_types::CertificateDer;
 use tokio_rustls::rustls::{
-    ClientConfig, RootCertStore, ServerConfig, {self}
+    ClientConfig, RootCertStore, ServerConfig, {self},
 };
 use tracing::trace;
 use verifier::*;
@@ -87,8 +88,8 @@ impl CaptainCrypto {
 
         let pk_str = read_private()?;
         let key_pair = KeyPair::from_pem(&pk_str)?;
-        let trusted_ca = CA::trusted(&key_pair)?;
-        let untrusted_ca = CA::untrusted(&key_pair)?;
+        let trusted_ca = CA::trusted(KeyPair::from_pem(&pk_str)?)?;
+        let untrusted_ca = CA::untrusted(KeyPair::from_pem(&pk_str)?)?;
         let private_key = str_to_private(&pk_str)?;
         Ok(CaptainCrypto {
             connector,
@@ -173,15 +174,13 @@ impl CaptainCrypto {
             trace!("new cert| ca| N");
             &mut self.untrusted_ca
         };
-        // 2. Generate new domain cert using server cert and CA cert.
-        let gen_cert = generate_domain_cert(&self.key_pair, cert, ca.cert())?;
+        let gen_cert =
+            generate_domain_cert(&self.key_pair, cert, ca.signer())?;
 
-        // 3. Generate Server Config
         let config =
             generate_server_config(gen_cert, self.private_key.clone_key())?;
         trace!("server config| Y");
 
-        // 4. Push to the selected store
         let arc_config = Arc::new(config);
         let tosend = arc_config.clone();
         ca.add_config(digest, arc_config);
@@ -190,38 +189,29 @@ impl CaptainCrypto {
     }
 }
 
-/* Description:
- *      Generate a new self signed certificate signed by selected CA.
- *
- * Steps:
- *      1. Build new CertificateParams from_ca_cert_der.
- *      2. Build new Certificate from CertificateParams signed by signer
- *         selected CA.
- */
-
-pub fn generate_domain_cert(
+fn generate_domain_cert(
     keypair: &KeyPair,
     cert: Vec<CertificateDer<'static>>,
-    signer: &rcgen::Certificate,
-) -> Result<CertificateDer<'static>, rcgen::Error> {
-    let cert_params = CertificateParams::from_ca_cert_der(&cert[0])?;
-    trace!("certificate params built");
+    signer: &Issuer<'_, KeyPair>,
+) -> Result<CertificateDer<'static>, CertError> {
+    let real_cert = X509::from_der(cert[0].as_ref())?;
+    let sans: Vec<String> = real_cert
+        .subject_alt_names()
+        .map(|names| {
+            names
+                .iter()
+                .filter_map(|n| n.dnsname().map(str::to_owned))
+                .collect()
+        })
+        .unwrap_or_default();
+    let cert_params = CertificateParams::new(sans)?;
     let certificate: CertificateDer<'static> = cert_params
-        .signed_by(keypair, signer, keypair)?
+        .signed_by(keypair, signer)?
         .into();
     Ok(certificate)
 }
 
-/* Description:
- *      Generate ServerConfig from certificate and private key.
- *
- * NOTE: Currently H11 support only.
- *
- * Steps:
- *      Build ServerConfig with single cert and private key.
- */
-
-pub fn generate_server_config(
+fn generate_server_config(
     cert: CertificateDer<'static>,
     private_key: PrivateKeyDer<'static>,
 ) -> Result<ServerConfig, rustls::Error> {

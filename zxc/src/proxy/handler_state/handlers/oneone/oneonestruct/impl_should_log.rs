@@ -1,14 +1,13 @@
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
+use header_plz::Method;
 use http::uri::PathAndQuery;
-use mime::ContentType;
-use oneone::enums::request_methods::*;
-use oneone::{Request, Response};
+use mime_plz::ContentType;
 use tokio::sync::mpsc::Sender;
 use tracing::{error, trace};
 
-use super::OneOneStruct;
+use super::*;
 use crate::CommanderRequest;
 use crate::commander::CommanderResponse;
 use crate::commander::communicate::response::convert::WrongMessage;
@@ -17,7 +16,7 @@ use crate::proxy::handler_state::ShouldLog;
 
 const ACCEPT: &str = "Accept";
 
-impl<T, E> ShouldLog for OneOneStruct<T, E, Request> {
+impl<T, E> ShouldLog for OneOneStruct<T, E, OneRequestLine> {
     type LogResult = (usize, PathBuf, Sender<CommanderToHistory>);
 
     /* Steps:
@@ -57,7 +56,7 @@ impl<T, E> ShouldLog for OneOneStruct<T, E, Request> {
 
     fn get_log_request(&self) -> Option<CommanderRequest> {
         let frame = self.frame.as_ref().unwrap(); // safe to unwrap
-        let method = frame.method_as_enum();
+        let method = frame.method_enum();
 
         let ext = match method {
             // 2.a. If GET
@@ -82,7 +81,9 @@ impl<T, E> ShouldLog for OneOneStruct<T, E, Request> {
                 if ext.is_empty() {
                     trace!("no ext");
                     if let Some(ct) = frame
-                        .value_for_key(ACCEPT)
+                        .header_map()
+                        .value_of_key(ACCEPT)
+                        .and_then(|bytes| std::str::from_utf8(bytes).ok())
                         .and_then(ContentType::from_accept_header)
                     {
                         trace!("accept header| {}", ct);
@@ -134,7 +135,7 @@ const SHOULD_LOG_PANIC: &str = "shouldlog| not applicable for response";
 
 // Blanket implementation Not Applicable for Response.
 // should succeed in can_log()
-impl<T, E> ShouldLog for OneOneStruct<T, E, Response> {
+impl<T, E> ShouldLog for OneOneStruct<T, E, OneResponseLine> {
     type LogResult = ();
 
     fn parse_log_response(

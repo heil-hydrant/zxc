@@ -13,11 +13,6 @@ pub trait AsyncStep {
     fn is_ended(&self) -> bool;
 }
 
-/* Description:
- *      Function with AsyncStep trait bound. Continues calling next() until
- *      is_ended() returns true.
- */
-
 pub async fn async_run<T>(mut state: T) -> Result<T, T::Error>
 where
     T: AsyncStep + Display,

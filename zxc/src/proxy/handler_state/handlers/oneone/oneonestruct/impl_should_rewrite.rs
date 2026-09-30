@@ -1,6 +1,4 @@
-use oneone::InfoLine;
-
-use super::OneOneStruct;
+use super::*;
 use crate::interceptor::message::from_ui::resume_info::ResumeInfo;
 use crate::proxy::handler_state::transition::update_frame::should_rewrite::ShouldRewrite;
 
@@ -17,7 +15,7 @@ use crate::proxy::handler_state::transition::update_frame::should_rewrite::Shoul
 
 impl<T, E, U> ShouldRewrite for OneOneStruct<T, E, U>
 where
-    U: InfoLine,
+    U: OneInfoLine,
 {
     #[inline(always)]
     fn should_rewrite(&self, resume_info: &ResumeInfo) -> bool {

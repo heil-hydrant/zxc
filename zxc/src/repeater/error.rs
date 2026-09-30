@@ -1,6 +1,8 @@
 use std::io;
 use std::path::PathBuf;
 
+use header_plz::InfoLineError;
+use header_plz::status::InvalidStatusCode;
 use thiserror::Error;
 use tokio::sync::mpsc::error::SendError;
 
@@ -12,7 +14,6 @@ use crate::io::inc_dir::DirError;
 use crate::io::socket::ConnectError;
 use crate::io::unix_sock::error::UnixSockError;
 use crate::proxy::handler_state::error::ProxyStateError;
-use crate::proxy::handler_state::handlers::scode::StatusCodeError;
 use crate::proxy::server_info::address::error::AddressError;
 use crate::run::boundary::IsUIError;
 
@@ -58,8 +59,10 @@ pub enum RepeaterError {
     Proxy(#[from] ProxyStateError),
 
     // ----- Get status code -----
-    #[error("status code| {0}")]
-    StatusCode(#[from] StatusCodeError),
+    #[error("{0}")]
+    InfoLine(#[from] InfoLineError),
+    #[error("{0}")]
+    StatusCode(#[from] InvalidStatusCode),
 
     // ----- Ws -----
     // send

@@ -6,8 +6,10 @@ where
     Self: Sized,
 {
     type Error: Into<ProxyStateError>;
+
     type State;
 
     async fn read(self) -> Result<Self::State, Self::Error>;
+
     async fn write(self) -> Result<Self::State, Self::Error>;
 }

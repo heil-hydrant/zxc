@@ -1,10 +1,8 @@
-use oneone::{Request, Response};
-
 use super::*;
 use crate::proxy::handler_state::ProxyState;
 use crate::proxy::handler_state::handlers::oneone::error::HandleOneOneError;
 
-/* ProxyState<OneOneStruct<T, E, Request>> => OneOneStruct<T,E,Request>.
+/* ProxyState<OneOneStruct<T, E, OneRequestLine>> => OneOneStruct<T,E,OneRequestLine>.
  *
  *      i.e. client_state to client_handler
  *
@@ -20,13 +18,13 @@ use crate::proxy::handler_state::handlers::oneone::error::HandleOneOneError;
  *      4. Else, unreachable
  */
 
-impl<T, E> TryFrom<ProxyState<OneOneStruct<T, E, Request>>>
-    for OneOneStruct<T, E, Request>
+impl<T, E> TryFrom<ProxyState<OneOneStruct<T, E, OneRequestLine>>>
+    for OneOneStruct<T, E, OneRequestLine>
 {
     type Error = HandleOneOneError<T, E>;
 
     fn try_from(
-        client_state: ProxyState<OneOneStruct<T, E, Request>>,
+        client_state: ProxyState<OneOneStruct<T, E, OneRequestLine>>,
     ) -> Result<Self, Self::Error> {
         match client_state {
             ProxyState::End(conn) => Ok(conn),
@@ -41,7 +39,7 @@ impl<T, E> TryFrom<ProxyState<OneOneStruct<T, E, Request>>>
     }
 }
 
-/* ProxyState<OneOneStruct<T, E, Response>> => OneOneStruct<T,E,Response>.
+/* ProxyState<OneOneStruct<T, E, OneResponseLine>> => OneOneStruct<T,E,OneResponseLine>.
  *
  *      i.e. server_state to server_handler
  *
@@ -54,13 +52,13 @@ impl<T, E> TryFrom<ProxyState<OneOneStruct<T, E, Request>>>
  *      3. Else, unreachable
  */
 
-impl<T, E> TryFrom<ProxyState<OneOneStruct<T, E, Response>>>
-    for OneOneStruct<T, E, Response>
+impl<T, E> TryFrom<ProxyState<OneOneStruct<T, E, OneResponseLine>>>
+    for OneOneStruct<T, E, OneResponseLine>
 {
     type Error = HandleOneOneError<E, T>;
 
     fn try_from(
-        server_state: ProxyState<OneOneStruct<T, E, Response>>,
+        server_state: ProxyState<OneOneStruct<T, E, OneResponseLine>>,
     ) -> Result<Self, Self::Error> {
         match server_state {
             ProxyState::End(conn) => Ok(conn),

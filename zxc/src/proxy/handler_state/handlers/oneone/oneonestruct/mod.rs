@@ -1,8 +1,10 @@
+use header_plz::{OneRequestLine, OneResponseLine};
 use std::fmt::{Debug, Display};
 use std::path::PathBuf;
 
 use bytes::BytesMut;
-use oneone::{InfoLine, OneOne};
+use header_plz::OneInfoLine;
+use http_plz::OneOne;
 use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::mpsc::{Receiver, Sender};
@@ -38,11 +40,10 @@ pub use impl_read_write::OneOneRWError;
 
 use crate::proxy::handler_state::transition::write_log::file_ops::FileOps;
 
-// http/1.1 handler struct.
 #[derive(FileOps, GetRole, CanCommunicate, Id)]
 pub struct OneOneStruct<T, E, U>
 where
-    U: InfoLine,
+    U: OneInfoLine,
 {
     pub server_info: ServerInfo,
     pub buf: BytesMut,
@@ -63,7 +64,7 @@ where
 
 impl<T, E, U> OneOneStruct<T, E, U>
 where
-    U: InfoLine,
+    U: OneInfoLine,
 {
     pub fn scheme(&self) -> Scheme {
         self.server_info.scheme()
@@ -81,7 +82,7 @@ where
 // Display trait for OneOneHandler
 impl<T, E, U> Display for OneOneStruct<T, E, U>
 where
-    U: InfoLine,
+    U: OneInfoLine,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "OneOneStruct display")
@@ -91,7 +92,7 @@ where
 // Debug trait for OneOneHandler
 impl<T, E, U> Debug for OneOneStruct<T, E, U>
 where
-    U: InfoLine,
+    U: OneInfoLine,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "OneOneStruct debug")

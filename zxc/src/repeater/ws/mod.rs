@@ -1,9 +1,10 @@
 use std::io::SeekFrom;
 
 use futures_util::{SinkExt, StreamExt};
+use header_plz::{OneInfoLine, OneResponseLine};
 use repeater_ws_handle::RepeaterWsHandle;
 use tokio::io::{
-    AsyncRead, AsyncReadExt, AsyncSeekExt, AsyncWrite, AsyncWriteExt
+    AsyncRead, AsyncReadExt, AsyncSeekExt, AsyncWrite, AsyncWriteExt,
 };
 use tokio::sync::mpsc::{self, Receiver};
 use tokio::{select, spawn};
@@ -14,7 +15,6 @@ use crate::async_step::AsyncStep;
 use crate::io::file::{FileErrorInfo, FileEvent};
 use crate::proxy::handler_state::error::ProxyStateError;
 use crate::proxy::handler_state::handlers::error::WsError;
-use crate::proxy::handler_state::handlers::scode::get_status_code;
 use crate::proxy::handler_state::role::Role;
 use crate::repeater::states::rstate::RepeaterState;
 use crate::repeater::states::transition::write_response::log_response;
@@ -55,8 +55,10 @@ where
 {
     let mut hconn = handle_http(conn).await?;
     let response = hconn.get_payload().unwrap();
-    // check status code
-    match get_status_code(response)? {
+    let scode = OneResponseLine::try_build_infoline(response)?
+        .status()?
+        .into();
+    match scode {
         101 => {
             let span = span!(Level::INFO, "repeater_ws", index);
             let _ = span.enter();

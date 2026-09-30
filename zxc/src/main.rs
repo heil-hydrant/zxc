@@ -1,5 +1,5 @@
-//#![allow(warnings, unused)]
-#![allow(async_fn_in_trait)]
+#![allow(warnings, dead_code)]
+#![allow(clippy::result_large_err)]
 
 mod config;
 use chrono::Local;
@@ -72,7 +72,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await
         .map_err(|e| MainError::PortBind(port, e))?;
 
-    let tmp_path = format!("/tmp/{}", &session_name);
+    let tmp_path = format!("/tmp/{}", session_name);
     create_dir(&tmp_path).map_err(MainError::TempDir)?;
 
     let index = if attach {
@@ -199,14 +199,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     proxy_token.cancel();
     handle.await?;
-    remove_dir_all(format!("/tmp/{}", &session.name))?;
+    remove_dir_all(format!("/tmp/{}", session.name))?;
     Ok(())
 }
 
 #[inline]
 fn create_session_dirs(sname: &str) -> Result<(), Error> {
     create_dir(sname)?;
-    let history_path = format!("./{}/history", &sname);
+    let history_path = format!("./{}/history", sname);
     create_dir(&history_path)
 }
 

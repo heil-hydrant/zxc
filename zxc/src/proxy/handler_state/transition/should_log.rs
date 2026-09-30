@@ -8,25 +8,19 @@ use crate::proxy::handler_state::{ProxyState, ProxyStateError};
 
 const SHOULD_LOG: &str = "ShouldLog";
 
-/* Description:
- *      Trait to check if request/response can be logged.
- *
- *      http response only
- */
-
+// Trait to check if request/response can be logged.
+// http response only
 pub trait CanLog {
     fn can_log(&self) -> bool;
 }
 
-/* Description:
- *      Trait to check if request/response should be logged.
- *
- * Associated type:
- *      LogResult   : type of the result of the log query
- *
- *          http    => (usize, PathBuf, Sender<CommanderToHistory>)
- *          ws      => usize
- */
+// Trait to check if request/response should be logged.
+//
+// Associated type:
+//     LogResult   : type of the result of the log query
+//
+//         http    => (usize, PathBuf, Sender<CommanderToHistory>)
+//         ws      => usize
 
 pub trait ShouldLog {
     type LogResult;

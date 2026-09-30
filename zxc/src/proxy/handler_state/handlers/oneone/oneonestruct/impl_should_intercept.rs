@@ -1,5 +1,3 @@
-use oneone::{Request, Response};
-
 use super::*;
 use crate::proxy::handler_state::QueryCommanderShouldIntercept;
 use crate::proxy::handler_state::error::ProxyStateError;
@@ -11,14 +9,14 @@ use crate::proxy::handler_state::transition::should_intercept::ShouldIntercept;
  *      For response, need_response value by user in resume_info
  */
 
-impl<T, E> ShouldIntercept for OneOneStruct<T, E, Request> {
+impl<T, E> ShouldIntercept for OneOneStruct<T, E, OneRequestLine> {
     #[inline(always)]
     fn should_intercept(&self) -> Option<bool> {
         Some(true)
     }
 }
 
-impl<T, E> ShouldIntercept for OneOneStruct<T, E, Response> {
+impl<T, E> ShouldIntercept for OneOneStruct<T, E, OneResponseLine> {
     #[inline(always)]
     fn should_intercept(&self) -> Option<bool> {
         Some(self.need_response)
@@ -28,7 +26,7 @@ impl<T, E> ShouldIntercept for OneOneStruct<T, E, Response> {
 // Blanket implementation, always panic
 impl<T, E, U> QueryCommanderShouldIntercept for OneOneStruct<T, E, U>
 where
-    U: InfoLine,
+    U: OneInfoLine,
 {
     async fn query_commander_should_intercept(
         &mut self,

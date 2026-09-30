@@ -1,15 +1,16 @@
-use oneone::InfoLine;
-use protocol_traits::Frame;
+use header_plz::body_headers::parse::ParseBodyHeaders;
+use http_plz::OneMessageHead;
 
-use super::OneOneStruct;
+use super::*;
 use crate::proxy::handler_state::FrameToPayload;
 
 impl<T, E, U> FrameToPayload for OneOneStruct<T, E, U>
 where
-    U: InfoLine,
+    U: OneInfoLine + std::fmt::Debug,
+    OneMessageHead<U>: ParseBodyHeaders,
 {
     fn frame_to_payload(&mut self) {
         // safe to unwrap
-        self.payload = Some(self.frame.take().unwrap().into_data());
+        self.payload = Some(self.frame.take().unwrap().into_bytes());
     }
 }

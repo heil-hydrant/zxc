@@ -2,7 +2,7 @@ use futures_util::stream::{SplitSink, SplitStream};
 use futures_util::{Sink, SinkExt, Stream, StreamExt};
 use tokio_tungstenite::WebSocketStream;
 use tokio_tungstenite::tungstenite::{
-    Message, {self}
+    Message, {self},
 };
 use tracing::trace;
 

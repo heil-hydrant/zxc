@@ -1,3 +1,5 @@
+use header_plz::OneRequestLine;
+
 use super::*;
 use crate::proxy::handler_state::additional_handler_info::AdditionalHandlerInfo;
 
@@ -7,8 +9,9 @@ use crate::proxy::handler_state::additional_handler_info::AdditionalHandlerInfo;
  *          State::SwitchTlsTcp
  *          State::SwitchTcpTls
  */
+
 impl<T, E> From<(Connection<T, E>, AdditionalHandlerInfo)>
-    for OneOneStruct<T, E, Request>
+    for OneOneStruct<T, E, OneRequestLine>
 where
     T: AsyncReadExt + AsyncWriteExt + Unpin,
     E: AsyncReadExt + AsyncWriteExt + Unpin,
@@ -16,7 +19,7 @@ where
     fn from(
         (conn, addinfo): (Connection<T, E>, AdditionalHandlerInfo),
     ) -> Self {
-        let mut one = OneOneStruct::<T, E, Request>::from((
+        let mut one = OneOneStruct::<T, E, OneRequestLine>::from((
             conn,
             addinfo.receiver,
             addinfo.server_info,

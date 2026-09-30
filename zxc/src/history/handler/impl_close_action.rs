@@ -1,6 +1,6 @@
 use std::io::{Error, IoSlice};
 
-use oneone::abnf::LF;
+use header_plz::abnf::LF;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 
@@ -29,7 +29,7 @@ impl CloseAction for HistoryHandler {
                 .iter()
                 .for_each(|entry| {
                     io_slices.push(IoSlice::new(entry.as_bytes()));
-                    io_slices.push(IoSlice::new(LF.as_bytes()));
+                    io_slices.push(IoSlice::new(&[LF]));
                 });
             let _ = file.write_vectored(&io_slices).await?;
             file.flush().await?;

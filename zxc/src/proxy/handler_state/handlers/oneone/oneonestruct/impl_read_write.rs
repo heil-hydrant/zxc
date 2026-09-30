@@ -1,7 +1,9 @@
 use std::io;
 
-use oneone::{
-    DecompressError, HeaderStruct, HttpReadError, InfoLine, ParseBodyHeaders
+use decompression_plz::MultiDecompressErrorReason;
+use header_plz::body_headers::parse::ParseBodyHeaders;
+use header_plz::{
+    MessageHead, OneHeader, OneInfoLine, OneRequestLine, OneResponseLine,
 };
 use thiserror::Error;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -20,18 +22,23 @@ pub enum OneOneRWError {
     Read(io::Error),
     #[error("write| {0}")]
     Write(io::Error),
-    #[error("parse| {0}")]
-    HttpError(#[from] HttpReadError),
+    #[error("request parse| {0}")]
+    RequestParse(#[from] oneone_plz::error::Error<OneRequestLine>),
+    #[error("response parse| {0}")]
+    ResponseParse(#[from] oneone_plz::error::Error<OneResponseLine>),
     #[error("decompress| {0}")]
-    Decompress(#[from] DecompressError),
+    Decompress(#[from] MultiDecompressErrorReason),
+    #[error("incorrect state| {0}")]
+    IncorrectState(#[from] oneone_plz::error::IncorrectState),
 }
 
 impl<T, E, U> ReadWrite for OneOneStruct<T, E, U>
 where
     T: AsyncReadExt + AsyncWriteExt + Unpin,
     E: AsyncReadExt + AsyncWriteExt + Unpin,
-    U: InfoLine + std::fmt::Debug,
-    HeaderStruct<U>: ParseBodyHeaders,
+    U: OneInfoLine + std::fmt::Debug,
+    MessageHead<U, OneHeader>: ParseBodyHeaders,
+    OneOneRWError: From<oneone_plz::error::Error<U>>,
 {
     type Error = OneOneRWError;
     type State = ProxyState<Self>;

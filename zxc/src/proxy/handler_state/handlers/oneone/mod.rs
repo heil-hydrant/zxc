@@ -1,4 +1,7 @@
-use protocol_traits::Step;
+use header_plz::body_headers::parse::ParseBodyHeaders;
+use header_plz::{OneInfoLine, OneRequestLine, OneResponseLine};
+use http_plz::{OneMessageHead, OneOne};
+use oneone_plz::state::State;
 
 use crate::CAPACITY_2MB;
 use crate::async_step::async_run;
@@ -14,25 +17,19 @@ use crate::proxy::server_info::json::ServerInfoJson;
 use crate::proxy::states::error::StateError;
 use crate::proxy::states::*;
 pub mod oneonestruct;
-use buffer::Cursor;
+use buffer_plz::Cursor;
 use bytes::BytesMut;
-use oneone::{
-    InfoLine, OneOne, OneOneState, ParseBodyHeaders, Request, Response
-};
 use oneonestruct::*;
 use tokio::io::{
-    AsyncReadExt, AsyncWriteExt, BufReader, copy_bidirectional_with_sizes
+    AsyncReadExt, AsyncWriteExt, BufReader, copy_bidirectional_with_sizes,
 };
 use tracing::trace;
 mod error;
-pub mod scode;
 use std::fmt::Debug;
 use std::io::Error;
 use std::path::PathBuf;
 
 use error::HandleOneOneError;
-use oneone::HeaderStruct;
-use scode::*;
 use tracing::error;
 
 use super::handle_websocket;
@@ -42,42 +39,12 @@ const XATTR_HTTP: &str = "user.http";
 const XATTR_SNI: &str = "user.sni";
 
 // client type alias
-type OneOneRequest<T, E> = OneOneStruct<T, E, Request>;
+type OneOneRequest<T, E> = OneOneStruct<T, E, OneRequestLine>;
 type ClientState<T, E> = ProxyState<OneOneRequest<T, E>>;
 
 // server type alias
-type OneOneResponse<T, E> = OneOneStruct<T, E, Response>;
+type OneOneResponse<T, E> = OneOneStruct<T, E, OneResponseLine>;
 type ServerState<T, E> = ProxyState<OneOneResponse<T, E>>;
-
-/* Description:
- *      Function to handle http connection cycle.
- *
- * Args:
- *      client_state: ProxyState<OneOneHandler<T, E, Request>>
- *
- * Trait Bound:
- *      - T,E : AsyncReadExt + AsyncWriteExt + Unpin + Sync + Send + 'static +
- *              Debug,
- *
- *      - OneOneHandler<T, E, Request>: Reconnect
- *
- *      - ConnectionState<U>: From<OneOneRequest<T, E>>
- *
- * Steps:
- *      1. Call handle_one_one() with client_state
- *
- *      2. If returned state is ProxyState::SwitchProtocol, Query commander by
- *         building CommanderRequest::ShouldProxyWs
- *
- *              true    =>  call handle_websocket() with connection.
- *              false   =>  copy_bidirectional_with_sizes() with reader and
- *                          writer
- *
- *      3. Else error is returned, handle error for SendToServer,
- *         ReadFromServer, NeedNewConnection.
- *
- *      4. return ConnectionState::End
- */
 
 pub async fn handle_http<T, E, U>(
     mut client_state: ClientState<T, E>,
@@ -150,7 +117,7 @@ where
                     HandleOneOneError::ReadFromServer(conn, e) => {
                         trace!("read_from_server err| {}", e);
                         let mut client =
-                            OneOneStruct::<T, E, Request>::from(conn);
+                            OneOneStruct::<T, E, OneRequestLine>::from(conn);
                         client.reconnect().await?;
                         trace!("reconnected");
                         ProxyState::ReadModFile(client, ResumeInfo::request())
@@ -210,6 +177,10 @@ where
                     }
                     HandleOneOneError::StatusCode(status_code_error) => {
                         error!("{}", status_code_error);
+                        break;
+                    }
+                    HandleOneOneError::InfoLine(info_line_error) => {
+                        error!("{}", info_line_error);
                         break;
                     }
                 };
@@ -308,8 +279,7 @@ where
         true => {
             // set xttr
             let info = ServerInfoJson::from(&client_conn.server_info);
-            let path = client_conn.path();
-            if let Err(e) = set_attr(path, info) {
+            if let Err(e) = set_attr(client_conn.path(), info) {
                 error!("Set Attr| {}", e);
             }
 
@@ -318,8 +288,10 @@ where
             let mut server_conn =
                 OneOneResponse::<E, T>::try_from(server_state)?;
 
-            // safe to unwrap
-            let scode = get_status_code(server_conn.payload.take().unwrap())?;
+            let scode = OneResponseLine::try_build_infoline(
+                server_conn.payload.take().unwrap(), // safe to unwrap
+            )?
+            .status()?;
 
             if scode == 101 {
                 trace!("ws switch");
@@ -333,7 +305,7 @@ where
         }
         // 10. if client not logged, Relay
         false => {
-            trace!("server relay");
+            trace!("relay");
             let mut reader = BufReader::new(&mut client_conn.writer);
             let _ = tokio::io::copy_buf(&mut reader, &mut client_conn.reader)
                 .await;
@@ -342,39 +314,30 @@ where
     }
 }
 
-// Function to read a http frame (request/response) from client/server.
 pub async fn read_http<T, U>(
     reader: &mut T,
     buf: &mut BytesMut,
 ) -> Result<OneOne<U>, OneOneRWError>
 where
     T: AsyncReadExt + Unpin,
-    U: InfoLine,
-    HeaderStruct<U>: ParseBodyHeaders,
+    U: OneInfoLine + std::fmt::Debug,
+    OneMessageHead<U>: ParseBodyHeaders,
+    OneOneRWError: From<oneone_plz::error::Error<U>>,
 {
-    let mut frame_state = OneOneState::<U>::new();
+    let mut frame_state = State::<U>::new();
     let mut cbuf = Cursor::new(buf);
     loop {
         let event = fill_buffer(reader, &mut cbuf)
             .await
             .map_err(OneOneRWError::Read)?;
-        frame_state = frame_state.next(event)?;
+        frame_state = frame_state.try_next(event)?;
         if frame_state.is_ended() {
-            return Ok(frame_state.into_frame()?);
+            return Ok(frame_state.try_into_frame()?);
         }
     }
 }
 
-/* Description:
- *      Function to set extended attributes to indicate server info
- *
- * Steps:
- *      1. Set XATTR_HOST
- *      2. If scheme is http, set XATTR_HTTP to 1
- *      3. If sni is Some, set XATTR_SNI
- */
-
-pub fn set_attr(path: &PathBuf, info: ServerInfoJson) -> Result<(), Error> {
+fn set_attr(path: &PathBuf, info: ServerInfoJson) -> Result<(), Error> {
     xattr::set(path, XATTR_HOST, info.host.as_bytes())?;
     if info.http.is_some() {
         xattr::set(path, XATTR_HTTP, b"1")?;

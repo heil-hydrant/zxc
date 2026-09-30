@@ -206,14 +206,14 @@ mod tests {
         let datav = vec![
             r#"{"Request":{"id":112,"method":"GET","host":"www.reddit.com","uri":"/robots.txt"}}"#,
             r#"{"Request":{"id":113,"method":"GET","host":"www.reddit.com","uri":"/robots.txt"}}"#,
-            r#"{"Response":{"id":112,"status":"200","length":538,"mime":"ukn"}}"#,
-            r#"{"Response":{"id":113,"status":"200","length":538,"mime":"ukn"}}"#,
+            r#"{"Response":{"id":112,"status":200,"length":538,"mime":"ukn"}}"#,
+            r#"{"Response":{"id":113,"status":200,"length":538,"mime":"ukn"}}"#,
             r#"{"Request":{"id":114,"method":"GET","host":"www.reddit.com","uri":"/robots.txt"}}"#,
-            r#"{"Response":{"id":114,"status":"200","length":538,"mime":"ukn"}}"#,
+            r#"{"Response":{"id":114,"status":200,"length":538,"mime":"ukn"}}"#,
             r#"{"Request":{"id":115,"method":"GET","host":"www.reddit.com","uri":"/robots.txt"}}"#,
-            r#"{"Response":{"id":115,"status":"200","length":538,"mime":"ukn"}}"#,
+            r#"{"Response":{"id":115,"status":200,"length":538,"mime":"ukn"}}"#,
             r#"{"Request":{"id":116,"method":"GET","host":"www.reddit.com","uri":"/robots.txt"}}"#,
-            r#"{"Response":{"id":116,"status":"200","length":538,"mime":"ukn"}}"#,
+            r#"{"Response":{"id":116,"status":200,"length":538,"mime":"ukn"}}"#,
         ];
         let data = datav.join("\n");
         // 113

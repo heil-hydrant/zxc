@@ -1,6 +1,4 @@
-use oneone::{Request, Response};
-
-use super::OneOneStruct;
+use super::*;
 use crate::file_types::{EXT_REQ, EXT_RES};
 use crate::proxy::handler_state::transition::write_log::update_log_extension::UpdateLogExt;
 
@@ -12,7 +10,7 @@ use crate::proxy::handler_state::transition::write_log::update_log_extension::Up
  *      history/index - directory created by commander
  */
 
-impl<T, E> UpdateLogExt for OneOneStruct<T, E, Request> {
+impl<T, E> UpdateLogExt for OneOneStruct<T, E, OneRequestLine> {
     fn update_extension(&mut self) {
         let path = self.path.as_mut().unwrap();
         path.push(self.log_id.to_string());
@@ -24,7 +22,7 @@ impl<T, E> UpdateLogExt for OneOneStruct<T, E, Request> {
  *      Set the extension to .res
  */
 
-impl<T, E> UpdateLogExt for OneOneStruct<T, E, Response> {
+impl<T, E> UpdateLogExt for OneOneStruct<T, E, OneResponseLine> {
     fn update_extension(&mut self) {
         self.path
             .as_mut()

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use addons::Addon;
-use mime::ContentType;
+use mime_plz::ContentType;
 use serde::Deserialize;
 pub mod parser;
 

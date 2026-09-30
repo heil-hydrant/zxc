@@ -11,7 +11,7 @@ use crate::proxy::server_info::scheme::Scheme;
 #[derive(Debug, Serialize, Deserialize)]
 pub enum HistoryEnum<'a> {
     Request(RequestHistory<'a>),
-    Response(ResponseHistory<'a>),
+    Response(ResponseHistory),
     #[serde(skip)]
     WebSocket(usize, WsHistory),
 }
@@ -76,18 +76,14 @@ impl<'a> RequestHistory<'a> {
 // Struct to represent the history data of the http response.
 // {"Response":{"id":0,"status":"200","length":2000,"mime":"img"}}
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ResponseHistory<'a> {
+pub struct ResponseHistory {
     id: usize,
-    status: Cow<'a, str>,
+    status: u16,
     length: usize,
 }
 
-impl<'a> ResponseHistory<'a> {
-    pub fn new(
-        id: usize,
-        status: Cow<'a, str>,
-        length: usize,
-    ) -> ResponseHistory<'a> {
+impl ResponseHistory {
+    pub fn new(id: usize, status: u16, length: usize) -> ResponseHistory {
         ResponseHistory {
             id,
             status,
@@ -171,14 +167,10 @@ mod tests {
 
     #[test]
     fn test_response_history() {
-        let res_history =
-            ResponseHistory::new(0, String::from_utf8_lossy(b"200"), 2000);
+        let res_history = ResponseHistory::new(0, 200, 2000);
         let his = HistoryEnum::Response(res_history);
         let out = serde_json::to_string(&his).unwrap();
-        assert_eq!(
-            out,
-            r#"{"Response":{"id":0,"status":"200","length":2000}}"#
-        )
+        assert_eq!(out, r#"{"Response":{"id":0,"status":200,"length":2000}}"#)
     }
 
     #[test]

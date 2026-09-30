@@ -1,4 +1,4 @@
-use mime::ContentType;
+use mime_plz::ContentType;
 use openssl::hash::DigestBytes;
 use tokio::sync::{mpsc, oneshot};
 use tokio_rustls::rustls::pki_types::CertificateDer;

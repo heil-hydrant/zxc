@@ -62,7 +62,7 @@ where
             reader: self.reader,
             writer: stream,
             buf: self.buf,
-            frame: self.frame,
+            request: self.request,
         })
     }
 }

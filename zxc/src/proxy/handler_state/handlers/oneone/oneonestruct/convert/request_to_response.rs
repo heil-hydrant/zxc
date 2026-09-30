@@ -2,8 +2,10 @@ use super::*;
 
 // OneOneStruct<Request> to OneOneStruct<Response>
 
-impl<T, E> From<OneOneStruct<T, E, Request>> for OneOneStruct<E, T, Response> {
-    fn from(request: OneOneStruct<T, E, Request>) -> Self {
+impl<T, E> From<OneOneStruct<T, E, OneRequestLine>>
+    for OneOneStruct<E, T, OneResponseLine>
+{
+    fn from(request: OneOneStruct<T, E, OneRequestLine>) -> Self {
         Self {
             buf: request.buf,
             commander_sendr: request.commander_sendr,
