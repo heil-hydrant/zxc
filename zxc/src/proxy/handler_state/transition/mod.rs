@@ -10,12 +10,12 @@ pub mod should_intercept;
 pub mod should_log;
 pub mod update_frame;
 pub mod write_history;
-pub mod write_log;
+mod write_log;
 
 pub use can_communicate::CanCommunicate;
 pub use drop_msg::DropMsg;
 pub use frame_to_payload::FrameToPayload;
-pub use read_modified_file::add_raw::AddRaw;
+pub use read_modified_file::AddRaw;
 pub use read_modified_file::read_mod_file;
 pub use resume_intercept::update_resume_info::UpdateResumeInfo;
 pub use rewrite::Rewrite;
@@ -23,9 +23,9 @@ pub use update_frame::bytes_to_frame::BytesToFrame;
 pub use update_frame::should_rewrite::ShouldRewrite;
 pub use update_frame::update_frame_state;
 pub use write_history::{GetHistory, SendHistory, write_history};
-pub use write_log::file_ops::FileOps;
-pub use write_log::log::Log;
-pub use write_log::update_log_extension::UpdateLogExt;
+pub use write_log::FileOps;
+pub use write_log::Log;
+pub use write_log::UpdateLogExt;
 pub use write_log::write_log;
 
 pub use intercept::*;

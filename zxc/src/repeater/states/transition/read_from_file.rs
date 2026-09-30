@@ -4,7 +4,7 @@ use tracing::trace;
 
 use super::should_update::ShouldUpdate;
 use crate::io::file::{FileErrorInfo, read_file};
-use crate::proxy::handler_state::transition::read_modified_file::add_raw::AddRaw;
+use crate::proxy::handler_state::transition::read_modified_file::AddRaw;
 use crate::repeater::states::rstate::RepeaterState;
 
 /* Description:

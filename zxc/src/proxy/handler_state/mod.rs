@@ -23,11 +23,14 @@ use crate::interceptor::message::from_ui::resume_info::ResumeInfo;
 // In order
 pub enum ProxyState<T> {
     Receive(T),
+    // log
     ShouldLog(T),
     WriteHistory(T),
     Log(T),
+    // intercept
     ShouldIntercept(T),
     Intercept(T),
+    // resume
     ResumeIntercept(T),
     ReadModFile(T, ResumeInfo),
     UpdateFrame(T, BytesMut, ResumeInfo),

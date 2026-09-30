@@ -34,11 +34,9 @@ mod impl_send_history;
 mod impl_should_intercept;
 mod impl_should_log;
 mod impl_should_rewrite;
-mod impl_update_log_extension;
 mod impl_update_resume_info;
+use crate::proxy::handler_state::transition::FileOps;
 pub use impl_read_write::OneOneRWError;
-
-use crate::proxy::handler_state::transition::write_log::file_ops::FileOps;
 
 #[derive(FileOps, GetRole, CanCommunicate, Id)]
 pub struct OneOneStruct<T, E, U>

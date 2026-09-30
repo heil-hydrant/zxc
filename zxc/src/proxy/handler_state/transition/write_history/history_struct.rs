@@ -4,7 +4,7 @@ use std::fmt::Display;
 use serde::{Deserialize, Serialize};
 
 use crate::history::message::from_commander::CommanderToHistory;
-use crate::proxy::handler_state::role::{Role, as_arrow};
+use crate::proxy::handler_state::role::Role;
 use crate::proxy::server_info::scheme::Scheme;
 
 // Enum to represent the history data of the http request/response and ws.
@@ -111,7 +111,7 @@ impl WsHistory {
         WsHistory {
             id,
             is_bin,
-            sign: as_arrow(role),
+            sign: role.as_arrow(),
             size,
         }
     }

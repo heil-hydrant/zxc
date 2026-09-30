@@ -5,7 +5,10 @@ use header_plz::{
 };
 
 use super::*;
-use crate::proxy::handler_state::transition::write_log::log::{Log, NLog};
+use crate::{
+    file_types::{EXT_REQ, EXT_RES},
+    proxy::handler_state::transition::{Log, UpdateLogExt},
+};
 
 impl<T, E, U> Log for OneOneStruct<T, E, U>
 where
@@ -20,12 +23,21 @@ where
     }
 }
 
-impl<T, E, U> NLog for OneOneStruct<T, E, U>
-where
-    U: OneInfoLine + std::fmt::Debug,
-    MessageHead<U, OneHeader>: ParseBodyHeaders,
-{
-    fn log_data(&self) -> impl bytes::Buf {
-        self.frame.as_ref().unwrap().as_chain() // safe to unwrap
+// Note:
+//      history/index - directory created by commander
+impl<T, E> UpdateLogExt for OneOneStruct<T, E, OneRequestLine> {
+    fn update_extension(&mut self) {
+        let path = self.path.as_mut().unwrap();
+        path.push(self.log_id.to_string());
+        path.set_extension(EXT_REQ);
+    }
+}
+
+impl<T, E> UpdateLogExt for OneOneStruct<T, E, OneResponseLine> {
+    fn update_extension(&mut self) {
+        self.path
+            .as_mut()
+            .unwrap()
+            .set_extension(EXT_RES);
     }
 }

@@ -1,8 +1,11 @@
 use std::fmt::{Display, Formatter};
 
-use crate::file_types::FileType;
+use crate::file_types::{EXT_WREQ, EXT_WRES, FileType};
 
-// Enum to represent the role played by the stream
+pub trait GetRole {
+    fn role(&self) -> Role;
+}
+
 #[derive(Copy, Clone)]
 pub enum Role {
     Client,
@@ -18,20 +21,28 @@ impl Display for Role {
     }
 }
 
-pub const fn as_arrow(role: &Role) -> &'static str {
-    match role {
-        Role::Server => "->",
-        Role::Client => "<-",
+impl Role {
+    pub const fn as_arrow(&self) -> &'static str {
+        use Role::*;
+        match self {
+            Server => "->",
+            Client => "<-",
+        }
     }
-}
 
-pub const fn as_ws_ft(role: &Role) -> FileType {
-    match role {
-        Role::Server => FileType::Wreq,
-        Role::Client => FileType::Wres,
+    pub const fn ws_ext(&self) -> &'static str {
+        use Role::*;
+        match self {
+            Server => EXT_WREQ,
+            Client => EXT_WRES,
+        }
     }
-}
 
-pub trait GetRole {
-    fn role(&self) -> Role;
+    pub const fn as_ws_ft(&self) -> FileType {
+        use Role::*;
+        match self {
+            Server => FileType::Wreq,
+            Client => FileType::Wres,
+        }
+    }
 }

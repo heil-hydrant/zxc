@@ -35,47 +35,46 @@ pub trait ShouldLog {
     fn update_path(&mut self, result: Self::LogResult);
 }
 
-/* Description:
- *      Transition function to check if request/response should be logged.
- *
- * Transition:
- *      ShouldLog -> WriteHistory | Send
- *
- * Steps:
- *      1. Check if connection can be logged. If a http request is logged, then
- *         the corresponding response can be logged as well. Return
- *         ProxyState::WriteHistory
- *
- *      2. If not, get
- *              CommanderRequest::ShouldLogHttp(id, extension) /
- *              CommanderRequest::ShouldLogHttpCt(id, content_type) for http
- *
- *              CommanderRequest::WsLog(id, role) for ws.
- *
- *         NOTE: HTTP methods HEAD, OPTIONS, TRACE are not logged. So they
- *         don't return any query.
- *
- *          Ws Binary frames are not logged.
- *
- *      3. If request is some, send the query to the commander and receive the
- *         response
- *
- *      4. Pass the result to parse_log_respone() to get Option<LogResult>
- *
- *      4. If the result is Some, pass the result to update_path(). return
- *         ProxyState::WriteHistory.
- *
- *      5. If all the above cases fail, convert frame to payload (http only)
- *         and return ProxyState::Send. Relay
- *
- * Returns:
- *      Ok(ProxyState::WriteHistory | ProxyState::Send)
- *
- * Error:
- *      ProxyStateError::CommanderRequest       [3]
- *      ProxyStateError::CommanderResponse      [3]
- *      ProxyStateError::WrongCommand           [4]
- */
+// Description:
+//      Transition function to check if request/response should be logged.
+//
+// Transition:
+//      ShouldLog -> WriteHistory | Send
+//
+// Steps:
+//      1. Check if connection can be logged. If a http request is logged, then
+//         the corresponding response can be logged as well. Return
+//         ProxyState::WriteHistory
+//
+//      2. If not, get
+//              CommanderRequest::ShouldLogHttp(id, extension) /
+//              CommanderRequest::ShouldLogHttpCt(id, content_type) for http
+//
+//              CommanderRequest::WsLog(id, role) for ws.
+//
+//         NOTE: HTTP methods HEAD, OPTIONS, TRACE are not logged. So they
+//         don't return any query.
+//
+//          Ws Binary frames are not logged.
+//
+//      3. If request is some, send the query to the commander and receive the
+//         response
+//
+//      4. Pass the result to parse_log_respone() to get Option<LogResult>
+//
+//      4. If the result is Some, pass the result to update_path(). return
+//         ProxyState::WriteHistory.
+//
+//      5. If all the above cases fail, convert frame to payload (http only)
+//         and return ProxyState::Send. Relay
+//
+// Returns:
+//      Ok(ProxyState::WriteHistory | ProxyState::Send)
+//
+// Error:
+//      ProxyStateError::CommanderRequest       [3]
+//      ProxyStateError::CommanderResponse      [3]
+//      ProxyStateError::WrongCommand           [4]
 
 pub async fn should_log<T>(
     mut conn: T,

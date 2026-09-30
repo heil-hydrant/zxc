@@ -15,7 +15,7 @@ use crate::io::file::{FileErrorInfo, FileEvent};
 use crate::io::write::write_and_flush;
 use crate::proxy::handler_state::handlers::error::WsError;
 use crate::proxy::handler_state::read_write::ReadWrite;
-use crate::proxy::handler_state::role::{Role, as_arrow};
+use crate::proxy::handler_state::role::Role;
 use crate::repeater::states::transition::read_from_file::RepeaterReadFile;
 use crate::repeater::states::transition::rewrite::Newrite;
 use crate::repeater::states::transition::write_response::WriteResponse;
@@ -85,7 +85,7 @@ impl<T> RWebSocket<T> {
         };
 
         let data =
-            format!("{} | {} | {}\n", self.log_id, as_arrow(&role), size);
+            format!("{} | {} | {}\n", self.log_id, role.as_arrow(), size);
         trace!("log| {}", data);
         // increment log_id for next write
         self.log_id += 1;

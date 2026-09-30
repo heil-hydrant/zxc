@@ -5,14 +5,14 @@ use bytes::BytesMut;
 use thiserror::Error;
 use tokio::fs::{File, OpenOptions};
 use tokio::io::{
-    AsyncReadExt, AsyncSeekExt, {self}
+    AsyncReadExt, AsyncSeekExt, {self},
 };
 
 use super::write::write_and_flush;
 
 // File related io operations
 #[derive(Debug, Error)]
-#[error("rr")]
+#[error("Event")]
 pub enum FileEvent {
     Create,
     Write,

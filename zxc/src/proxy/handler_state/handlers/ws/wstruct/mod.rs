@@ -32,9 +32,8 @@ mod impl_send_history;
 mod impl_should_intercept;
 mod impl_should_log;
 mod impl_should_rewrite;
-mod impl_update_log_extension;
 mod impl_update_resume_info;
-use crate::proxy::handler_state::transition::write_log::file_ops::FileOps;
+use crate::proxy::handler_state::transition::FileOps;
 
 // Handler for ws connection
 #[derive(FileOps, GetRole, CanCommunicate, Id)]

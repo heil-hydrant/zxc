@@ -1,7 +1,7 @@
 use bytes::BytesMut;
 
 use super::Roneone;
-use crate::proxy::handler_state::transition::read_modified_file::add_raw::AddRaw;
+use crate::proxy::handler_state::transition::read_modified_file::AddRaw;
 
 impl<T> AddRaw for Roneone<T> {
     fn add_raw(&mut self, buf: BytesMut) {

@@ -1,23 +1,21 @@
 use serde::Serialize;
 
 use crate::file_types::FileType;
-use crate::proxy::handler_state::role::{Role, as_ws_ft};
+use crate::proxy::handler_state::role::Role;
 use crate::proxy::server_info::json::ServerInfoJson;
 
-/* Different types of msgs that can be sent to Interceptor UI
- *
- * Format:
- *
- *      {   'id': 1,
- *          'ft': 'req',
- *          'server_info': {'host': 'www.google.com'}
- *          'ws_info': {
- *              'log_id': 1
- *              'is_bin: true
- *              }
- *          }
- *
- */
+// Different types of msgs that can be sent to Interceptor UI
+//
+// Format:
+//
+//      {   'id': 1,
+//          'ft': 'req',
+//          'server_info': {'host': 'www.google.com'}
+//          'ws_info': {
+//              'log_id': 1
+//              'is_bin: true
+//              }
+//          }
 
 #[derive(Debug, Serialize)]
 pub struct InterToUI {
@@ -57,7 +55,7 @@ impl InterToUI {
         role: &Role,
         is_bin: bool,
     ) -> Self {
-        let ft = as_ws_ft(role);
+        let ft = role.as_ws_ft();
         let ws_info = Some(WsInfo::new(log_id, is_bin));
         Self {
             id,
