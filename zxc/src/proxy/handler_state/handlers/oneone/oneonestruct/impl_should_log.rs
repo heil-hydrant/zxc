@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use header_plz::Method;
-use http::uri::PathAndQuery;
+use header_plz::uri::path::PathAndQuery;
 use mime_plz::ContentType;
 use tokio::sync::mpsc::Sender;
 use tracing::{error, trace};

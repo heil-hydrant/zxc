@@ -25,7 +25,6 @@ clap = { version = "4.6.6" , features = ["derive"] }
 criterion = "*"
 form_urlencoded = "1.2.2"
 futures-util = "0.3.34"
-http = "1.5.0"
 rcgen = { version = "0.14.10", features = ["pem", "x509-parser"] }
 ring = "0.17.14"
 rustls-pemfile = "2.2.0"

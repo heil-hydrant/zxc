@@ -7,7 +7,7 @@ use tokio_rustls::rustls::client::WebPkiServerVerifier;
 use tokio_rustls::rustls::client::danger::ServerCertVerifier;
 use tokio_rustls::rustls::pki_types::CertificateDer;
 use tokio_rustls::rustls::{
-    ClientConfig, RootCertStore, ServerConfig, {self}
+    ClientConfig, RootCertStore, ServerConfig, {self},
 };
 use tracing::trace;
 use x509_parser::asn1_rs::FromDer;
