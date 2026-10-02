@@ -1,9 +1,9 @@
 use std::fs::{File, create_dir};
 use std::io::{self, Write};
 use std::sync::{LockResult, Mutex, MutexGuard};
-use time::macros::format_description;
 
 use time::UtcOffset;
+use time::macros::format_description;
 use tracing::subscriber::set_global_default;
 use tracing::{Level, Metadata};
 use tracing_subscriber::field::MakeExt;

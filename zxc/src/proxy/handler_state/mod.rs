@@ -7,7 +7,6 @@ use std::fmt::Display;
 
 use bytes::BytesMut;
 use role::GetRole;
-
 use transition::*;
 pub mod additional_handler_info;
 

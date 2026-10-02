@@ -1,29 +1,21 @@
+use std::collections::HashMap;
 use std::fs::read_to_string;
 use std::sync::Arc;
 
-use openssl::hash::DigestBytes;
 use rcgen::{CertificateParams, Issuer, KeyPair};
 use tokio_rustls::rustls::ServerConfig;
 
 use super::CryptoBuildError;
+use crate::commander::captain_crypto::CertDigest;
 use crate::config::global::parser::global_config_path;
 
-/* Destiption:
- *      CA Certificate is used to generate self signeed tls certificates for
- * the domains
- *
- * There are two CA's:
- *      1. Trusted      : user generated and trusted
- *      2. Untrusted    : per session generated
- *
- * TODO:
- *      Use HashMap instead of Vec
- *      https://github.com/sfackler/rust-openssl/pull/2299
- */
+// There are two CA's:
+//      1. Trusted      : user generated and trusted
+//      2. Untrusted    : generated per session
 
 pub struct CA {
     issuer: Issuer<'static, KeyPair>,
-    store: Vec<(DigestBytes, Arc<ServerConfig>)>,
+    store: HashMap<CertDigest, Arc<ServerConfig>>,
 }
 
 impl CA {
@@ -36,7 +28,7 @@ impl CA {
         let issuer = Issuer::from_ca_cert_pem(&cert_str, key_pair)?;
         Ok(CA {
             issuer,
-            store: Vec::new(),
+            store: HashMap::new(),
         })
     }
 
@@ -45,7 +37,7 @@ impl CA {
         let issuer = Issuer::new(CertificateParams::default(), key_pair);
         Ok(CA {
             issuer,
-            store: Vec::new(),
+            store: HashMap::new(),
         })
     }
 
@@ -53,15 +45,15 @@ impl CA {
         &self.issuer
     }
 
-    pub fn store(&self) -> &Vec<(DigestBytes, Arc<ServerConfig>)> {
+    pub fn store(&self) -> &HashMap<CertDigest, Arc<ServerConfig>> {
         &self.store
     }
 
     pub fn add_config(
         &mut self,
-        digest: DigestBytes,
+        digest: CertDigest,
         config: Arc<ServerConfig>,
     ) {
-        self.store.push((digest, config));
+        self.store.insert(digest, config);
     }
 }

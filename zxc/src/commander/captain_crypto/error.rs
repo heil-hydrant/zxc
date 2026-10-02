@@ -10,8 +10,8 @@ pub enum CertError {
     Rcgen(#[from] rcgen::Error),
     #[error("rustls| {0}")]
     Rustls(#[from] rustls::Error),
-    #[error("openssl| {0}")]
-    Openssl(#[from] openssl::error::ErrorStack),
+    #[error("x509 parse| {0}")]
+    X509(String),
 }
 
 #[derive(Debug, Error)]
@@ -24,6 +24,10 @@ pub enum CryptoBuildError {
     Read(#[from] io::Error),
     #[error("rcgen| {0}")]
     Rcgen(#[from] rcgen::Error),
+    #[error("read private key| {0}")]
+    ReadPrivateKey(String),
+    #[error("no private.key")]
+    NoKeyFound,
     #[error("unknown private key type")]
     UnknownPrivateKeyType,
 }

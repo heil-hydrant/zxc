@@ -1,9 +1,8 @@
-use header_plz::{OneRequestLine, OneResponseLine};
 use std::fmt::{Debug, Display};
 use std::path::PathBuf;
 
 use bytes::BytesMut;
-use header_plz::OneInfoLine;
+use header_plz::{OneInfoLine, OneRequestLine, OneResponseLine};
 use http_plz::OneOne;
 use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -35,8 +34,9 @@ mod impl_should_intercept;
 mod impl_should_log;
 mod impl_should_rewrite;
 mod impl_update_resume_info;
-use crate::proxy::handler_state::transition::FileOps;
 pub use impl_read_write::OneOneRWError;
+
+use crate::proxy::handler_state::transition::FileOps;
 
 #[derive(FileOps, GetRole, CanCommunicate, Id)]
 pub struct OneOneStruct<T, E, U>

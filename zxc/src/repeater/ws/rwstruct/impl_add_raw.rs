@@ -2,7 +2,7 @@ use bytes::BytesMut;
 
 use super::RWebSocket;
 use crate::proxy::handler_state::transition::read_modified_file::{
-    AddRaw, WS_ADD_RAW_PANIC,
+    AddRaw, WS_ADD_RAW_PANIC
 };
 
 // Blanket Implementation

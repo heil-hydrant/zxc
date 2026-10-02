@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use tracing::{Instrument, Level, span};
 
-// Trait like AsyncIterator. Used in async_run().
+// Trait like AsyncIterator
 pub trait AsyncStep {
     type Error;
 

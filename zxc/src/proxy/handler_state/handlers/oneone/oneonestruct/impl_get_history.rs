@@ -1,6 +1,6 @@
 use super::*;
 use crate::proxy::handler_state::transition::write_history::{
-    GetHistory, HistoryEnum, RequestHistory, ResponseHistory,
+    GetHistory, HistoryEnum, RequestHistory, ResponseHistory
 };
 
 impl<T, E> GetHistory for OneOneStruct<T, E, OneRequestLine> {

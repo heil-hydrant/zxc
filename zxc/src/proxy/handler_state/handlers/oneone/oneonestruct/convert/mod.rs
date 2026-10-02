@@ -1,5 +1,4 @@
-use header_plz::OneRequestLine;
-use header_plz::OneResponseLine;
+use header_plz::{OneRequestLine, OneResponseLine};
 
 use super::*;
 use crate::proxy::states::Connection;

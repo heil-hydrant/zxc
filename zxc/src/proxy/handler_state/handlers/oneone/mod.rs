@@ -21,7 +21,7 @@ use buffer_plz::Cursor;
 use bytes::BytesMut;
 use oneonestruct::*;
 use tokio::io::{
-    AsyncReadExt, AsyncWriteExt, BufReader, copy_bidirectional_with_sizes,
+    AsyncReadExt, AsyncWriteExt, BufReader, copy_bidirectional_with_sizes
 };
 use tracing::trace;
 mod error;

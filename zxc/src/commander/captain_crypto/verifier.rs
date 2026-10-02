@@ -1,15 +1,12 @@
 use rustls_pki_types::{CertificateDer, ServerName, UnixTime};
 use tokio_rustls::rustls::client::danger::{
-    HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier,
+    HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier
 };
 use tokio_rustls::rustls::{DigitallySignedStruct, Error, SignatureScheme};
 
-/* Descrption:
- *      Custom Certificate verifier implements ServerCertVerifier trait.
- *      Does not verify the certificate.
- *      Always returns true.
- */
-
+// Custom Certificate verifier implements ServerCertVerifier trait.
+// Does not verify the certificate.
+// Always returns true.
 #[derive(Debug)]
 pub struct CertVerifier {
     schemes: Vec<SignatureScheme>,

@@ -2,8 +2,9 @@ use header_plz::body_headers::parse::ParseBodyHeaders;
 use http_plz::OneMessageHead;
 
 use super::*;
-use crate::proxy::handler_state::transition::BytesToFrame;
-use crate::proxy::handler_state::transition::ProxyUpdateFrameError;
+use crate::proxy::handler_state::transition::{
+    BytesToFrame, ProxyUpdateFrameError
+};
 
 impl<T, E, U> BytesToFrame for OneOneStruct<T, E, U>
 where

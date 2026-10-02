@@ -1,14 +1,8 @@
 use std::path::PathBuf;
 
-use header_plz::{
-    MessageHead, OneHeader, body_headers::parse::ParseBodyHeaders,
-};
-
 use super::*;
-use crate::{
-    file_types::{EXT_REQ, EXT_RES},
-    proxy::handler_state::transition::{Log, UpdateLogExt},
-};
+use crate::file_types::{EXT_REQ, EXT_RES};
+use crate::proxy::handler_state::transition::{Log, UpdateLogExt};
 
 impl<T, E, U> Log for OneOneStruct<T, E, U>
 where

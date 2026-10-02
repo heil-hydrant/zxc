@@ -1,5 +1,3 @@
-use openssl::hash::MessageDigest;
-use openssl::x509::X509;
 use rustls_pki_types::UnixTime;
 use tokio::sync::mpsc::Receiver;
 use tokio_rustls::StartHandshake;
@@ -11,6 +9,7 @@ pub use tokio_rustls::server::TlsStream as ServerTlsStream;
 
 use super::*;
 use crate::commander::CommanderResponse;
+use crate::commander::captain_crypto::CertDigest;
 use crate::commander::captain_crypto::error::CertError;
 use crate::proxy::states::StateError;
 
@@ -105,8 +104,13 @@ where
             .is_ok();
 
         // 5. Get Hash
-        let digest = X509::from_der(cert_chain[0].as_ref())?
-            .digest(MessageDigest::sha256())?;
+        let digest: CertDigest = ring::digest::digest(
+            &ring::digest::SHA256,
+            cert_chain[0].as_ref(),
+        )
+        .as_ref()
+        .try_into()
+        .expect("SHA-256 output is always 32 bytes");
 
         // 6. Check if cert already exists
         let req = CommanderRequest::CheckCertificate(self.id, verify, digest);

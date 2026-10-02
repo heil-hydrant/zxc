@@ -1,27 +1,28 @@
-mod ca;
-pub mod error;
-mod verifier;
 use std::sync::Arc;
 
-use ca::*;
-use error::*;
-use openssl::hash::DigestBytes;
-use openssl::x509::X509;
-use rcgen::{CertificateParams, Issuer, KeyPair};
+use rcgen::{CertificateParams, Issuer, KeyPair, SanType};
 use rustls_pki_types::PrivateKeyDer;
 use tokio_rustls::TlsConnector;
 use tokio_rustls::rustls::client::WebPkiServerVerifier;
 use tokio_rustls::rustls::client::danger::ServerCertVerifier;
 use tokio_rustls::rustls::pki_types::CertificateDer;
 use tokio_rustls::rustls::{
-    ClientConfig, RootCertStore, ServerConfig, {self},
+    ClientConfig, RootCertStore, ServerConfig, {self}
 };
 use tracing::trace;
+use x509_parser::asn1_rs::FromDer;
+
+mod ca;
+pub mod error;
+mod private_key;
+mod verifier;
+
+use ca::*;
+use error::*;
+use private_key::{read_private, str_to_private};
 use verifier::*;
 
-mod private_key;
-use private_key::{read_private, str_to_private};
-use webpki_roots::TLS_SERVER_ROOTS;
+pub type CertDigest = [u8; 32];
 
 const ALPN_H1: &[u8] = b"http/1.1";
 
@@ -35,50 +36,15 @@ pub struct CaptainCrypto {
 }
 
 impl CaptainCrypto {
-    /* Steps:
-     *      1. Build WebPkiServerVerifier
-     *          a. Build RootCertStore from TLS_SERVER_ROOTS
-     *          b. Build WebPkiServerVerifier from RootCertStore
-     *
-     *      2. Build TlsConnector
-     *          a. Get Vec<SignatureScheme> from WebPkiServerVerifier
-     *
-     *          b. Build ClientConfig with custom certificate verifier and
-     *          Vec<SignatureScheme>
-     *
-     *          c. Build TlsConnector from ClientConfig
-     *
-     *      3. Read PrivateKey String from file, $HOME/.config/zxc/private.key
-     *         by calling read_private().
-     *
-     *      4. Build KeyPair from PrivateKey String.
-     *
-     *      5. Build trusted_ca and untrusted_ca by methods CA::trusted()
-     *         and CA::untrusted() with the KeyPair as arg
-     *
-     *      6. Convert PrivateKey (&str) to PrivateKeyDer
-     *
-     * Returns:
-     *      Ok(CaptainCrypto)
-     *
-     * Errors:
-     *      CryptoBuildError::VerifierBuild         [1.b]
-     *      CryptoBuildError::Var                   [3]
-     *      CryptoBuildError::Read                  [3]
-     *      CryptoBuildError::UnknownPrivateKeyType [3]
-     *      CryptoBuildError::Rcgen                 [4] [5]
-     */
-
     pub fn new() -> Result<Self, CryptoBuildError> {
-        // 1
-        let root_cert_store =
-            RootCertStore::from_iter(TLS_SERVER_ROOTS.iter().cloned());
+        let root_cert_store = RootCertStore::from_iter(
+            webpki_roots::TLS_SERVER_ROOTS
+                .iter()
+                .cloned(),
+        );
         let web_pki =
             WebPkiServerVerifier::builder(root_cert_store.into()).build()?;
-
-        // 2
-        let supported_verify_schemes = web_pki.supported_verify_schemes();
-        let verifier = CertVerifier::new(supported_verify_schemes);
+        let verifier = CertVerifier::new(web_pki.supported_verify_schemes());
         let client_config = ClientConfig::builder()
             .dangerous()
             .with_custom_certificate_verifier(Arc::new(verifier))
@@ -109,19 +75,10 @@ impl CaptainCrypto {
         self.web_pki.clone()
     }
 
-    /* Description:
-     *      Check if a certificate already exists in the selected store.
-     *
-     * Steps:
-     *      Select the Cert Store and Search,
-     *          verified == true =>  Trusted
-     *          verified == false => Untrusted
-     */
-
     pub fn check_serial(
         &self,
         verified: bool,
-        digest_to_check: DigestBytes,
+        digest: CertDigest,
     ) -> Option<Arc<ServerConfig>> {
         let cert_store = if verified {
             trace!("trusted");
@@ -130,43 +87,15 @@ impl CaptainCrypto {
             trace!("untrusted");
             &self.untrusted_ca.store()
         };
-        cert_store
-            .iter()
-            .find_map(|(digest, config)| {
-                if digest.as_ref() == digest_to_check.as_ref() {
-                    Some(config.clone())
-                } else {
-                    None
-                }
-            })
+        cert_store.get(&digest).cloned()
     }
-
-    /* Description:
-     *      Generate new certificate based on verification result from web_pki.
-     *
-     * Steps:
-     *      1. Select CA based on verification result
-     *          verified == true =>  Trusted
-     *          verified == false => Untrusted
-     *      2. Generate new domain cert using server cert and CA cert.
-     *      3. Generate Server Config using generated cert and private key
-     *      4. Push to the selected store
-     *
-     * Returns:
-     *      Result<Arc<ServerConfig>, CertError>
-     *
-     * Error:
-     *      CertError::Rcgen    [2]
-     *      CertError::Rustls   [4]
-     */
 
     pub fn generate_new_cert(
         &mut self,
         verified: bool,
-        digest: DigestBytes,
+        digest: CertDigest,
         cert: Vec<CertificateDer<'static>>,
     ) -> Result<Arc<ServerConfig>, CertError> {
-        // 1. Select CA based on verification result
         let ca = if verified {
             trace!("new cert| ca| Y");
             &mut self.trusted_ca
@@ -194,17 +123,48 @@ fn generate_domain_cert(
     cert: Vec<CertificateDer<'static>>,
     signer: &Issuer<'_, KeyPair>,
 ) -> Result<CertificateDer<'static>, CertError> {
-    let real_cert = X509::from_der(cert[0].as_ref())?;
-    let sans: Vec<String> = real_cert
-        .subject_alt_names()
-        .map(|names| {
-            names
+    use std::net::IpAddr;
+
+    use rcgen::string::Ia5String;
+    use x509_parser::extensions::GeneralName;
+
+    let (_, real_cert) =
+        x509_parser::certificate::X509Certificate::from_der(cert[0].as_ref())
+            .map_err(|e| CertError::X509(e.to_string()))?;
+    let subject_alt_names = real_cert
+        .subject_alternative_name()
+        .map_err(|e| CertError::X509(e.to_string()))?
+        .map(|ext| {
+            ext.value
+                .general_names
                 .iter()
-                .filter_map(|n| n.dnsname().map(str::to_owned))
-                .collect()
+                .filter_map(|name| match name {
+                    GeneralName::DNSName(dns) => {
+                        Some(Ia5String::try_from(*dns).map(SanType::DnsName))
+                    }
+                    GeneralName::IPAddress(bytes) => match bytes.len() {
+                        4 => <[u8; 4]>::try_from(*bytes)
+                            .ok()
+                            .map(|arr| {
+                                Ok(SanType::IpAddress(IpAddr::from(arr)))
+                            }),
+                        16 => <[u8; 16]>::try_from(*bytes)
+                            .ok()
+                            .map(|arr| {
+                                Ok(SanType::IpAddress(IpAddr::from(arr)))
+                            }),
+                        _ => None,
+                    },
+                    _ => None,
+                })
+                .collect::<Result<Vec<_>, rcgen::Error>>()
         })
-        .unwrap_or_default();
-    let cert_params = CertificateParams::new(sans)?;
+        .transpose()?;
+
+    let mut cert_params = CertificateParams::default();
+    if let Some(alt_names) = subject_alt_names {
+        cert_params.subject_alt_names = alt_names;
+    }
     let certificate: CertificateDer<'static> = cert_params
         .signed_by(keypair, signer)?
         .into();

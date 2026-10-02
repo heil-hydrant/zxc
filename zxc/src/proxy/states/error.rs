@@ -1,7 +1,6 @@
 use std::convert::Infallible;
 use std::io::{self, ErrorKind};
 
-use openssl::error::ErrorStack;
 use rustls_pki_types::InvalidDnsNameError;
 use thiserror::Error;
 use tokio::sync::mpsc::error::SendError;
@@ -55,9 +54,6 @@ pub enum StateError {
     // ----- Complete Handshake -----
     #[error("no peer certificate")]
     NoPeerCertificate,
-    // openssl get serial
-    #[error("serial| {0}")]
-    Serial(#[from] ErrorStack),
     #[error("client cert gen| {0}")]
     ClientCertificateGen(#[from] CertError),
     #[error("complete handshake| {0}")]

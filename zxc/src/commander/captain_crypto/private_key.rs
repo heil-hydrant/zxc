@@ -12,10 +12,9 @@ use crate::config::global::parser::global_config_path;
 pub fn str_to_private(
     pk: &str,
 ) -> Result<PrivateKeyDer<'static>, CryptoBuildError> {
-    let new_key = read_one_from_slice(pk.as_bytes())
-        .unwrap()
-        .unwrap()
-        .0;
+    let (new_key, _) = read_one_from_slice(pk.as_bytes())
+        .map_err(|e| CryptoBuildError::ReadPrivateKey(format!("{e:?}")))?
+        .ok_or(CryptoBuildError::NoKeyFound)?;
     if let Item::Pkcs8Key(val) = new_key {
         Ok(val.into())
     } else {
@@ -23,17 +22,7 @@ pub fn str_to_private(
     }
 }
 
-/* Description:
- *      Function to read from file and convert to PrivateKeyDer
- *
- * Steps:
- *      Read from file, $HOME/.config/zxc/private.key
- *
- * Error:
- *      CryptoBuildError::Var [1]
- *      CryptoBuildError::Read [2]
- */
-
+// private key - $HOME/.config/zxc/private.key
 pub fn read_private() -> Result<String, CryptoBuildError> {
     let mut path = global_config_path()?;
     path.push("private.key");

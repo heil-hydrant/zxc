@@ -3,10 +3,7 @@ use std::path::PathBuf;
 use tokio_tungstenite::tungstenite::Message;
 
 use super::WsStruct;
-use crate::file_types::{EXT_WREQ, EXT_WRES};
-use crate::proxy::handler_state::role::Role;
-use crate::proxy::handler_state::transition::Log;
-use crate::proxy::handler_state::transition::UpdateLogExt;
+use crate::proxy::handler_state::transition::{Log, UpdateLogExt};
 
 impl<T, E> Log for WsStruct<T, E> {
     fn path(&self) -> &PathBuf {

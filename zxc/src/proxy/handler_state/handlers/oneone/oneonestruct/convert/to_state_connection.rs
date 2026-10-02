@@ -1,6 +1,6 @@
 use super::*;
 use crate::proxy::states::{
-    ClientTlsStream, ConnectionState, ServerTlsStream, Tcp,
+    ClientTlsStream, ConnectionState, ServerTlsStream, Tcp
 };
 
 /* OneOneStruct<T,Tcp,OneRequestLine> => ConnectionState<T>

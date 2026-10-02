@@ -1,6 +1,5 @@
-use crate::proxy::handler_state::transition::CanLog;
-
 use super::*;
+use crate::proxy::handler_state::transition::CanLog;
 
 // Always returns false.
 // Each request/response needs to have unique path.
