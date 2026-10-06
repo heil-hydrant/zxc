@@ -43,6 +43,7 @@ where
             &mut self.commander_recvr,
             server_name,
             tcp,
+            false, // TODO
         )
         .await?;
         trace!("Encrypted");

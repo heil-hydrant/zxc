@@ -6,7 +6,7 @@ use rcgen::{CertificateParams, Issuer, KeyPair};
 use tokio_rustls::rustls::ServerConfig;
 
 use super::CryptoBuildError;
-use crate::commander::captain_crypto::CertDigest;
+use crate::commander::captain_crypto::{CertDigest, NegotiatedAlpn};
 use crate::config::global::parser::global_config_path;
 
 // There are two CA's:
@@ -15,7 +15,7 @@ use crate::config::global::parser::global_config_path;
 
 pub struct CA {
     issuer: Issuer<'static, KeyPair>,
-    store: HashMap<CertDigest, Arc<ServerConfig>>,
+    store: HashMap<(CertDigest, NegotiatedAlpn), Arc<ServerConfig>>,
 }
 
 impl CA {
@@ -45,15 +45,19 @@ impl CA {
         &self.issuer
     }
 
-    pub fn store(&self) -> &HashMap<CertDigest, Arc<ServerConfig>> {
+    pub fn store(
+        &self,
+    ) -> &HashMap<(CertDigest, NegotiatedAlpn), Arc<ServerConfig>> {
         &self.store
     }
 
     pub fn add_config(
         &mut self,
         digest: CertDigest,
+        alpn: NegotiatedAlpn,
         config: Arc<ServerConfig>,
     ) {
-        self.store.insert(digest, config);
+        self.store
+            .insert((digest, alpn), config);
     }
 }

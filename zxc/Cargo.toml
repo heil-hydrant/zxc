@@ -9,14 +9,15 @@ edition = "2024"
 zxc-derive = { path = "../zxc-derive" }
 
 # parseplz
-oneone-plz = { version = "0.0.19" }
-header-plz = "0.0.50"
-buffer-plz = "0.0.4"
-mime-plz = "0.0.2"
-protocol-traits-plz = "0.0.4"
 body-plz = "0.0.55"
+buffer-plz = "0.0.4"
 decompression-plz = "0.0.32"
+header-plz = "0.0.50"
 http-plz = "0.0.12"
+mime-plz = "0.0.2"
+oneone-plz = { version = "0.0.19" }
+protocol-traits-plz = "0.0.4"
+two-plz = { git = "https://github.com/parseplz/two-plz" }
 
 base64 = "0.23.1"
 bytes = "*"

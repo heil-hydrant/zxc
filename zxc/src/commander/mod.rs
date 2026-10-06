@@ -211,7 +211,7 @@ impl Commander {
             //      Connection Id
             _ => {
                 let (id, response) = match request {
-                    CommanderRequest::GetClientConfig(id) => {
+                    CommanderRequest::GetClientConnector(id) => {
                         let connector = self.captain_crypto.get_connector();
                         (id, CommanderResponse::ClientConfig(connector))
                     }
@@ -220,13 +220,15 @@ impl Commander {
                         let verifier = self.captain_crypto.get_verifier();
                         (id, CommanderResponse::Verifier(verifier))
                     }
-
-                    /* Associated Values:
-                     *      verify_status (vs)      : bool
-                     *      digest_to_check (d)     : DigestBytes
-                     */
-                    CommanderRequest::CheckCertificate(id, vs, d) => {
-                        let config = self.captain_crypto.check_serial(vs, d);
+                    CommanderRequest::CheckServerConfigCache(
+                        id,
+                        verified,
+                        digest,
+                        alpn,
+                    ) => {
+                        let config = self
+                            .captain_crypto
+                            .check_server_config_cache(verified, digest, alpn);
                         if config.is_some() {
                             trace!("cert exists| Y");
                         } else {
@@ -236,18 +238,16 @@ impl Commander {
                         (id, response)
                     }
 
-                    /* Associated Values:
-                     *      verify_status       : bool
-                     *      digest_to_check     : DigestBytes
-                     *      certificate         : Vec<CertificateDer<'static>>,
-                     *
-                     *  Error:
-                     *      CommunicateError::GenNewCert
-                     */
-                    CommanderRequest::GenNewCert(id, vs, d, cert) => {
+                    CommanderRequest::GetServerConfig(
+                        id,
+                        verified,
+                        digest,
+                        cert,
+                        alpn,
+                    ) => {
                         let result = self
                             .captain_crypto
-                            .generate_new_cert(vs, d, cert);
+                            .get_server_config(verified, digest, cert, alpn);
                         let response =
                             CommanderResponse::NewCertificate(result);
                         (id, response)

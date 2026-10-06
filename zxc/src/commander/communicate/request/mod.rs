@@ -3,7 +3,7 @@ use tokio::sync::{mpsc, oneshot};
 use tokio_rustls::rustls::pki_types::CertificateDer;
 
 use super::response::CommanderResponse;
-use crate::commander::captain_crypto::CertDigest;
+use crate::commander::captain_crypto::{CertDigest, NegotiatedAlpn};
 use crate::interceptor::message::to_ui::InterToUI;
 use crate::proxy::handler_state::role::Role;
 
@@ -16,11 +16,17 @@ pub enum CommanderRequest {
     ),
     // ----- Encryption -----
     // Client
-    GetClientConfig(usize),
+    GetClientConnector(usize),
     // Server
     GetVerifier(usize),
-    CheckCertificate(usize, bool, CertDigest),
-    GenNewCert(usize, bool, CertDigest, Vec<CertificateDer<'static>>),
+    CheckServerConfigCache(usize, bool, CertDigest, NegotiatedAlpn),
+    GetServerConfig(
+        usize,
+        bool,
+        CertDigest,
+        Vec<CertificateDer<'static>>,
+        NegotiatedAlpn,
+    ),
 
     // ----- Should Log -----
     // http

@@ -223,6 +223,13 @@ where
                     server_info,
                 ));
                 client.frame.take();
+                let alpn = client
+                    .reader
+                    .get_ref()
+                    .1
+                    .alpn_protocol()
+                    .unwrap_or_default();
+                trace!("alpn {}", String::from_utf8_lossy(&alpn));
                 let client_state = ProxyState::Receive(client);
                 handle_http(client_state).await
             }
@@ -260,6 +267,7 @@ where
                     &mut addinfo.receiver,
                     sni,
                     tcp,
+                    false, // TODO
                 )
                 .await?;
                 let conn = Connection::from((conn, tls));

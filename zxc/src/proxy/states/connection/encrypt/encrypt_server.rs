@@ -10,27 +10,13 @@ use tokio_rustls::{StartHandshake, TlsConnector};
 
 use super::*;
 use crate::commander::CommanderResponse;
+use crate::commander::captain_crypto::{ALPN_H1, ALPN_H2};
 use crate::commander::communicate::response::convert::WrongMessage;
 use crate::proxy::states::StateError;
 
-/* Description:
- *      Performs Server Stream Encyption.
- *
- * Steps:
- *      1. Get client hello by calling client_hello()
- *      2. Get sni from client_hello by calling server_name()
- *      3. Get ServerName by passing sni to server_info.address.get_servername()
- *      4. Encrypt server stream by calling server_encrypt().
- *      5. Store the ServerName in self.server_name .
- *
- * Error:
- *      StateError::InvalidDns      [3]
- *      StateError::ServerEncrypt   [4]
- */
-
 impl<T> Connection<StartHandshake<T>, TcpStream>
 where
-    T: AsyncReadExt + AsyncWriteExt + std::marker::Unpin, // Stream
+    T: AsyncReadExt + AsyncWriteExt + std::marker::Unpin,
 {
     pub async fn encrypt_server(
         mut self,
@@ -42,6 +28,10 @@ where
     > {
         let client_hello = self.reader.client_hello();
         let sni = client_hello.server_name();
+        let only_h1 = client_hello
+            .alpn()
+            .map(|mut protos| !protos.any(|p| p == ALPN_H2))
+            .unwrap_or(true);
         let server_name: ServerName = server_info
             .address()
             .parse_sni(sni)?
@@ -52,6 +42,7 @@ where
             recvr,
             server_name.clone(),
             self.writer,
+            only_h1,
         )
         .await?;
 
@@ -79,40 +70,28 @@ pub enum ServerEncryptError {
     Io(#[from] io::Error),
 }
 
-/* Description:
- *      Function to encrypt server stream.
- *
- * Steps:
- *      1. Build Communicate::GetClientConfig request.
- *      2. Send request and receive response
- *      3. Get Arc<TlsConnector> from response [TryFrom trait implemented in
- *         response/convert.rs ]
- *      4. Encrypt server by calling connect() with args ServerName and server
- *         stream on tls_connector received from commander.
- *
- * Error:
- *      ServerEncryptError::Send            [2]
- *      ServerEncryptError::Recv            [2]
- *      ServerEncryptError::WrongMessage    [3]
- *      ServerEncryptError::Io              [4]
- */
-
 pub async fn server_encrypt(
     id: usize,
     sender: &mut Sender<CommanderRequest>,
     recvr: &mut Receiver<CommanderResponse>,
     server_name: ServerName<'static>,
     stream: TcpStream,
+    only_h1: bool,
 ) -> Result<TlsStream<TcpStream>, ServerEncryptError> {
-    let req = CommanderRequest::GetClientConfig(id);
+    let req = CommanderRequest::GetClientConnector(id);
     sender.send(req).await?;
     let res = recvr
         .recv()
         .await
         .ok_or(ServerEncryptError::Recv)?;
     let connector = Arc::<TlsConnector>::try_from(res)?;
-    connector
-        .connect(server_name.clone(), stream)
-        .await
-        .map_err(Into::into)
+    if only_h1 {
+        connector
+            .with_alpn(vec![ALPN_H1.to_vec()])
+            .connect(server_name, stream)
+    } else {
+        connector.connect(server_name, stream)
+    }
+    .await
+    .map_err(Into::into)
 }
