@@ -4,13 +4,10 @@ use std::path::PathBuf;
 use bytes::BytesMut;
 use thiserror::Error;
 use tokio::fs::{File, OpenOptions};
-use tokio::io::{
-    AsyncReadExt, AsyncSeekExt, {self}
-};
+use tokio::io::{self, AsyncReadExt, AsyncSeekExt};
 
-use super::write::write_and_flush;
+use crate::io::write_and_flush;
 
-// File related io operations
 #[derive(Debug, Error)]
 #[error("Event")]
 pub enum FileEvent {

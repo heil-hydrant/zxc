@@ -1,13 +1,12 @@
 mod filter;
+
 use filter::DomainFilter;
 use filter::domain_list::DomainList;
 use mime_plz::ContentType;
 use mime_plz::from_extension::EXTENSION_MAP;
 use tracing::trace;
 
-use super::GlobalConfig;
-use super::local::proxy::ProxyArgs;
-use crate::config::misc::{add_option_vec, sanitize_option_vec_string};
+use crate::config::*;
 
 // Configuration Struct which holds the config informartion
 #[cfg_attr(any(test, debug_assertions), derive(PartialEq))]

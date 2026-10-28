@@ -1,7 +1,11 @@
+pub mod connection;
+pub mod error;
+
 use std::fmt::{Debug, Display, Formatter};
 use std::marker::Unpin;
 
-use connection::encrypt::server_encrypt;
+pub use connection::{Connection, ZStream};
+pub use error::*;
 use header_plz::OneRequestLine;
 use tokio::io::{AsyncReadExt, AsyncWriteExt, copy_bidirectional_with_sizes};
 use tokio::net::TcpStream;
@@ -12,22 +16,16 @@ pub use tokio_rustls::client::TlsStream as ClientTlsStream;
 pub use tokio_rustls::server::TlsStream as ServerTlsStream;
 use tracing::trace;
 
+use crate::CAPACITY_2MB;
 use crate::async_step::AsyncStep;
-use crate::commander::{CommanderResponse, Protocol};
+use crate::commander::*;
 use crate::io::socket::establish_connection;
-use crate::io::write::write_and_flush;
-use crate::proxy::server_info::ServerInfo;
-use crate::proxy::server_info::address::get_address;
-use crate::{CAPACITY_2MB, CommanderRequest};
-pub mod connection;
-pub use connection::{Connection, ZStream};
-pub mod error;
-use error::*;
-
-use super::handler_state::ProxyState;
-use super::handler_state::additional_handler_info::AdditionalHandlerInfo;
-use super::handler_state::handlers::oneonestruct::OneOneStruct;
-use super::handler_state::handlers::{handle_http, read_http};
+use crate::io::write_and_flush;
+use crate::proxy::handler_state::handlers::oneoneconn::OneOneConn;
+use crate::proxy::handler_state::handlers::{
+    handle_http, handle_http2, read_http
+};
+use crate::proxy::prelude::*;
 
 pub const PROXY_ESTABLISHED: &[u8; 39] =
     b"HTTP/1.1 200 Connection established\r\n\r\n";
@@ -210,32 +208,45 @@ where
             }
 
             Self::CompleteHandshake(conn, mut recvr, server_info) => {
-                let conn = conn
+                let (conn, alpn) = conn
                     .complete_handshake(&mut recvr, &server_info)
                     .await?;
-                Ok(Self::HandleTls(conn, recvr, server_info, Protocol::OneOne))
+                Ok(Self::HandleTls(conn, recvr, server_info, alpn.into()))
             }
 
-            Self::HandleTls(conn, recvr, server_info, _protocol) => {
-                let mut client = OneOneStruct::<_, _, OneRequestLine>::from((
-                    conn,
-                    recvr,
-                    server_info,
-                ));
-                client.frame.take();
-                let alpn = client
-                    .reader
-                    .get_ref()
-                    .1
-                    .alpn_protocol()
-                    .unwrap_or_default();
-                trace!("alpn {}", String::from_utf8_lossy(&alpn));
-                let client_state = ProxyState::Receive(client);
-                handle_http(client_state).await
+            Self::HandleTls(conn, recvr, server_info, protocol) => {
+                match protocol {
+                    Protocol::OneOne => {
+                        let mut client =
+                            OneOneConn::<_, _, OneRequestLine>::from((
+                                conn,
+                                recvr,
+                                server_info,
+                            ));
+                        client.msg.take();
+                        let _alpn = client
+                            .reader
+                            .get_ref()
+                            .1
+                            .alpn_protocol()
+                            .unwrap_or_default();
+                        let client_state = ProxyState::Receive(client);
+                        handle_http(client_state).await
+                    }
+                    Protocol::Two => {
+                        if let Err(e) =
+                            handle_http2(conn, recvr, server_info).await
+                        {
+                            tracing::error!("h2 connection error| {e}");
+                        }
+                        Ok(Self::End)
+                    }
+                    Protocol::Websocket => unreachable!(),
+                }
             }
 
             Self::HandleTcp(conn, recvr, server_info, _protocol) => {
-                let client = OneOneStruct::<_, _, OneRequestLine>::from((
+                let client = OneOneConn::<_, _, OneRequestLine>::from((
                     conn,
                     recvr,
                     server_info,
@@ -251,9 +262,8 @@ where
             }
 
             Self::HandleTlsTcp(conn, addinfo) => {
-                let oneone = OneOneStruct::<_, _, OneRequestLine>::from((
-                    conn, addinfo,
-                ));
+                let oneone =
+                    OneOneConn::<_, _, OneRequestLine>::from((conn, addinfo));
                 let client_state = ProxyState::Send(oneone);
                 handle_http(client_state).await
             }
@@ -275,9 +285,8 @@ where
             }
 
             Self::HandleTcpTls(conn, addinfo) => {
-                let oneone = OneOneStruct::<_, _, OneRequestLine>::from((
-                    conn, addinfo,
-                ));
+                let oneone =
+                    OneOneConn::<_, _, OneRequestLine>::from((conn, addinfo));
                 let client_state = ProxyState::Send(oneone);
                 handle_http(client_state).await
             }

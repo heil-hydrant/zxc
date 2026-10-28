@@ -12,13 +12,12 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use tracing::trace;
 use zxc_derive::{Buffer, NotifyCommander};
 
-use super::error::HistoryError;
-use super::message::from_commander::CommanderToHistory;
-use super::message::from_ui::HistoryUIOps;
-use super::wshistory::{HISTORY_WS_HIS, WsHistory};
 use crate::CAPACITY_2MB;
+use crate::history::{
+    CommanderToHistory, HISTORY_WS_HIS, HistoryError, HistoryUIOps, WsHistory,
+};
 use crate::id::Id;
-use crate::io::write::write_and_flush;
+use crate::io::write_and_flush;
 use crate::run::boundary::{Buffer, HandleCommander, NotifyCommander};
 
 const WS_HISTORY: &str = "ws_history";

@@ -6,14 +6,9 @@ use thiserror::Error;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::oneshot::error::RecvError;
 
-use super::connection::encrypt::ServerEncryptError;
-use crate::CommanderRequest;
-use crate::commander::captain_crypto::error::CertError;
-use crate::commander::communicate::response::convert::WrongMessage;
+use crate::commander::*;
 use crate::io::socket::ConnectError;
-use crate::proxy::handler_state::error::ProxyStateError;
-use crate::proxy::handler_state::handlers::oneonestruct::OneOneRWError;
-use crate::proxy::server_info::address::error::AddressError;
+use crate::proxy::prelude::*;
 
 #[derive(Error, Debug)]
 pub enum StateError {

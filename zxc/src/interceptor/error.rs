@@ -2,9 +2,9 @@ use bytes::BytesMut;
 use thiserror::Error;
 use tokio::sync::mpsc::error::SendError;
 
-use super::message::from_ui::InterUIOps;
-use crate::commander::codec::error::CodecError;
-use crate::io::unix_sock::error::UnixSockError;
+use crate::commander::CodecError;
+use crate::interceptor::InterUIOps;
+use crate::io::UnixSockError;
 use crate::run::boundary::IsUIError;
 
 #[derive(Debug, Error)]

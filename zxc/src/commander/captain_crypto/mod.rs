@@ -1,26 +1,23 @@
-use std::sync::Arc;
-
-use rcgen::{CertificateParams, Issuer, KeyPair, SanType};
-use rustls_pki_types::PrivateKeyDer;
-use tokio_rustls::TlsConnector;
-use tokio_rustls::rustls::client::WebPkiServerVerifier;
-use tokio_rustls::rustls::client::danger::ServerCertVerifier;
-use tokio_rustls::rustls::pki_types::CertificateDer;
-use tokio_rustls::rustls::{
-    ClientConfig, RootCertStore, ServerConfig, {self},
-};
-use tracing::trace;
-use x509_parser::asn1_rs::FromDer;
-
 mod ca;
 pub mod error;
 mod private_key;
 mod verifier;
 
-use ca::*;
-use error::*;
-use private_key::{read_private, str_to_private};
-use verifier::*;
+use std::sync::Arc;
+
+pub use error::*;
+use rcgen::{CertificateParams, Issuer, KeyPair, SanType};
+use rustls_pki_types::{CertificateDer, PrivateKeyDer};
+use tokio_rustls::TlsConnector;
+use tokio_rustls::rustls::client::WebPkiServerVerifier;
+use tokio_rustls::rustls::client::danger::ServerCertVerifier;
+use tokio_rustls::rustls::{self, ClientConfig, RootCertStore, ServerConfig};
+use tracing::trace;
+use x509_parser::asn1_rs::FromDer;
+
+use self::ca::CA;
+use self::private_key::{read_private, str_to_private};
+use self::verifier::CertVerifier;
 
 pub type CertDigest = [u8; 32];
 
@@ -28,26 +25,26 @@ pub const ALPN_H1: &[u8] = b"http/1.1";
 pub const ALPN_H2: &[u8] = b"h2";
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub enum NegotiatedAlpn {
+pub enum Alpn {
     None,
     Http1,
     H2,
 }
 
-impl NegotiatedAlpn {
+impl Alpn {
     pub fn from_bytes(alpn: Option<&[u8]>) -> Self {
         match alpn {
-            None => NegotiatedAlpn::None,
-            Some(ALPN_H2) => NegotiatedAlpn::H2,
-            Some(_) => NegotiatedAlpn::Http1,
+            None => Alpn::None,
+            Some(ALPN_H2) => Alpn::H2,
+            Some(_) => Alpn::Http1,
         }
     }
 
     pub fn as_bytes(self) -> Option<&'static [u8]> {
         match self {
-            NegotiatedAlpn::None => None,
-            NegotiatedAlpn::Http1 => Some(ALPN_H1),
-            NegotiatedAlpn::H2 => Some(ALPN_H2),
+            Alpn::None => None,
+            Alpn::Http1 => Some(ALPN_H1),
+            Alpn::H2 => Some(ALPN_H2),
         }
     }
 }
@@ -107,7 +104,7 @@ impl CaptainCrypto {
         &self,
         verified: bool,
         digest: CertDigest,
-        alpn: NegotiatedAlpn,
+        alpn: Alpn,
     ) -> Option<Arc<ServerConfig>> {
         let cert_store = if verified {
             trace!("trusted");
@@ -124,7 +121,7 @@ impl CaptainCrypto {
         verified: bool,
         digest: CertDigest,
         cert: Vec<CertificateDer<'static>>,
-        alpn: NegotiatedAlpn,
+        alpn: Alpn,
     ) -> Result<Arc<ServerConfig>, CertError> {
         let ca = if verified {
             trace!("new cert| ca| Y");
@@ -201,7 +198,7 @@ fn generate_domain_cert(
 fn generate_server_config(
     cert: CertificateDer<'static>,
     private_key: PrivateKeyDer<'static>,
-    alpn: NegotiatedAlpn,
+    alpn: Alpn,
 ) -> Result<ServerConfig, rustls::Error> {
     let mut server_config = ServerConfig::builder()
         .with_no_client_auth()

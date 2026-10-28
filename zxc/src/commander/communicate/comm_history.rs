@@ -2,8 +2,7 @@ use std::path::PathBuf;
 
 use tokio::sync::mpsc::{Receiver, Sender};
 
-use crate::history::message::from_commander::CommanderToHistory;
-use crate::history::message::from_ui::HistoryUIOps;
+use crate::history::{CommanderToHistory, HistoryUIOps};
 
 pub struct HistoryComm {
     pub from_history: Receiver<HistoryUIOps>,

@@ -1,9 +1,7 @@
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::sync::mpsc::Receiver;
 
-use super::message::RepeaterWsMsg;
-use super::rwstruct::RWebSocket;
-use crate::repeater::error::RepeaterError;
+use crate::repeater::prelude::*;
 
 /* Description:
  *      Trait Implementation types to RepeaterWs.

@@ -2,8 +2,7 @@ use std::env::{self, VarError};
 use std::fs::read_to_string;
 use std::path::PathBuf;
 
-use crate::config::error::ConfigError;
-use crate::config::{CONFIG_FILE_NAME, GlobalConfig};
+use crate::config::*;
 
 // $HOME/.config/zxc
 pub fn global_config_path() -> Result<PathBuf, VarError> {

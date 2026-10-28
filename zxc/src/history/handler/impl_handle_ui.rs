@@ -1,7 +1,7 @@
-use super::HistoryHandler;
-use crate::history::error::HistoryError;
-use crate::history::message::from_ui::{HistoryUIOps, HistoryUImsg};
-use crate::io::unix_sock::error::UnixSockError;
+use crate::history::{
+    HistoryError, HistoryHandler, HistoryUIOps, HistoryUImsg
+};
+use crate::io::UnixSockError;
 use crate::run::boundary::HandleUI;
 
 /* Steps:

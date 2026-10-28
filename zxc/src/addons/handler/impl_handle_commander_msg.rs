@@ -1,5 +1,5 @@
-use crate::addons::error::AddonError;
-use crate::addons::handler::AddonHandler;
+use super::AddonHandler;
+use crate::addons::AddonError;
 use crate::forward_info::ForwardInfo;
 use crate::run::boundary::HandleCommander;
 

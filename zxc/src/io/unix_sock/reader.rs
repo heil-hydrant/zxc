@@ -3,7 +3,7 @@ use std::io::{Error, ErrorKind};
 use bytes::BytesMut;
 use tokio::net::UnixStream;
 
-use super::error::UnixSockError;
+use crate::io::*;
 
 pub fn read_from_unix(
     result: Result<(), Error>,

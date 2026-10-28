@@ -1,5 +1,4 @@
-use crate::proxy::handler_state::error::ProxyStateError;
-use crate::proxy::server_info::ServerInfo;
+use crate::proxy::prelude::*;
 
 /* Description:
  *      Trait to reconnect to server.
@@ -22,5 +21,6 @@ use crate::proxy::server_info::ServerInfo;
 
 pub trait Reconnect {
     fn can_reconnect(&self, server_info: &ServerInfo) -> bool;
+
     async fn reconnect(&mut self) -> Result<(), ProxyStateError>;
 }

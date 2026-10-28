@@ -1,32 +1,8 @@
-use super::InterceptorHandler;
-use crate::commander::codec::perform_codec_op;
-use crate::interceptor::error::InterceptorError;
-use crate::interceptor::message::from_ui::{InterUIOps, InterUImsg};
+use crate::commander::perform_codec_op;
+use crate::interceptor::{
+    InterUIOps, InterUImsg, InterceptorError, InterceptorHandler
+};
 use crate::run::boundary::HandleUI;
-
-/* Steps
- *      1. Serialize self.buf to InterUImsg
- *
- *      2. Match Operation
- *
- *      3. If Toggle, change intercept_state to !intercept_state and send to
- *      commander
- *
- *      4. If Resume | Forward | Drop , send to commander
- *
- *      5. If Close, return InterceptorError::UIclosed
- *
- *      6. If encode | decode , call perform_codec_op(), set result to Some
- *
- *      7. If result is Some, return Some((msg.id, result))
- *
- * Errors:
- *      InterceptorError
- *          MsgDeSerialize      [1]
- *          CommanderSend       [3] [4]
- *          Codec               [5]
- *          UIclosed            [6]
- */
 
 impl HandleUI for InterceptorHandler {
     async fn handle_ui(

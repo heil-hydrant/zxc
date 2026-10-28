@@ -1,5 +1,4 @@
-use super::InterceptorHandler;
-use crate::interceptor::message::to_ui::InterToUI;
+use crate::interceptor::{InterToUI, InterceptorHandler};
 use crate::run::boundary::FromCommander;
 
 impl FromCommander for InterceptorHandler {

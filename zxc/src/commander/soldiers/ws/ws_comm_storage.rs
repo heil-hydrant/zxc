@@ -1,10 +1,10 @@
 use tokio::sync::mpsc::Sender;
 use tracing::trace;
 
-use super::ws_comm::WsComm;
+use super::WsComm;
 use crate::commander::{CommanderResponse, CommunicateError};
-use crate::id::Id;
-use crate::proxy::handler_state::role::Role;
+use crate::id::{Id, SoldierId};
+use crate::proxy::Role;
 
 const WS_SEND_LOG: &str = "Ws Send Log";
 const WS_SHOULD_INTERCEPT: &str = "Ws Should Intercept Response";
@@ -19,7 +19,7 @@ pub struct WsCommStorage {
 impl WsCommStorage {
     pub fn add_handle(
         &mut self,
-        id: usize,
+        id: SoldierId,
         client: Sender<CommanderResponse>,
         server: Sender<CommanderResponse>,
     ) {
@@ -30,7 +30,7 @@ impl WsCommStorage {
 
     pub async fn send_log(
         &mut self,
-        id: usize,
+        id: SoldierId,
         role: Role,
     ) -> Result<(), CommunicateError> {
         let wscomm = self
@@ -47,7 +47,7 @@ impl WsCommStorage {
 
     pub async fn send_should_intercept_response(
         &mut self,
-        id: usize,
+        id: SoldierId,
     ) -> Result<(), CommunicateError> {
         let wscomm = self
             .store
@@ -66,7 +66,7 @@ impl WsCommStorage {
 
     pub fn set_need_response(
         &mut self,
-        id: usize,
+        id: SoldierId,
     ) -> Result<(), CommunicateError> {
         let wscomm = self
             .store
@@ -84,7 +84,7 @@ impl WsCommStorage {
     pub fn iter(
         &self,
         role: Role,
-    ) -> impl Iterator<Item = (usize, &Sender<CommanderResponse>)> {
+    ) -> impl Iterator<Item = (SoldierId, &Sender<CommanderResponse>)> {
         self.store.iter().map(move |x| {
             (
                 x.id(),

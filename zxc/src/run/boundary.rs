@@ -4,16 +4,14 @@ use std::io;
 use bytes::BytesMut;
 use tokio::net::UnixStream;
 
-use crate::io::unix_sock::error::UnixSockError;
+use crate::io::UnixSockError;
 
-/* Description:
- *      The Following traits are implemented by the ui handlers.
- *
- *          AddonHandler
- *          HistoryHandler
- *          InterceptorHandler
- *          RepeaterHandler
- */
+// The Following traits are implemented by the ui handlers.
+//
+//     AddonHandler
+//     HistoryHandler
+//     InterceptorHandler
+//     RepeaterHandler
 
 pub trait FromCommander {
     type Message;

@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use tracing::trace;
 
-use crate::io::file::{FileErrorInfo, create_and_write_file};
+use crate::io::*;
 
 /* Description:
  *     Trait to log response to file.

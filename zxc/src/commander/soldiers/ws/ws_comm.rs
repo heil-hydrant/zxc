@@ -4,13 +4,13 @@ use tracing::trace;
 use zxc_derive::Id;
 
 use crate::commander::CommanderResponse;
-use crate::id::Id;
-use crate::proxy::handler_state::role::Role;
+use crate::id::{Id, SoldierId};
+use crate::proxy::Role;
 
 // Structure that contains ws communication info
 #[derive(Id)]
 pub struct WsComm {
-    id: usize,
+    id: SoldierId,
     client: Sender<CommanderResponse>,
     server: Sender<CommanderResponse>,
     log_index: usize,
@@ -19,7 +19,7 @@ pub struct WsComm {
 
 impl WsComm {
     pub fn new(
-        id: usize,
+        id: SoldierId,
         client: Sender<CommanderResponse>,
         server: Sender<CommanderResponse>,
     ) -> Self {

@@ -6,15 +6,12 @@ use header_plz::status::InvalidStatusCode;
 use thiserror::Error;
 use tokio::sync::mpsc::error::SendError;
 
-use super::ws::builder::RWsBuildError;
-use super::ws::message::RepeaterWsMsg;
 use crate::commander::codec::error::CodecError;
 use crate::forward_info::ForwardInfo;
-use crate::io::inc_dir::DirError;
-use crate::io::socket::ConnectError;
-use crate::io::unix_sock::error::UnixSockError;
-use crate::proxy::handler_state::error::ProxyStateError;
+use crate::io::*;
 use crate::proxy::server_info::address::error::AddressError;
+use crate::proxy::*;
+use crate::repeater::ws::*;
 use crate::run::boundary::IsUIError;
 
 #[derive(Debug, Error)]

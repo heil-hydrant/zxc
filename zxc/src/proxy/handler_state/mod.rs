@@ -1,22 +1,22 @@
+pub mod additional_handler_info;
 pub mod error;
 pub mod handlers;
 pub mod read_write;
 pub mod role;
 pub mod transition;
+
 use std::fmt::Display;
 
 use bytes::BytesMut;
-use role::GetRole;
-use transition::*;
-pub mod additional_handler_info;
+pub use error::ProxyStateError;
+pub use read_write::ReadWrite;
+pub use role::GetRole;
+pub use transition::*;
 
-use self::error::ProxyStateError;
-use self::read_write::ReadWrite;
-use super::server_info::json::ServerInfoJson;
 use crate::async_step::AsyncStep;
-use crate::commander::Protocol;
-use crate::id::Id;
-use crate::interceptor::message::from_ui::resume_info::ResumeInfo;
+use crate::commander::*;
+use crate::interceptor::*;
+use crate::proxy::prelude::*;
 
 // All possible Handler States
 // In order
@@ -32,9 +32,9 @@ pub enum ProxyState<T> {
     // resume
     ResumeIntercept(T),
     ReadModFile(T, ResumeInfo),
-    UpdateFrame(T, BytesMut, ResumeInfo),
+    UpdateMsg(T, BytesMut, ResumeInfo),
     ReWrite(T, ResumeInfo),
-    NewConnection(T, ServerInfoJson), // http only
+    NewConnection(T, ServerInfoJson), // http/1 reconnect; h2 currently ignored
     Send(T),
     Drop(T),
     End(T),
@@ -45,28 +45,26 @@ pub enum ProxyState<T> {
 impl<T> AsyncStep for ProxyState<T>
 where
     Self: Sized,
-    T: ReadWrite
-        + ReadWrite<State = Self>
+    T: AddRaw
+        + BytesToMsg
         + CanCommunicate
-        + GetRole
         + CanLog
-        + ShouldLog
-        + UpdateLogExt
-        + Log
+        + DropMsg
+        + FileOps
         + GetHistory
+        + GetRole
+        + Id
+        + Intercept
+        + Log
+        + MsgToBytes
+        + ReadWrite<State = Self>
+        + Rewrite
         + SendHistory
         + ShouldIntercept
-        + QueryCommanderShouldIntercept
-        + Intercept
-        + BytesToFrame
+        + ShouldLog
         + ShouldRewrite
-        + FrameToPayload
-        + FileOps
-        + UpdateResumeInfo
-        + AddRaw
-        + Id
-        + Rewrite
-        + DropMsg,
+        + UpdateLogExt
+        + UpdateResumeInfo,
     <T as ReadWrite>::Error: Into<ProxyStateError>,
 {
     type Error = ProxyStateError;
@@ -93,27 +91,26 @@ where
                 T::continue_on_drop()?;
                 Ok(Self::Receive(conn))
             }
-            // 7. ResumeIntercept -> ReadModFile | NewConnection | Send
+            // 8. ResumeIntercept -> ReadModFile | NewConnection | Send
             Self::ResumeIntercept(conn) => resume_intercept(conn).await,
-            // 8. ReadModFile -> UpdateFrame | Send
+            // 9. ReadModFile -> UpdateFrame | Send
             Self::ReadModFile(conn, resume_info) => {
                 read_mod_file(conn, resume_info).await
             }
-            // 9. UpdateFrame -> ReWrite | Send
-            Self::UpdateFrame(conn, buf, resume_info) => {
-                update_frame_state(conn, buf, resume_info)
+            // 10. UpdateFrame -> ReWrite | Send
+            Self::UpdateMsg(conn, buf, resume_info) => {
+                update_msg(conn, buf, resume_info)
             }
-            // 10. ReWrite -> Send
+            // 11. ReWrite -> Send
             Self::ReWrite(conn, resume_info) => {
                 rewrite_log(conn, resume_info).await
             }
-            // 11. Send -> End | ReadFail | Read (full duplex)
+            // 12. Send -> End | ReadFail | Read (full duplex)
             Self::Send(conn) => conn.write().await.map_err(Into::into),
             _ => Ok(self),
         }
     }
 
-    // Checks if the state has ended
     fn is_ended(&self) -> bool {
         matches!(self, Self::End(_))
             || matches!(self, Self::ServerClose(_, _))
@@ -135,12 +132,12 @@ where
             Self::Intercept(conn) => (conn, "intercept"),
             Self::ResumeIntercept(conn) => (conn, "resume_intercept"),
             Self::ReadModFile(conn, _) => (conn, "read_mod_file"),
-            Self::UpdateFrame(conn, ..) => (conn, "update_frame"),
+            Self::UpdateMsg(conn, ..) => (conn, "update_frame"),
             Self::ReWrite(conn, _) => (conn, "rewrite"),
             Self::Send(conn) => (conn, "send"),
             Self::SwitchProtocol(conn, _) => (conn, "switch_protocol"),
             _ => return Err(std::fmt::Error),
         };
-        write!(f, "{}| {}", conn.role(), val)
+        write!(f, "[{}::{}]", conn.role(), val)
     }
 }

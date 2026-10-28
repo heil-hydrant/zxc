@@ -1,9 +1,9 @@
-use std::path::PathBuf;
-
-use crate::proxy::server_info::ServerInfo;
-use crate::proxy::server_info::address::Address;
 mod convert;
 mod encrypt;
+
+use std::path::PathBuf;
+
+use crate::proxy::prelude::*;
 
 // Repeater connection struct
 pub struct RepeaterConn<T> {

@@ -2,32 +2,32 @@ pub mod captain_crypto;
 pub mod codec;
 pub mod communicate;
 pub mod error;
-use communicate::comm_history::HistoryComm;
-use communicate::comm_interceptor::InterceptorComm;
-use communicate::comm_repeater::RepeaterComm;
-use tokio_util::sync::CancellationToken;
 mod protocol;
-use std::path::PathBuf;
-
-use captain_crypto::*;
-pub use communicate::request::CommanderRequest;
-pub use communicate::response::CommanderResponse;
-use error::*;
-pub use protocol::*;
-use soldiers::Soldiers;
-use tokio::fs::create_dir;
-use tokio::sync::mpsc::{Receiver, Sender, channel};
-use tracing::{debug, error, trace};
 pub mod soldiers;
 
-use crate::config::Config;
-use crate::config::global::parser::parse_global_config;
-use crate::config::local::io::parse_local_config;
+use std::path::PathBuf;
+
+pub use captain_crypto::{
+    ALPN_H1, ALPN_H2, Alpn, CaptainCrypto, CertDigest, CertError
+};
+pub use codec::{Codec, CodecError, perform_codec_op};
+pub use communicate::request::CommanderRequest;
+pub use communicate::response::{CommanderResponse, WrongMessage};
+pub use communicate::{HistoryComm, InterceptorComm, RepeaterComm};
+pub use error::*;
+pub use protocol::*;
+use tokio::fs::create_dir;
+use tokio::sync::mpsc::{Receiver, Sender, channel};
+use tokio_util::sync::CancellationToken;
+use tracing::{debug, error, trace};
+
+use self::soldiers::Soldiers;
+use crate::config::{Config, parse_global_config, parse_local_config};
 use crate::file_types::FileType;
 use crate::forward_info::{ForwardInfo, Module};
-use crate::history::message::from_commander::CommanderToHistory;
-use crate::history::message::from_ui::HistoryUIOps;
-use crate::interceptor::message::from_ui::InterUIOps;
+use crate::history::{CommanderToHistory, HistoryUIOps};
+use crate::id::SoldierId;
+use crate::interceptor::InterUIOps;
 
 const WS_REGISTER: &str = "ws_register";
 
@@ -70,21 +70,6 @@ impl Commander {
         request: CommanderRequest,
     ) -> Result<(), CommunicateError> {
         match request {
-            /* Associated Values:
-             *      host        : String
-             *      sender      : <Option<Receiver<CommanderResponse>>>
-             *
-             * Steps:
-             *      1. if config is some, call should_proxy() with host
-             *      2. If true, create new Receiver<CommanderResponse> for
-             *      the connection by calling http_storage.add_handle() with
-             *      the id
-             *      2. If false, send None
-             *      3. send result through oneshot sender
-             *
-             * Error:
-             *      CommunicateError::ShouldProxy
-             */
             CommanderRequest::ShouldProxy(id, host, tx) => {
                 let tosend = if let Some(config) = self.config.as_ref() {
                     if config.should_proxy(&host) {
@@ -102,10 +87,23 @@ impl Commander {
                     .map_err(|_| CommunicateError::ShouldProxy)
             }
 
-            /* Error:
-             *      CommunicateError::NoId
-             *      CommunicateError::Send
-             */
+            CommanderRequest::H2StreamRegister(id, tx) => {
+                trace!("h2 stream registered | {id}");
+                let rx = match id {
+                    SoldierId::H2Stream {
+                        conn_id,
+                        stream_id,
+                    } => self
+                        .soldiers
+                        .add_h2_stream_handle(conn_id, stream_id),
+                    SoldierId::Connection(conn_id) => {
+                        self.soldiers.add_http_handle(conn_id)
+                    }
+                };
+                tx.send(rx)
+                    .map_err(|_| CommunicateError::H2StreamRegister)
+            }
+
             CommanderRequest::WsLog(id, role) => {
                 trace!("wslog| {}| {}", id, role);
                 self.soldiers
@@ -113,10 +111,6 @@ impl Commander {
                     .await
             }
 
-            /* Error:
-             *      CommunicateError::NoId
-             *      CommunicateError::Send
-             */
             CommanderRequest::ShouldInterceptWsRespone(id) => {
                 trace!("should intercept ws response");
                 self.soldiers
@@ -124,20 +118,6 @@ impl Commander {
                     .await
             }
 
-            /* Associated Values:
-             *      info    : InterToUI
-             *
-             * Steps:
-             *      1. If interception is off, send none to respective conn
-             *
-             *      2. else send msg to ui through interceptor_handle by calling
-             *         interceptor_handle.send_to_interceptor()
-             *
-             * Error:
-             *      CommunicateError::NoId
-             *      CommunicateError::Send
-             *      CommunicateError::InterceptorSend
-             */
             CommanderRequest::Intercept(id, info) => {
                 if !self.comm_interceptor.status() {
                     trace!("interceptor off");
@@ -171,7 +151,8 @@ impl Commander {
              *      CommunicateError::NoId
              */
             CommanderRequest::WsRegister(id) => {
-                let server_sender = self.soldiers.pop_http_sender(id)?;
+                let conn_id = id.conn_id();
+                let server_sender = self.soldiers.pop_http_sender(conn_id)?;
 
                 let (client_sender, client_receiver) =
                     channel::<CommanderResponse>(1);
@@ -193,6 +174,10 @@ impl Commander {
              *         CommanderToHistory::RemoveWs to history
              */
             CommanderRequest::Close(id) => {
+                if let SoldierId::Connection(conn_id) = id {
+                    self.comm_interceptor
+                        .purge_connection(conn_id);
+                }
                 if self.soldiers.remove_from_http_store(id) {
                     trace!("removed| http| {}", id);
                 } else if self.soldiers.remove_from_ws_store(id) {
@@ -213,12 +198,18 @@ impl Commander {
                 let (id, response) = match request {
                     CommanderRequest::GetClientConnector(id) => {
                         let connector = self.captain_crypto.get_connector();
-                        (id, CommanderResponse::ClientConfig(connector))
+                        (
+                            SoldierId::Connection(id),
+                            CommanderResponse::ClientConfig(connector),
+                        )
                     }
 
                     CommanderRequest::GetVerifier(id) => {
                         let verifier = self.captain_crypto.get_verifier();
-                        (id, CommanderResponse::Verifier(verifier))
+                        (
+                            SoldierId::Connection(id),
+                            CommanderResponse::Verifier(verifier),
+                        )
                     }
                     CommanderRequest::CheckServerConfigCache(
                         id,
@@ -235,7 +226,7 @@ impl Commander {
                             trace!("cert exists| N");
                         }
                         let response = CommanderResponse::ServerConfig(config);
-                        (id, response)
+                        (SoldierId::Connection(id), response)
                     }
 
                     CommanderRequest::GetServerConfig(
@@ -250,7 +241,7 @@ impl Commander {
                             .get_server_config(verified, digest, cert, alpn);
                         let response =
                             CommanderResponse::NewCertificate(result);
-                        (id, response)
+                        (SoldierId::Connection(id), response)
                     }
 
                     /* Associated Values:
@@ -326,28 +317,16 @@ impl Commander {
         }
     }
 
-    /* Description:
-     *      Method to get the path for http log
-     *
-     * Steps:
-     *      1. Clone history_path and append self.http_log_index
-     *
-     *      2. Create directory with new path,
-     *          a. if success increment self.http_log_index and return
-     *          Some((index, path, Sender<CommanderToHistory>))
-     *          b. else return None
-     */
-
     pub async fn get_http_log_path(
         &mut self,
-        id: usize,
+        id: SoldierId,
     ) -> Option<(usize, PathBuf, Sender<CommanderToHistory>)> {
         let mut path = self.comm_history.path();
         path.push(
             self.comm_history
                 .http_log_index
                 .to_string(),
-        ); //2
+        );
         trace!("log path| {}| {}", id, path.to_string_lossy());
         match create_dir(&path).await {
             Ok(_) => {
@@ -367,11 +346,6 @@ impl Commander {
             }
         }
     }
-
-    /* Error:
-     *      CommunicateError::NoId
-     *      CommunicateError::Send
-     */
 
     pub async fn empty_resume_queue(
         &mut self,
@@ -432,7 +406,6 @@ impl Commander {
             InterUIOps::Toggle => {
                 trace!("toggle");
                 self.comm_interceptor.toggle();
-                // 2. If toggle is false empty the queue
                 if !self.comm_interceptor.status() {
                     self.empty_resume_queue().await?;
                 }
@@ -458,16 +431,16 @@ impl Commander {
                     }
                     _ => unreachable!(),
                 };
-                let conn_id = self
+                let soldier_id = self
                     .comm_interceptor
-                    .conn_id_from_log_id(log_id, &ft)?;
+                    .soldier_id_from_log_id(log_id, &ft)?;
 
                 if response.wreq_need_response() {
                     self.soldiers
-                        .set_ws_need_response(conn_id)?;
+                        .set_ws_need_response(soldier_id)?;
                 }
                 self.soldiers
-                    .send_response_ft(conn_id, &ft, response)
+                    .send_response_ft(soldier_id, &ft, response)
                     .await
             }
         }
@@ -512,55 +485,50 @@ impl Commander {
     }
 }
 
-/* Description:
- *      Runs the Commander .
- *      Continuously looks for messages from
- *          soldiers
- *          interceptor
- *          repeater
- *          history
- *
- * Steps:
- *      ----- loop -----
- *          ----- select -----
- *              Soldier      => handle_soldier
- *              Interceptor  => handle_interceptor
- *              History      => handle_history
- *              Repeater     => forward
- *              Token        => return
- */
-
 pub async fn run_commander(mut comm: Commander, token: CancellationToken) {
     debug!("[+] commander started");
     loop {
         tokio::select! {
-            soldier_msg = comm.comm_soldiers.recv() => {
-                if let Some(smsg) = soldier_msg
-                    && let Err(e) = comm.handle_soldier(smsg).await {
-                        error!("soldier| {:?}", e);
-                    }
-            }
-            interceptor_msg = comm.comm_interceptor.from_interceptor.recv() => {
-                if let Some(imsg) = interceptor_msg
-                    && let Err(e) = comm.handle_interceptor(imsg).await {
-                        error!("interceptor| {:?}", e);
-                    }
-            }
-            history_msg = comm.comm_history.from_history.recv() => {
-                if let Some(msg) = history_msg
-                    && let Err(e) = comm.handle_history(msg).await {
-                        error!("history| {:?}", e);
-                    }
-            }
-            repeater_msg = comm.comm_repeater.from_repeater.recv() => {
-                if let Some(msg) = repeater_msg
-                    && let Err(e) = comm.forward(msg).await {
-                        error!("repeater| {:?}", e);
-                    }
-            }
+            biased;
             _ = token.cancelled() => {
                 trace!("cancelled");
-                return
+                return;
+            }
+            soldier_msg = comm.comm_soldiers.recv() => {
+                let Some(smsg) = soldier_msg else {
+                    trace!("soldiers channel closed");
+                    return;
+                };
+                if let Err(e) = comm.handle_soldier(smsg).await {
+                    error!("soldier| {:?}", e);
+                }
+            }
+            interceptor_msg = comm.comm_interceptor.from_interceptor.recv() => {
+                let Some(imsg) = interceptor_msg else {
+                    trace!("interceptor channel closed");
+                    return;
+                };
+                if let Err(e) = comm.handle_interceptor(imsg).await {
+                    error!("interceptor| {:?}", e);
+                }
+            }
+            history_msg = comm.comm_history.from_history.recv() => {
+                let Some(msg) = history_msg else {
+                    trace!("history channel closed");
+                    return;
+                };
+                if let Err(e) = comm.handle_history(msg).await {
+                    error!("history| {:?}", e);
+                }
+            }
+            repeater_msg = comm.comm_repeater.from_repeater.recv() => {
+                let Some(msg) = repeater_msg else {
+                    trace!("repeater channel closed");
+                    return;
+                };
+                if let Err(e) = comm.forward(msg).await {
+                    error!("repeater| {:?}", e);
+                }
             }
         }
     }

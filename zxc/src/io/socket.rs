@@ -1,14 +1,10 @@
 use buffer_plz::{Cursor, Event};
 use thiserror::Error;
-use tokio::io::{
-    AsyncReadExt, {self}
-};
+use tokio::io::{self, AsyncReadExt};
 use tokio::net::TcpStream;
 use tracing::trace;
 
-use crate::proxy::server_info::address::Address;
-
-// Socket related IO operations
+use crate::proxy::prelude::*;
 
 #[derive(Debug, Error)]
 #[error("{address}| {error}")]

@@ -1,16 +1,16 @@
 use std::time::Duration;
 
+use tokio::io::AsyncReadExt;
 use tokio::net::{UnixListener, UnixStream};
 use tokio::select;
-use tokio::time::sleep;
+use tokio::time::timeout;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info, trace};
 
 use super::boundary::*;
-use crate::io::unix_sock::error::UnixSockError;
-use crate::io::unix_sock::reader::read_from_unix;
-use crate::io::unix_sock::writer::build_slice_and_write;
-use crate::io::write::write_and_flush;
+use crate::io::{
+    UnixSockError, build_slice_and_write, read_from_unix, write_and_flush
+};
 
 const CLOSE_MSG: &[u8] = br#"[0,{"Action": "Close"}]"#;
 
@@ -70,6 +70,17 @@ where
     info!("running");
     loop {
         select! {
+            biased;
+            _ = token.cancelled() => {
+                let _ = timeout(
+                    Duration::from_millis(300),
+                    write_and_flush(&mut stream, CLOSE_MSG),
+                ).await;
+                let mut eof_buf = [0u8; 1];
+                let _ = timeout(Duration::from_millis(300), stream.read(&mut eof_buf)).await;
+                trace!("runner| cancelled cleanly");
+                return Ok(());
+            }
             result = listener.accept() => {
                 if stream.try_write(&[0]).is_err() {
                     stream = result.map_err(UnixSockError::Accept)?.0;
@@ -81,19 +92,25 @@ where
             }
             result = handler.recv() => {
                 trace!("from commander");
-                if let Some(msg) = result {
-                    match handler.handle_commander_ui(msg).await
-                    {
-                        Ok(None) => (),
-                        Ok(Some(data)) => build_slice_and_write(0, data, &mut stream).await?,
-                        Err(e) => {
-                            if e.needs_flush() {
-                                trace!("needs flush");
-                                handler.flush_storage(&mut stream).await?;
-                                continue;
+                match result {
+                    Some(msg) => {
+                        match handler.handle_commander_ui(msg).await
+                        {
+                            Ok(None) => (),
+                            Ok(Some(data)) => build_slice_and_write(0, data, &mut stream).await?,
+                            Err(e) => {
+                                if e.needs_flush() {
+                                    trace!("needs flush");
+                                    handler.flush_storage(&mut stream).await?;
+                                    continue;
+                                }
+                                error!("handle commander| {}", e);
                             }
-                            error!("handle commander| {}", e);
                         }
+                    }
+                    None => {
+                        trace!("commander channel closed");
+                        return Ok(());
                     }
                 }
             }
@@ -122,16 +139,6 @@ where
                         }
                         error!("handle ui| {}", e);
                     }
-                }
-            }
-            _ = token.cancelled() => {
-                write_and_flush(&mut stream, CLOSE_MSG).await.map_err(UnixSockError::Write)?;
-                loop {
-                    if write_and_flush(&mut stream, &[0]).await.is_err() {
-                        trace!("runner| cancelled");
-                        return Ok(())
-                    }
-                    sleep(Duration::from_millis(10)).await;
                 }
             }
         }

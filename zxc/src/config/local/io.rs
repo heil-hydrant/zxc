@@ -1,8 +1,6 @@
 use std::fs::{self, read_to_string};
 
-use super::proxy::ProxyArgs;
-use crate::config::CONFIG_FILE_NAME;
-use crate::config::error::ConfigError;
+use crate::config::*;
 
 /* Steps:
  *      1. If !should_attach i.e. new_session, write new config

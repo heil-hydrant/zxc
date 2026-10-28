@@ -1,40 +1,40 @@
-#![allow(warnings, dead_code)]
+//#![allow(warnings, dead_code)]
+#![allow(async_fn_in_trait)]
 #![allow(clippy::result_large_err)]
 
-mod config;
-use chrono::Local;
-use clap::Parser;
-use config::CliArgs;
-use config::local::io::write_local_config;
-use tmux::Session;
 mod addons;
-mod async_step;
+mod builder;
 mod commander;
-mod file_types;
+mod config;
+pub mod core;
+pub use core::constants::*;
+pub use core::{async_step, file_types, forward_info, id};
 mod history;
-mod id;
 mod interceptor;
 mod io;
 mod proxy;
 mod repeater;
-mod setup;
-use std::fs::{create_dir, remove_dir_all};
-use std::io::Error;
-mod builder;
-mod forward_info;
 mod run;
+mod setup;
 mod tmux;
 
+use std::fs::{create_dir, remove_dir_all};
+use std::io::Error;
+use std::path::PathBuf;
+use std::time::Duration;
+
 use builder::*;
-use commander::{CommanderRequest, run_commander};
+use chrono::Local;
+use clap::Parser;
+use commander::run_commander;
+use config::{CliArgs, write_local_config};
 use run::starter::start_module;
 use setup::*;
+use tmux::Session;
 use tokio::net::TcpListener;
 use tokio_util::sync::CancellationToken;
 use tokio_util::task::TaskTracker;
-use tracing::{Instrument, Level, error, span};
-
-const CAPACITY_2MB: usize = 65536 * 32;
+use tracing::{Instrument, Level, debug, error, span};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -44,11 +44,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let attach = args.should_attach();
 
-    let session_name = args
-        .session_name(attach)
-        .unwrap_or_else(|| {
-            format!("zxs-{}", Local::now().format("%d-%m-%H-%M-%S"))
-        });
+    let session_name =
+        resolve_session_name(args.session_name(attach), attach)?;
 
     if !attach {
         create_session_dirs(&session_name)
@@ -75,6 +72,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let tmp_path = format!("/tmp/{}", session_name);
     create_dir(&tmp_path).map_err(MainError::TempDir)?;
+    let _dir_guard = SessionDirGuard {
+        path: PathBuf::from(&tmp_path),
+    };
 
     let index = if attach {
         get_largest_file_index().map_err(MainError::LargestIndex)? + 1
@@ -184,11 +184,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap();
     });
 
-    let handle = tokio::spawn(async move {
-        set.close();
-        set.wait().await;
-    });
-
     // tmux session
     let session = Session::new(session_name);
     session
@@ -199,9 +194,64 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .map_err(MainError::AttachSession)?;
 
     proxy_token.cancel();
-    handle.await?;
-    remove_dir_all(format!("/tmp/{}", session.name))?;
+    set.close();
+    match tokio::time::timeout(Duration::from_secs(3), set.wait()).await {
+        Ok(()) => debug!("tasks drained"),
+        Err(_) => error!("timed out waiting for tasks to drain"),
+    }
     Ok(())
+}
+
+struct SessionDirGuard {
+    path: PathBuf,
+}
+
+impl Drop for SessionDirGuard {
+    fn drop(&mut self) {
+        if self.path.exists()
+            && let Err(e) = remove_dir_all(&self.path)
+        {
+            eprintln!("remove session dir| {}| {}", self.path.display(), e);
+        }
+    }
+}
+
+fn default_session_name() -> String {
+    format!("zxs-{}", Local::now().format("%d-%m-%H-%M-%S"))
+}
+
+#[inline(always)]
+fn resolve_session_name(
+    provided: Option<String>,
+    attach: bool,
+) -> Result<String, MainError> {
+    match provided {
+        Some(name) => match validate_session_name(&name) {
+            Ok(()) => Ok(name),
+            Err(e) if attach => Err(e),
+            Err(e) => {
+                eprintln!("invalid session name| {}| using default", e);
+                Ok(default_session_name())
+            }
+        },
+        None => Ok(default_session_name()),
+    }
+}
+
+#[inline(always)]
+fn validate_session_name(name: &str) -> Result<(), MainError> {
+    let valid = !name.is_empty()
+        && name.len() <= 64
+        && name != "."
+        && name != ".."
+        && name
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_'));
+    if valid {
+        Ok(())
+    } else {
+        Err(MainError::InvalidSessionName(name.to_string()))
+    }
 }
 
 #[inline]
@@ -215,6 +265,8 @@ fn create_session_dirs(sname: &str) -> Result<(), Error> {
 enum MainError {
     #[error("create session dir| {}", .0)]
     CreateSessionDir(Error),
+    #[error("invalid session name| {0}")]
+    InvalidSessionName(String),
     #[error("set current dir| {}", .0)]
     CurrentDir(Error),
     #[error("bind to port| {}| {}", .0, .1)]
@@ -229,4 +281,50 @@ enum MainError {
     BuildSession(Error),
     #[error("attach session| {}", .0)]
     AttachSession(Error),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_validate_session_name() {
+        assert!(validate_session_name("zxs-31-10-12-00-00").is_ok());
+        assert!(validate_session_name("abc_123").is_ok());
+        assert!(validate_session_name("").is_err());
+        assert!(validate_session_name(".").is_err());
+        assert!(validate_session_name("..").is_err());
+        assert!(validate_session_name("../escape").is_err());
+        assert!(validate_session_name("a/b").is_err());
+
+        let long_name = "a".repeat(65);
+        assert!(validate_session_name(&long_name).is_err());
+    }
+
+    #[test]
+    fn test_resolve_session_name() {
+        assert_eq!(
+            resolve_session_name(Some("valid_name".to_string()), false)
+                .unwrap(),
+            "valid_name"
+        );
+        assert_eq!(
+            resolve_session_name(Some("valid_name".to_string()), true)
+                .unwrap(),
+            "valid_name"
+        );
+
+        let fallback =
+            resolve_session_name(Some("../escape".to_string()), false)
+                .unwrap();
+        assert!(fallback.starts_with("zxs-"));
+
+        assert!(matches!(
+            resolve_session_name(Some("../escape".to_string()), true),
+            Err(MainError::InvalidSessionName(_))
+        ));
+
+        let default = resolve_session_name(None, false).unwrap();
+        assert!(default.starts_with("zxs-"));
+    }
 }

@@ -1,7 +1,7 @@
-use crate::addons::error::AddonError;
-use crate::addons::handler::AddonHandler;
+use super::AddonHandler;
+use crate::addons::AddonError;
 use crate::addons::message::from_ui::AddonMsg;
-use crate::io::unix_sock::error::UnixSockError;
+use crate::io::UnixSockError;
 use crate::run::boundary::HandleUI;
 
 // Only Close msg is supported

@@ -4,8 +4,7 @@ use tokio::net::TcpStream;
 use tokio_rustls::TlsConnector;
 use tokio_rustls::client::TlsStream;
 
-use super::RepeaterConn;
-use crate::repeater::error::RepeaterError;
+use crate::repeater::prelude::*;
 
 /* Description:
  *      convert RepeaterConn<TcpStream> -> RepeaterConn<TlsStream<TcpStream>>

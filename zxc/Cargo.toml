@@ -20,14 +20,14 @@ protocol-traits-plz = "0.0.4"
 two-plz = { git = "https://github.com/parseplz/two-plz" }
 
 base64 = "0.23.1"
-bytes = "*"
+bytes = "1.12.1"
 chrono = "0.4.45"
 clap = { version = "4.6.6" , features = ["derive"] }
-criterion = "*"
 form_urlencoded = "1.2.2"
 futures-util = "0.3.34"
 rcgen = { version = "0.14.10", features = ["pem", "x509-parser"] }
 ring = "0.17.14"
+rustc-hash = "2.1.3"
 rustls-pemfile = "2.2.0"
 rustls-pki-types = "1.15.1"
 serde = { version = "1.0.229", features = ["derive", "rc"] }

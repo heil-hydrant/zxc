@@ -1,7 +1,6 @@
 use tracing::trace;
 
-use super::InterceptorHandler;
-use crate::interceptor::message::from_ui::InterUIOps;
+use crate::interceptor::{InterUIOps, InterceptorHandler};
 use crate::run::boundary::{HandleCommander, NotifyCommander};
 
 impl NotifyCommander for InterceptorHandler {

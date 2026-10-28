@@ -1,15 +1,12 @@
-use std::sync::Arc;
+mod convert;
+pub mod encrypt;
 
 use bytes::BytesMut;
 use http_plz::OneRequest;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::mpsc::Sender;
 
-use super::{ServerInfo, Tcp};
 use crate::CAPACITY_2MB;
-use crate::commander::CommanderRequest;
-mod convert;
-pub mod encrypt;
+use crate::commander::*;
 
 // Zero sized struct to denote no stream
 pub struct ZStream;

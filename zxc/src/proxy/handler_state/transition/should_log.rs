@@ -1,12 +1,21 @@
+use std::path::{Path, PathBuf};
+
+use header_plz::Method;
+use header_plz::const_headers::ACCEPT;
+use header_plz::message_head::header_map::{HMap, Hmap};
+use mime_plz::ContentType;
+use tokio::sync::mpsc::Sender;
 use tracing::trace;
 
 use super::can_communicate::CanCommunicate;
-use super::frame_to_payload::FrameToPayload;
-use crate::commander::communicate::response::convert::WrongMessage;
-use crate::commander::{CommanderRequest, CommanderResponse};
-use crate::proxy::handler_state::{ProxyState, ProxyStateError};
+use super::msg_to_bytes::MsgToBytes;
+use crate::commander::*;
+use crate::history::*;
+use crate::id::SoldierId;
+use crate::proxy::prelude::*;
 
 const SHOULD_LOG: &str = "ShouldLog";
+const SHOULD_LOG_UNREACHABLE: &str = "shouldlog| not applicable for response";
 
 // Trait to check if request/response can be logged.
 // http response only
@@ -22,73 +31,136 @@ pub trait CanLog {
 //         http    => (usize, PathBuf, Sender<CommanderToHistory>)
 //         ws      => usize
 
+pub fn http_log_request<H, P>(
+    id: SoldierId,
+    method: &Method,
+    headers: &HMap<H>,
+    path: impl FnOnce() -> P,
+) -> Option<CommanderRequest>
+where
+    H: Hmap,
+    P: AsRef<str>,
+{
+    let ext = match method {
+        Method::GET => {
+            let path = path();
+            let ext = Path::new(path.as_ref())
+                .extension()
+                .and_then(|e| e.to_str())
+                .map(str::to_string)
+                .unwrap_or_default();
+            trace!("extension| {}", ext);
+            if ext.is_empty() {
+                trace!("no ext");
+                if let Some(ct) = headers
+                    .value_of_key(ACCEPT)
+                    .and_then(|bytes| std::str::from_utf8(bytes).ok())
+                    .and_then(ContentType::from_accept_header)
+                {
+                    trace!("accept header| {}", ct);
+                    return Some(CommanderRequest::ShouldLogHttpCt(id, ct));
+                }
+                trace!("no accept header");
+            }
+            ext
+        }
+        Method::HEAD | Method::OPTIONS | Method::TRACE => return None,
+        _ => String::new(),
+    };
+    Some(CommanderRequest::ShouldLogHttp(id, ext))
+}
+
 pub trait ShouldLog {
     type LogResult;
 
-    fn get_log_request(&self) -> Option<CommanderRequest>;
+    fn commander_log_request(&self) -> Option<CommanderRequest> {
+        unreachable!("{}", SHOULD_LOG_UNREACHABLE)
+    }
+
+    fn parse_log_response(
+        &self,
+        _response: CommanderResponse,
+    ) -> Result<Option<Self::LogResult>, WrongMessage> {
+        unreachable!("{}", SHOULD_LOG_UNREACHABLE)
+    }
+
+    fn update_path(&mut self, _result: Self::LogResult) {
+        unreachable!("{}", SHOULD_LOG_UNREACHABLE)
+    }
+
+    #[inline(always)]
+    fn needs_msg_to_bytes(&self) -> bool {
+        false
+    }
+}
+
+// Trait for HTTP request handlers that participate in logging.
+pub trait HttpRequestLog {
+    fn id(&self) -> SoldierId;
+
+    fn log_id_mut(&mut self) -> &mut usize;
+
+    fn path_mut(&mut self) -> &mut Option<PathBuf>;
+
+    fn history_sendr_mut(&mut self)
+    -> &mut Option<Sender<CommanderToHistory>>;
+
+    fn http_commander_log_request(&self) -> Option<CommanderRequest>;
+
+    #[inline(always)]
+    fn needs_msg_to_bytes(&self) -> bool {
+        false
+    }
+}
+
+impl<T> ShouldLog for T
+where
+    T: HttpRequestLog,
+{
+    type LogResult = (usize, PathBuf, Sender<CommanderToHistory>);
+
+    fn commander_log_request(&self) -> Option<CommanderRequest> {
+        self.http_commander_log_request()
+    }
 
     fn parse_log_response(
         &self,
         response: CommanderResponse,
-    ) -> Result<Option<Self::LogResult>, WrongMessage>;
+    ) -> Result<Option<Self::LogResult>, WrongMessage> {
+        response.try_into()
+    }
 
-    fn update_path(&mut self, result: Self::LogResult);
+    fn update_path(
+        &mut self,
+        (index, path, history_sender): (
+            usize,
+            PathBuf,
+            Sender<CommanderToHistory>,
+        ),
+    ) {
+        *self.log_id_mut() = index;
+        *self.path_mut() = Some(path);
+        *self.history_sendr_mut() = Some(history_sender);
+    }
+
+    #[inline(always)]
+    fn needs_msg_to_bytes(&self) -> bool {
+        <T as HttpRequestLog>::needs_msg_to_bytes(self)
+    }
 }
-
-// Description:
-//      Transition function to check if request/response should be logged.
-//
-// Transition:
-//      ShouldLog -> WriteHistory | Send
-//
-// Steps:
-//      1. Check if connection can be logged. If a http request is logged, then
-//         the corresponding response can be logged as well. Return
-//         ProxyState::WriteHistory
-//
-//      2. If not, get
-//              CommanderRequest::ShouldLogHttp(id, extension) /
-//              CommanderRequest::ShouldLogHttpCt(id, content_type) for http
-//
-//              CommanderRequest::WsLog(id, role) for ws.
-//
-//         NOTE: HTTP methods HEAD, OPTIONS, TRACE are not logged. So they
-//         don't return any query.
-//
-//          Ws Binary frames are not logged.
-//
-//      3. If request is some, send the query to the commander and receive the
-//         response
-//
-//      4. Pass the result to parse_log_respone() to get Option<LogResult>
-//
-//      4. If the result is Some, pass the result to update_path(). return
-//         ProxyState::WriteHistory.
-//
-//      5. If all the above cases fail, convert frame to payload (http only)
-//         and return ProxyState::Send. Relay
-//
-// Returns:
-//      Ok(ProxyState::WriteHistory | ProxyState::Send)
-//
-// Error:
-//      ProxyStateError::CommanderRequest       [3]
-//      ProxyStateError::CommanderResponse      [3]
-//      ProxyStateError::WrongCommand           [4]
 
 pub async fn should_log<T>(
     mut conn: T,
 ) -> Result<ProxyState<T>, ProxyStateError>
 where
-    T: CanLog + ShouldLog + FrameToPayload + CanCommunicate,
+    T: CanLog + ShouldLog + MsgToBytes + CanCommunicate,
 {
-    // 1. HTTP Response only
     if conn.can_log() {
         trace!("can log| Y");
         return Ok(ProxyState::WriteHistory(conn));
     }
 
-    if let Some(req) = conn.get_log_request() {
+    if let Some(req) = conn.commander_log_request() {
         trace!("log request| Y");
         conn.sender().send(req).await?;
         let response = conn
@@ -102,9 +174,9 @@ where
             return Ok(ProxyState::WriteHistory(conn));
         }
     }
-
-    // 5. Default Case, No logging
     trace!("log| N");
-    conn.frame_to_payload();
+    if conn.needs_msg_to_bytes() {
+        conn.msg_to_bytes();
+    }
     Ok(ProxyState::Send(conn))
 }

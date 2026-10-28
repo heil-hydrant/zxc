@@ -1,4 +1,4 @@
-use crate::proxy::handler_state::error::ProxyStateError;
+use crate::proxy::prelude::*;
 
 // Trait to decide to continue on drop when the message is dropped by
 // interceptor

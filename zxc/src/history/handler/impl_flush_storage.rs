@@ -2,10 +2,9 @@ use std::io::IoSlice;
 
 use tokio::net::UnixStream;
 
-use super::HistoryHandler;
-use crate::io::unix_sock::error::UnixSockError;
-use crate::io::unix_sock::writer::{
-    CLOSE_SQUARE_BRACKET, DEFAULT_ID, unix_write_vec_and_flush
+use crate::history::HistoryHandler;
+use crate::io::{
+    CLOSE_SQUARE_BRACKET, DEFAULT_ID, UnixSockError, unix_write_vec_and_flush
 };
 use crate::run::boundary::FlushStorage;
 

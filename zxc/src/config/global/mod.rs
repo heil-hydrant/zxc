@@ -1,13 +1,12 @@
-use std::collections::HashMap;
-
-use addons::Addon;
-use mime_plz::ContentType;
-use serde::Deserialize;
+pub mod addons;
 pub mod parser;
 
-use super::misc::sanitize_option_vec_string;
+use std::collections::HashMap;
 
-pub mod addons;
+use mime_plz::ContentType;
+use serde::Deserialize;
+
+use crate::config::*;
 
 // Global config only contains a list of excluded domains and excluded content
 // types

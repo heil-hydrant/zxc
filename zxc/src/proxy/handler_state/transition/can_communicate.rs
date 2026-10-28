@@ -1,7 +1,6 @@
 use tokio::sync::mpsc::{Receiver, Sender};
 
-use crate::CommanderRequest;
-use crate::commander::CommanderResponse;
+use crate::commander::*;
 
 // Trait to communicate with commander.
 //

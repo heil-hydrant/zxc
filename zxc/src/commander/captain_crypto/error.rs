@@ -1,8 +1,8 @@
 use std::{env, io};
 
 use thiserror::Error;
+use tokio_rustls::rustls;
 use tokio_rustls::rustls::server::VerifierBuilderError;
-use tokio_rustls::rustls::{self};
 
 #[derive(Debug, Error)]
 pub enum CertError {

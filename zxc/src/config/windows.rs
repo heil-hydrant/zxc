@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::builder::{ADDONS, INTERCEPTOR, REPEATER};
+use crate::core::constants::{ADDONS, INTERCEPTOR, REPEATER};
 
 // Enum to represent modules
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]

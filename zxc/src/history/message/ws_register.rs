@@ -1,10 +1,11 @@
 use std::path::PathBuf;
 
-use crate::proxy::server_info::ServerInfo;
+use crate::id::SoldierId;
+use crate::proxy::ServerInfo;
 
 // Ws Register
 pub struct HistoryWsRegisterInfo {
-    pub id: usize,
+    pub id: SoldierId,
     http_id: usize,
     pub path: PathBuf,
     server_info: ServerInfo,
@@ -12,7 +13,7 @@ pub struct HistoryWsRegisterInfo {
 
 impl HistoryWsRegisterInfo {
     pub fn new(
-        id: usize,
+        id: SoldierId,
         http_id: usize,
         path: PathBuf,
         server_info: ServerInfo,

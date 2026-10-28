@@ -4,10 +4,9 @@ use bytes::BytesMut;
 use rustls_pki_types::ServerName;
 use tokio::sync::mpsc::{Receiver, Sender};
 
-use crate::commander::CommanderResponse;
-use crate::history::message::from_commander::CommanderToHistory;
-use crate::proxy::server_info::ServerInfo;
-use crate::proxy::server_info::address::Address;
+use crate::commander::*;
+use crate::history::*;
+use crate::proxy::prelude::*;
 
 /* When a new connection is required, OneOneStruct<Request> is split into
  * Connection and AdditionalHandlerInfo structs.

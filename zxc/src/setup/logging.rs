@@ -6,6 +6,7 @@ use time::UtcOffset;
 use time::macros::format_description;
 use tracing::subscriber::set_global_default;
 use tracing::{Level, Metadata};
+use tracing_subscriber::EnvFilter;
 use tracing_subscriber::field::MakeExt;
 use tracing_subscriber::fmt::time::OffsetTime;
 use tracing_subscriber::fmt::{MakeWriter, format};
@@ -82,20 +83,24 @@ pub fn setup_logging(debug: bool) -> Result<(), Box<dyn std::error::Error>> {
     let formatter =
         format::debug_fn(|writer, _, value| write!(writer, "{:?}", value))
             .delimited(" | ");
-    // Subscriber
-    let mut subscriber = tracing_subscriber::fmt()
-        .fmt_fields(formatter)
-        .with_timer(timer);
-
     let max_level = if debug {
         Level::TRACE
     } else {
         Level::DEBUG
     };
 
+    let filter = EnvFilter::new(if debug {
+        "trace,two_plz=off"
+    } else {
+        "debug,two_plz=off"
+    });
+
+    // Subscriber
     let basic_file = File::create("log.txt")?;
-    subscriber = subscriber
-        .with_max_level(max_level)
+    let subscriber = tracing_subscriber::fmt()
+        .fmt_fields(formatter)
+        .with_timer(timer)
+        .with_env_filter(filter)
         .with_ansi(false);
 
     if max_level == Level::TRACE {

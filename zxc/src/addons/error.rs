@@ -1,8 +1,7 @@
 use thiserror::Error;
 
 use crate::forward_info::ForwardInfo;
-use crate::io::inc_dir::DirError;
-use crate::io::unix_sock::error::UnixSockError;
+use crate::io::{DirError, UnixSockError};
 use crate::run::boundary::IsUIError;
 
 #[derive(Debug, Error)]

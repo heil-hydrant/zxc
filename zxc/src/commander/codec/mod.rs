@@ -1,11 +1,13 @@
-use decode::perform_decode;
-use encode::perform_encode;
-use error::CodecError;
-use serde::Deserialize;
-use serde_json::{Value, json};
 pub mod decode;
 pub mod encode;
 pub mod error;
+
+pub use error::CodecError;
+use serde::Deserialize;
+use serde_json::{Value, json};
+
+use self::decode::perform_decode;
+use self::encode::perform_encode;
 
 // Enum to represent different codecs
 // derive copy clone only for testing

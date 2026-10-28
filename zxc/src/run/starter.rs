@@ -8,17 +8,6 @@ use tracing::{debug, error, info, trace};
 use super::boundary::*;
 use crate::run::runner::run_module;
 
-/* Steps:
- * ----- loop -----
- *      ----- select -----
- *          1. Accept new connections
- *              a. Flush storage
- *              b. call run_module
- *          2. Receive from commander, call handle_commander_no_ui
- *          3. Check token cancelled
- *              return
- */
-
 pub async fn start_module<T>(
     mut handler: T,
     listener: UnixListener,
@@ -36,6 +25,12 @@ pub async fn start_module<T>(
     debug!("started");
     loop {
         select! {
+            biased;
+            _ = token.cancelled() => {
+                run_close_action(&mut handler).await;
+                trace!("start cancelled");
+                return;
+            }
             result = listener.accept() => {
                 match result {
                     Ok((mut conn,_)) => {
@@ -43,12 +38,19 @@ pub async fn start_module<T>(
                         if let Err(e) = handler.flush_storage(&mut conn).await{
                             error!("flush storage| {}", e);
                         }
-                        if let Err(e) = run_module(&mut handler, &listener, conn, &token).await {
-                            if e.is_ui_error()
-                                && let Err(e) = handler.notify_commander().await {
-                                    error!("notify commander| {}", e);
-                                }
-                            error!("run| {}", e);
+                        match run_module(&mut handler, &listener, conn, &token).await {
+                            Ok(()) => {
+                                run_close_action(&mut handler).await;
+                                trace!("start cancelled");
+                                return;
+                            }
+                            Err(e) => {
+                                if e.is_ui_error()
+                                    && let Err(e) = handler.notify_commander().await {
+                                        error!("notify commander| {}", e);
+                                    }
+                                error!("run| {}", e);
+                            }
                         }
                     }
                     Err(e) => {
@@ -56,17 +58,29 @@ pub async fn start_module<T>(
                     }
                 }
             }
-            result = handler.recv()=> {
-                if let Some(msg) = result
-                    && let Err(e) = handler.handle_commander_no_ui(msg).await{
-                        error!("handle commander no ui| {}", e);
+            result = handler.recv() => {
+                match result {
+                    Some(msg) => {
+                        if let Err(e) = handler.handle_commander_no_ui(msg).await {
+                            error!("handle commander no ui| {}", e);
+                        }
                     }
-            }
-            _ = token.cancelled() => {
-                handler.close_action().await.expect("close action");
-                trace!("start cancelled");
-                return
+                    None => {
+                        run_close_action(&mut handler).await;
+                        trace!("commander channel closed");
+                        return;
+                    }
+                }
             }
         }
+    }
+}
+
+async fn run_close_action<T>(handler: &mut T)
+where
+    T: CloseAction,
+{
+    if let Err(e) = handler.close_action().await {
+        error!("close action| {}", e);
     }
 }

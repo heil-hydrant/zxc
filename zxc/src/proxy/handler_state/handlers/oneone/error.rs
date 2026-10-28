@@ -4,9 +4,8 @@ use header_plz::status::InvalidStatusCode;
 use header_plz::{InfoLineError, OneRequestLine, OneResponseLine};
 use thiserror::Error;
 
-use super::OneOneStruct;
-use crate::proxy::handler_state::error::ProxyStateError;
-use crate::proxy::server_info::json::ServerInfoJson;
+use super::OneOneConn;
+use crate::proxy::prelude::*;
 
 // one one errors
 
@@ -17,12 +16,12 @@ pub enum HandleOneOneError<T, E> {
     ProxyError(#[from] ProxyStateError),
     // ----- client state => client conn
     #[error("http read")]
-    SendToServer(OneOneStruct<T, E, OneRequestLine>, ProxyStateError),
+    SendToServer(OneOneConn<T, E, OneRequestLine>, ProxyStateError),
     #[error("new connection")]
-    NeedNewConnection(OneOneStruct<T, E, OneRequestLine>, ServerInfoJson),
+    NeedNewConnection(OneOneConn<T, E, OneRequestLine>, ServerInfoJson),
     // server state
     #[error("http read")]
-    ReadFromServer(OneOneStruct<E, T, OneResponseLine>, ProxyStateError),
+    ReadFromServer(OneOneConn<E, T, OneResponseLine>, ProxyStateError),
     // ws upgrade
     #[error("{0}")]
     InfoLine(#[from] InfoLineError),

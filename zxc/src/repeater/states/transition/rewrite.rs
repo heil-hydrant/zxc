@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use tokio::fs::File;
 use tracing::trace;
 
-use crate::io::file::{FileErrorInfo, create_and_write_file, rewrite_file};
+use crate::io::*;
 
 /* Description:
  *      Trait to rewrite file.

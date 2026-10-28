@@ -5,23 +5,6 @@ use form_urlencoded::byte_serialize;
 use super::Codec;
 use super::error::EncodeError;
 
-/* Description:
- *      Perform encoding of data according to the given codec.
- *
- * Args:
- *      codec: Codec
- *      data: &[u8]
- *
- * Steps:
- *      Match codec and call appropriate encode function
- *
- * Returns:
- *      Ok(Vec<u8>)
- *
- * Error:
- *      EncodeError
- */
-
 pub fn perform_encode(
     codec: &Codec,
     data: &[u8],

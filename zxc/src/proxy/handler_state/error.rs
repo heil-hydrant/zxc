@@ -1,15 +1,11 @@
 use thiserror::Error;
 use tokio::sync::mpsc::error::SendError;
 
-use super::handlers::error::WsError;
-use super::handlers::oneonestruct::OneOneRWError;
-use super::transition::update_frame::error::ProxyUpdateFrameError;
-use crate::commander::CommanderRequest;
-use crate::commander::communicate::response::convert::WrongMessage;
-use crate::history::message::from_commander::CommanderToHistory;
+use crate::commander::*;
+use crate::history::*;
 use crate::io::file::FileErrorInfo;
 use crate::io::socket::ConnectError;
-use crate::proxy::states::connection::encrypt::ServerEncryptError;
+use crate::proxy::prelude::*;
 
 // Various Errors that can occur on handler state transition
 #[derive(Error, Debug)]
@@ -26,6 +22,8 @@ pub enum ProxyStateError {
     // HTTP
     #[error("HTTP Error| {0}")]
     OneOne(#[from] OneOneRWError),
+    #[error("h2 Error| {0}")]
+    Two(#[from] two_plz::error::OpError),
     // WebSocket
     #[error("Ws| {0}")]
     Ws(#[from] WsError),
@@ -48,7 +46,7 @@ pub enum ProxyStateError {
 
     // ----- Update Frame -----
     #[error("Update Frame| {0}")]
-    UpdateFrame(#[from] ProxyUpdateFrameError),
+    UpdateFrame(#[from] UpdateMsgError),
 
     // ----- NewConnection -----
     #[error("Reconnect| {0}")]

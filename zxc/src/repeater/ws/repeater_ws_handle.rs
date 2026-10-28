@@ -2,7 +2,7 @@ use tokio::sync::mpsc::Sender;
 use tokio::sync::mpsc::error::SendError;
 use tokio::task::JoinHandle;
 
-use super::RepeaterWsMsg;
+use crate::repeater::prelude::*;
 
 /* Description:
  *       Handle for RepeaterWs.

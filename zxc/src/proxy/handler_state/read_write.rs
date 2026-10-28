@@ -1,4 +1,4 @@
-use super::error::ProxyStateError;
+use crate::proxy::prelude::*;
 
 // Trait to read and write data from stream based on the protocol.
 pub trait ReadWrite

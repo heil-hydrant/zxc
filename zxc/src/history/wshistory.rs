@@ -3,8 +3,8 @@ use std::io::Error;
 use tokio::fs::{File, OpenOptions};
 use zxc_derive::Id;
 
-use super::message::ws_register::HistoryWsRegisterInfo;
-use crate::id::Id;
+use crate::history::HistoryWsRegisterInfo;
+use crate::id::{Id, SoldierId};
 
 pub const HISTORY_WS_WSESS: &str = "history.wsess";
 pub const HISTORY_WS_HIS: &str = "./ws.whis";
@@ -12,7 +12,7 @@ pub const HISTORY_WS_HIS: &str = "./ws.whis";
 // struct to map ws conn to .wsess file
 #[derive(Id)]
 pub struct WsHistory {
-    id: usize,
+    id: SoldierId,
     file: File,
 }
 

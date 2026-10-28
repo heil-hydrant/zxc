@@ -4,7 +4,7 @@ use tokio::select;
 use tokio::time::{Instant, interval_at};
 use tracing::trace;
 
-use super::HistoryHandler;
+use crate::history::HistoryHandler;
 use crate::run::boundary::FromCommander;
 
 const LIMIT: usize = 100;
@@ -39,7 +39,15 @@ impl FromCommander for HistoryHandler {
             interval_at(Instant::now() + curr_duration, curr_duration);
         loop {
             select! {
-                _ = self.from_commander.recv_many(&mut self.msg_storage, LIMIT) => {
+                n = self.from_commander.recv_many(&mut self.msg_storage, LIMIT) => {
+                    if n == 0 {
+                        trace!("commander channel closed");
+                        return if self.msg_storage.is_empty() {
+                            None
+                        } else {
+                            Some(self.msg_storage.len())
+                        };
+                    }
                     if interval.period() != duration {
                         trace!("timer reset");
                         curr_duration = duration;
@@ -59,5 +67,48 @@ impl FromCommander for HistoryHandler {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use tokio::sync::mpsc::channel;
+    use tokio::time::timeout;
+
+    use super::*;
+    use crate::history::{CommanderToHistory, HistoryUIOps};
+    use crate::run::boundary::FromCommander;
+
+    #[tokio::test]
+    async fn recv_returns_none_when_channel_closed() {
+        let (tx, rx) = channel::<CommanderToHistory>(1);
+        let (to_commander, _to_commander_rx) = channel::<HistoryUIOps>(1);
+        let mut handler = HistoryHandler::new(rx, to_commander, Vec::new());
+        drop(tx);
+
+        let result = timeout(Duration::from_secs(1), handler.recv())
+            .await
+            .expect("recv timed out");
+
+        assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn recv_returns_pending_messages_when_channel_closed() {
+        let (tx, rx) = channel::<CommanderToHistory>(1);
+        let (to_commander, _to_commander_rx) = channel::<HistoryUIOps>(1);
+        let mut handler = HistoryHandler::new(rx, to_commander, Vec::new());
+        tx.send(CommanderToHistory::Http("pending".to_string()))
+            .await
+            .unwrap();
+        drop(tx);
+
+        let result = timeout(Duration::from_secs(1), handler.recv())
+            .await
+            .expect("recv timed out");
+
+        assert_eq!(result, Some(1));
     }
 }

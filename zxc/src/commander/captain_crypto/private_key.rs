@@ -4,7 +4,7 @@ use rustls_pemfile::{Item, read_one_from_slice};
 use rustls_pki_types::PrivateKeyDer;
 
 use super::CryptoBuildError;
-use crate::config::global::parser::global_config_path;
+use crate::config::global_config_path;
 
 // https://github.com/rustls/pemfile/issues/39
 

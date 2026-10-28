@@ -1,16 +1,17 @@
+pub mod address;
+pub mod json;
+pub mod scheme;
+
 use std::fmt::{Display, Formatter};
 
-use json::ServerInfoJson;
-use rustls_pki_types::ServerName;
-pub mod address;
-pub mod scheme;
 use address::Address;
 use address::error::AddressError;
+pub use json::ServerInfoJson;
+use rustls_pki_types::ServerName;
 use scheme::Scheme;
-pub mod json;
 
 // struct to store server info
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ServerInfo {
     address: Address,
     scheme: Scheme,

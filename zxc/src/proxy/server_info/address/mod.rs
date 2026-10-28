@@ -1,12 +1,14 @@
+mod convert;
+pub mod error;
+
 use std::fmt::{Display, Formatter};
 use std::net::SocketAddr;
-pub mod error;
-use error::AddressError;
+
+pub use error::AddressError;
 use header_plz::OneRequestLine;
 use rustls_pki_types::{InvalidDnsNameError, ServerName};
 
 use super::scheme::Scheme;
-mod convert;
 
 // Enum to represent the different address types of the server.
 // The DNS variant holds host and port as a tuple.

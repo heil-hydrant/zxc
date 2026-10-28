@@ -1,11 +1,11 @@
 use serde::{Deserialize, Serialize};
 
-use super::ServerInfo;
-use super::scheme::Scheme;
+use crate::proxy::prelude::*;
 
 // Sent and received from ui
 #[cfg_attr(test, derive(Default))]
-#[derive(Debug, Serialize, Deserialize)]
+// #[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ServerInfoJson {
     pub host: String,
     #[serde(skip_serializing_if = "Option::is_none")]

@@ -1,10 +1,11 @@
-use clap::Parser;
-use proxy::ProxyArgs;
-use session::SessionArgs;
-
 pub mod io;
 pub mod proxy;
 mod session;
+
+use clap::Parser;
+
+use self::session::SessionArgs;
+use crate::config::*;
 
 // Struct for cli args
 #[derive(Parser, Debug, Default)]

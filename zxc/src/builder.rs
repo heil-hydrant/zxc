@@ -1,38 +1,21 @@
-use std::fs::{File, remove_file};
 use std::io::{BufRead, BufReader, Error, Read};
 
 use tokio::net::UnixListener;
 use tokio::sync::mpsc::{Receiver, Sender, channel};
 use tracing::{error, trace};
 
-use crate::addons::handler::AddonHandler;
-use crate::commander::captain_crypto::CaptainCrypto;
-use crate::commander::communicate::comm_history::HistoryComm;
-use crate::commander::communicate::comm_interceptor::InterceptorComm;
-use crate::commander::communicate::comm_repeater::RepeaterComm;
-use crate::commander::{Commander, CommanderRequest};
-use crate::config::global::parser::parse_global_config;
-use crate::config::local::proxy::ProxyArgs;
-use crate::config::{Config, GlobalConfig};
+use crate::addons::AddonHandler;
+use crate::commander::{
+    CaptainCrypto, Commander, CommanderRequest, HistoryComm, InterceptorComm,
+    RepeaterComm,
+};
+use crate::config::{Config, GlobalConfig, ProxyArgs, parse_global_config};
+use crate::core::HISTORY_STATE_FILE;
 use crate::forward_info::ForwardInfo;
-use crate::history::handler::HistoryHandler;
-use crate::history::message::from_commander::CommanderToHistory;
-use crate::history::message::from_ui::HistoryUIOps;
-use crate::interceptor::InterceptorHandler;
-use crate::interceptor::message::from_ui::InterUIOps;
-use crate::interceptor::message::to_ui::InterToUI;
-use crate::proxy::handler_state::transition::write_history::HistoryEnum;
+use crate::history::{CommanderToHistory, HistoryHandler, HistoryUIOps};
+use crate::interceptor::{InterToUI, InterUIOps, InterceptorHandler};
+use crate::proxy::HistoryEnum;
 use crate::repeater::RepeaterHandler;
-
-pub const HISTORY_STATE_FILE: &str = ".history.state";
-
-pub const PROXY: &str = "proxy";
-pub const COMMANDER: &str = "commander";
-
-pub const INTERCEPTOR: &str = "interceptor";
-pub const HISTORY: &str = "history";
-pub const REPEATER: &str = "repeater";
-pub const ADDONS: &str = "addons";
 
 pub struct Builder {
     attach: bool,
@@ -156,9 +139,9 @@ impl Builder {
 
 #[inline(always)]
 fn read_history_state(id: usize) -> Result<Vec<String>, Error> {
-    let file = File::open(HISTORY_STATE_FILE)?;
+    let file = std::fs::File::open(HISTORY_STATE_FILE)?;
     let result = remove_unlogged(file, id);
-    remove_file(HISTORY_STATE_FILE)?;
+    std::fs::remove_file(HISTORY_STATE_FILE)?;
     Ok(result)
 }
 

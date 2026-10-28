@@ -1,16 +1,27 @@
 pub mod handler_state;
+pub mod prelude;
 pub mod server_info;
 pub mod states;
 
+pub use handler_state::error::ProxyStateError;
+pub use handler_state::handlers::OneOneRWError;
+pub use handler_state::handlers::error::WsError;
+pub use handler_state::read_write::ReadWrite;
+pub use handler_state::role::Role;
+pub use handler_state::transition::{
+    AddRaw, HistoryEnum, UpdateMsgError, WS_ADD_RAW_PANIC
+};
+pub use server_info::{ServerInfo, ServerInfoJson};
+pub use states::ZStream;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::select;
 use tokio::sync::mpsc::Sender;
 use tokio_util::sync::CancellationToken;
 use tracing::{Instrument, Level, debug, error, span, trace};
 
-use crate::CommanderRequest;
 use crate::async_step::async_run;
-use crate::proxy::states::ConnectionState;
+use crate::commander::*;
+use crate::proxy::prelude::*;
 
 pub async fn start_proxy(
     tx: Sender<CommanderRequest>,
@@ -45,7 +56,7 @@ pub async fn start_proxy(
                                     error!("{}", e)
                                 }
                             }
-                            let request = CommanderRequest::Close(id);
+                            let request = CommanderRequest::Close(SoldierId::Connection(id));
                             let _ = tx_clone.send(request).await;
                         });
                         id += 1;

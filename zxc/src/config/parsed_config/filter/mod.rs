@@ -1,5 +1,6 @@
+#[path = "domain_list.rs"]
 pub mod domain_list;
-use domain_list::DomainList;
+pub use domain_list::*;
 
 // Enum which contains the included/exluded DomainList
 #[cfg_attr(any(test, debug_assertions), derive(PartialEq))]

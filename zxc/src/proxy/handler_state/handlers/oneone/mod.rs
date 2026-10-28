@@ -1,49 +1,36 @@
+mod error;
+pub mod oneoneconn;
+
+use std::fmt::Debug;
+
+use buffer_plz::Cursor;
+use bytes::BytesMut;
 use header_plz::body_headers::parse::ParseBodyHeaders;
 use header_plz::{OneInfoLine, OneRequestLine, OneResponseLine};
 use http_plz::{OneMessageHead, OneOne};
 use oneone_plz::state::State;
+pub use oneoneconn::*;
+use tokio::io::{
+    AsyncReadExt, AsyncWriteExt, BufReader, copy_bidirectional_with_sizes,
+};
+use tracing::{error, trace};
 
+use self::error::HandleOneOneError;
+use super::handle_websocket;
 use crate::CAPACITY_2MB;
 use crate::async_step::async_run;
-use crate::commander::{CommanderRequest, Protocol};
-use crate::interceptor::message::from_ui::resume_info::ResumeInfo;
+use crate::commander::*;
+use crate::interceptor::*;
 use crate::io::socket::fill_buffer;
-use crate::proxy::handler_state::ProxyState;
-use crate::proxy::handler_state::read_write::ReadWrite;
-use crate::proxy::handler_state::transition::Log;
-use crate::proxy::handler_state::transition::reconnect::Reconnect;
-use crate::proxy::server_info::ServerInfo;
-use crate::proxy::server_info::json::ServerInfoJson;
-use crate::proxy::states::error::StateError;
+use crate::proxy::prelude::*;
 use crate::proxy::states::*;
-pub mod oneonestruct;
-use buffer_plz::Cursor;
-use bytes::BytesMut;
-use oneonestruct::*;
-use tokio::io::{
-    AsyncReadExt, AsyncWriteExt, BufReader, copy_bidirectional_with_sizes
-};
-use tracing::trace;
-mod error;
-use std::fmt::Debug;
-use std::io::Error;
-use std::path::PathBuf;
-
-use error::HandleOneOneError;
-use tracing::error;
-
-use super::handle_websocket;
-
-const XATTR_HOST: &str = "user.host";
-const XATTR_HTTP: &str = "user.http";
-const XATTR_SNI: &str = "user.sni";
 
 // client type alias
-type OneOneRequest<T, E> = OneOneStruct<T, E, OneRequestLine>;
+type OneOneRequest<T, E> = OneOneConn<T, E, OneRequestLine>;
 type ClientState<T, E> = ProxyState<OneOneRequest<T, E>>;
 
 // server type alias
-type OneOneResponse<T, E> = OneOneStruct<T, E, OneResponseLine>;
+type OneOneResponse<T, E> = OneOneConn<T, E, OneResponseLine>;
 type ServerState<T, E> = ProxyState<OneOneResponse<T, E>>;
 
 pub async fn handle_http<T, E, U>(
@@ -100,61 +87,14 @@ where
                         conn.reconnect().await?;
                         ProxyState::Send(conn)
                     }
-
-                    /* Description:
-                     *      Read from server failed
-                     *
-                     * Steps:
-                     *      1. Conver OneOneResponse to OneOneRequest
-                     *          [ From trait implementation in
-                     *          convert/response_to_request ]
-                     *      2. Reconnect to server
-                     *      3. Set client_state to ProxyState::ReadModFile with
-                     *         a blank request specific ResumeInfo to satisfy
-                     *         state transition requirements.
-                     *         [ ResumeInfo::request() ]
-                     */
                     HandleOneOneError::ReadFromServer(conn, e) => {
                         trace!("read_from_server err| {}", e);
                         let mut client =
-                            OneOneStruct::<T, E, OneRequestLine>::from(conn);
+                            OneOneConn::<T, E, OneRequestLine>::from(conn);
                         client.reconnect().await?;
                         trace!("reconnected");
                         ProxyState::ReadModFile(client, ResumeInfo::request())
                     }
-
-                    /* Description:
-                     *      User specified a new server to connect to from
-                     *      interceptor ui.
-                     *
-                     * Steps:
-                     *      1. Convert AddReqInfo to ServerInfo [ TryFrom ]
-                     *
-                     *      2. Check if can be connected to the new address
-                     *         i.e. if server conn is tls and new addr is also
-                     *         tls. similarily for tcp.
-                     *
-                     *      3. If can reconnect, set serverinfo for
-                     *         OneOneRequest and reconnect.
-                     *
-                     *      4. If cannot be connected, then convert
-                     *         OneOneRequest to ConnnectionState [ From trait
-                     *         in convert/to_state_connection ]
-                     *
-                     *          a. if,
-                     *                  client      = tls://
-                     *                  server      = tls://
-                     *                  new server  = tcp://
-                     *              then,
-                     *                  ConnectionState::EstablishTlsTcp
-                     *
-                     *          b. if,
-                     *                  client      = tcp://
-                     *                  server      = tcp://
-                     *                  new server  = tls://
-                     *              then,
-                     *                  ConnectionState::EstablishTcpTls
-                     */
                     HandleOneOneError::NeedNewConnection(
                         mut conn,
                         addinfo,
@@ -263,13 +203,13 @@ pub async fn handle_one_one<T, E>(
     mut client_state: ClientState<T, E>,
 ) -> Result<ServerState<E, T>, HandleOneOneError<T, E>>
 where
-    T: AsyncReadExt + AsyncWriteExt + Unpin,
-    E: AsyncReadExt + AsyncWriteExt + Unpin,
+    T: AsyncReadExt + AsyncWriteExt + Unpin + Send + Sync + 'static,
+    E: AsyncReadExt + AsyncWriteExt + Unpin + Send + Sync + 'static,
     OneOneRequest<T, E>: ReadWrite
         + Reconnect
         + Into<OneOneResponse<E, T>>
         + ReadWrite<State = ClientState<T, E>>,
-    OneOneResponse<T, E>: ReadWrite,
+    OneOneResponse<E, T>: ReadWrite<State = ServerState<E, T>>,
 {
     client_state = async_run(client_state).await?;
     let mut client_conn = OneOneRequest::<T, E>::try_from(client_state)?;
@@ -289,7 +229,7 @@ where
                 OneOneResponse::<E, T>::try_from(server_state)?;
 
             let scode = OneResponseLine::try_build_infoline(
-                server_conn.payload.take().unwrap(), // safe to unwrap
+                server_conn.msg_bytes.take().unwrap(), // safe to unwrap
             )?
             .status()?;
 
@@ -297,7 +237,7 @@ where
                 trace!("ws switch");
                 return Ok(ProxyState::SwitchProtocol(
                     server_conn,
-                    Protocol::WebSocket,
+                    Protocol::Websocket,
                 ));
             }
             trace!("end");
@@ -335,16 +275,4 @@ where
             return Ok(frame_state.try_into_frame()?);
         }
     }
-}
-
-fn set_attr(path: &PathBuf, info: ServerInfoJson) -> Result<(), Error> {
-    xattr::set(path, XATTR_HOST, info.host.as_bytes())?;
-    if info.http.is_some() {
-        xattr::set(path, XATTR_HTTP, b"1")?;
-    }
-    if let Some(sni) = info.sni {
-        xattr::set(path, XATTR_SNI, sni.as_bytes())?;
-    }
-    trace!("attr set");
-    Ok(())
 }

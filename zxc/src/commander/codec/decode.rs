@@ -7,24 +7,6 @@ use base64::engine::general_purpose;
 use super::Codec;
 use super::error::DecodeError;
 
-/*
- * Description:
- *      Perform decoding of data according to the given codec.
- *
- * Args:
- *      codec: Codec
- *      data: &[u8]
- *
- * Steps:
- *      Match codec and call appropriate decode function
- *
- * Returns:
- *      Ok(Vec<u8>)
- *
- * Error:
- *      DecodeError
- */
-
 pub fn perform_decode(
     codec: &Codec,
     data: &[u8],

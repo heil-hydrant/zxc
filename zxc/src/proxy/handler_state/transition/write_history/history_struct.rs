@@ -3,26 +3,55 @@ use std::fmt::Display;
 
 use serde::{Deserialize, Serialize};
 
-use crate::history::message::from_commander::CommanderToHistory;
-use crate::proxy::handler_state::role::Role;
-use crate::proxy::server_info::scheme::Scheme;
+use crate::history::*;
+use crate::proxy::prelude::*;
 
-// Enum to represent the history data of the http request/response and ws.
 #[derive(Debug, Serialize, Deserialize)]
 pub enum HistoryEnum<'a> {
     Request(RequestHistory<'a>),
     Response(ResponseHistory),
     #[serde(skip)]
-    WebSocket(usize, WsHistory),
+    WebSocket(SoldierId, WsHistory),
 }
 
-impl HistoryEnum<'_> {
+impl<'a> HistoryEnum<'a> {
     pub fn id(&self) -> Option<usize> {
         match self {
             Self::Request(req) => Some(req.id),
             Self::Response(resp) => Some(resp.id),
             Self::WebSocket(..) => None,
         }
+    }
+
+    pub fn http_request<M, U>(
+        id: usize,
+        server_info: &ServerInfo,
+        method: M,
+        uri: U,
+    ) -> Self
+    where
+        M: Into<Cow<'a, str>>,
+        U: Into<Cow<'a, str>>,
+    {
+        Self::Request(RequestHistory::new(
+            id,
+            method.into(),
+            server_info.scheme(),
+            server_info.address_to_string(),
+            uri.into(),
+        ))
+    }
+
+    pub fn http_response(
+        id: usize,
+        status: u16,
+        content_length: Option<&[u8]>,
+    ) -> Self {
+        let length = content_length
+            .and_then(|b| std::str::from_utf8(b).ok())
+            .and_then(|s| s.trim().parse::<usize>().ok())
+            .unwrap_or(0);
+        Self::Response(ResponseHistory::new(id, status, length))
     }
 }
 
@@ -42,9 +71,7 @@ impl TryFrom<HistoryEnum<'_>> for CommanderToHistory {
     }
 }
 
-// Struct to represent the history data of the http request.
-// {"Request":{"id":1,"method":"GET","http":bool,"host":"www.google.com","
-// uri":"/robots.txt"}}
+// {"Request":{"id":1,"method":"GET","http":bool,"host":"www.google.com"," uri":"/robots.txt"}}
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RequestHistory<'a> {
     id: usize,
@@ -73,7 +100,6 @@ impl<'a> RequestHistory<'a> {
     }
 }
 
-// Struct to represent the history data of the http response.
 // {"Response":{"id":0,"status":"200","length":2000,"mime":"img"}}
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ResponseHistory {
@@ -92,7 +118,6 @@ impl ResponseHistory {
     }
 }
 
-// Struct to represent the history data of the ws.
 #[derive(Debug)]
 pub struct WsHistory {
     id: usize,

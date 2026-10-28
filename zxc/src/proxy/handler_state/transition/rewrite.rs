@@ -1,35 +1,13 @@
 use tokio::fs::File;
 use tracing::trace;
 
-use crate::interceptor::message::from_ui::resume_info::ResumeInfo;
+use crate::interceptor::*;
 use crate::io::file::{FileErrorInfo, rewrite_file};
-use crate::proxy::handler_state::ProxyState;
-use crate::proxy::handler_state::error::ProxyStateError;
-
-/* Description:
- *      Trait to rewrite log.
- */
+use crate::proxy::prelude::*;
 
 pub trait Rewrite {
     fn file_and_data(&mut self) -> (&mut File, &[u8]);
 }
-
-/* Description:
- *      Transition function to rewrite http request/response.
- *      ws connections should not reach this state.
- *
- * Transition:
- *      Rewrite -> NewConnection | Send
- *
- * Steps:
- *      1. Get File and data
- *      2. call rewrite_file
- *      3. If resume_info has req_info, return ProxyState::NewConnection
- *      4. Default, return ProxyState::Send
- *
- * Errors:
- *      ProxyStateError::ReWriteFile     [3]
- */
 
 pub async fn rewrite_log<T>(
     mut conn: T,

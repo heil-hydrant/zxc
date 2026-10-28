@@ -1,4 +1,5 @@
-use super::ws_register::HistoryWsRegisterInfo;
+use crate::history::HistoryWsRegisterInfo;
+use crate::id::SoldierId;
 
 // Messages from commander to history
 pub enum CommanderToHistory {
@@ -6,6 +7,6 @@ pub enum CommanderToHistory {
     Http(String),
     // From Soldiers - ws
     RegisterWs(HistoryWsRegisterInfo),
-    WebSocket(usize, String),
-    RemoveWs(usize),
+    WebSocket(SoldierId, String),
+    RemoveWs(SoldierId),
 }

@@ -5,9 +5,8 @@ use std::sync::Arc;
 use rcgen::{CertificateParams, Issuer, KeyPair};
 use tokio_rustls::rustls::ServerConfig;
 
-use super::CryptoBuildError;
-use crate::commander::captain_crypto::{CertDigest, NegotiatedAlpn};
-use crate::config::global::parser::global_config_path;
+use super::{Alpn, CertDigest, CryptoBuildError};
+use crate::config::global_config_path;
 
 // There are two CA's:
 //      1. Trusted      : user generated and trusted
@@ -15,7 +14,7 @@ use crate::config::global::parser::global_config_path;
 
 pub struct CA {
     issuer: Issuer<'static, KeyPair>,
-    store: HashMap<(CertDigest, NegotiatedAlpn), Arc<ServerConfig>>,
+    store: HashMap<(CertDigest, Alpn), Arc<ServerConfig>>,
 }
 
 impl CA {
@@ -45,16 +44,14 @@ impl CA {
         &self.issuer
     }
 
-    pub fn store(
-        &self,
-    ) -> &HashMap<(CertDigest, NegotiatedAlpn), Arc<ServerConfig>> {
+    pub fn store(&self) -> &HashMap<(CertDigest, Alpn), Arc<ServerConfig>> {
         &self.store
     }
 
     pub fn add_config(
         &mut self,
         digest: CertDigest,
-        alpn: NegotiatedAlpn,
+        alpn: Alpn,
         config: Arc<ServerConfig>,
     ) {
         self.store

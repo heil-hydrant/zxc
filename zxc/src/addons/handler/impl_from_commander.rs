@@ -1,4 +1,4 @@
-use crate::addons::handler::AddonHandler;
+use super::AddonHandler;
 use crate::forward_info::ForwardInfo;
 use crate::run::boundary::FromCommander;
 

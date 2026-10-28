@@ -5,10 +5,7 @@ use std::process::Command;
 
 use super::constants::*;
 
-/* Command:
- *      tmux -L session_name -f $HOME/.config/zxc/tmux.conf new-session -d
- */
-
+// tmux -L session_name -f $HOME/.config/zxc/tmux.conf new-session -d
 #[inline(always)]
 pub fn create_session(cmd: &mut Command) -> Result<(), Error> {
     // get users home dir
@@ -24,15 +21,13 @@ pub fn create_session(cmd: &mut Command) -> Result<(), Error> {
     Ok(())
 }
 
-// Command | tmux -L session_name ls
-
+// tmux -L session_name ls
 #[inline(always)]
 pub fn list_sessions(cmd: &mut Command) {
     cmd.arg("ls");
 }
 
-// Command | tmux -L session_name list-windows -F "#{window_index}"
-
+// tmux -L session_name list-windows -F "#{window_index}"
 #[inline(always)]
 pub fn list_windows(cmd: &mut Command) {
     cmd.arg("list-windows")
@@ -40,14 +35,14 @@ pub fn list_windows(cmd: &mut Command) {
         .arg("#{window_index}");
 }
 
-// Command | tmux -L session_name new-window
-
+// tmux -L session_name new-window
+#[inline(always)]
 pub fn create_window(cmd: &mut Command) {
     cmd.arg(NEW_WINDOW);
 }
 
-// Command | tmux -L session_name rename-window -t target_window module
-
+// tmux -L session_name rename-window -t target_window module
+#[inline(always)]
 pub fn rename_window(cmd: &mut Command, target: usize, name: &str) {
     cmd.arg(RENAME_WINDOW)
         .arg(FLAG_TARGET)
@@ -55,8 +50,8 @@ pub fn rename_window(cmd: &mut Command, target: usize, name: &str) {
         .arg(name);
 }
 
-// Command | tmux -L session_name send-keys -t target_window module Enter
-
+// tmux -L session_name send-keys -t target_window module Enter
+#[inline(always)]
 pub fn run_module(cmd: &mut Command, target: &str, name: &str) {
     cmd.args(ARGUMENTS_BEFORE_TARGET)
         .arg(target)
@@ -64,17 +59,15 @@ pub fn run_module(cmd: &mut Command, target: &str, name: &str) {
         .arg(ENTER);
 }
 
-// Command | tmux -L session_name setenv ZXC 1
-
+// tmux -L session_name setenv ZXC 1
+#[inline(always)]
 pub fn set_env(cmd: &mut Command, name: &str, value: &str) {
     cmd.arg("setenv").arg(name).arg(value);
 }
 
-/* Command | tmux -L session_name attach -t :1
- *
- * By default, attaches to the history window (:1).
- */
-
+// tmux -L session_name attach -t :1
+//
+// default, history window (:1).
 #[inline(always)]
 pub fn attach_session(cmd: &mut Command) {
     cmd.arg("attach").arg("-t").arg(":1");

@@ -4,7 +4,7 @@ use clap::Args;
 use clap::builder::NonEmptyStringValueParser;
 use serde::{Deserialize, Serialize};
 
-use crate::config::misc::{add_option_vec, sanitize_option_vec_string};
+use crate::config::*;
 
 // Struct for command line arguments + Local Config
 #[cfg_attr(test, derive(PartialEq, Clone, Default))]

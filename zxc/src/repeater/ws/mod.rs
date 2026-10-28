@@ -1,8 +1,18 @@
+pub mod builder;
+pub mod convert;
+pub mod message;
+pub mod repeater_ws_handle;
+pub mod rwstruct;
+
 use std::io::SeekFrom;
 
+pub use builder::*;
+pub use convert::*;
 use futures_util::{SinkExt, StreamExt};
 use header_plz::{OneInfoLine, OneResponseLine};
-use repeater_ws_handle::RepeaterWsHandle;
+pub use message::*;
+pub use repeater_ws_handle::*;
+pub use rwstruct::*;
 use tokio::io::{
     AsyncRead, AsyncReadExt, AsyncSeekExt, AsyncWrite, AsyncWriteExt
 };
@@ -12,23 +22,9 @@ use tokio_tungstenite::tungstenite::Message;
 use tracing::{Instrument, Level, error, span, trace};
 
 use crate::async_step::AsyncStep;
-use crate::io::file::{FileErrorInfo, FileEvent};
-use crate::proxy::handler_state::error::ProxyStateError;
-use crate::proxy::handler_state::handlers::error::WsError;
-use crate::proxy::handler_state::role::Role;
-use crate::repeater::states::rstate::RepeaterState;
-use crate::repeater::states::transition::write_response::log_response;
-pub mod builder;
-pub mod convert;
-pub mod message;
-pub mod repeater_ws_handle;
-pub mod rwstruct;
-use convert::*;
-use message::*;
-
-use super::conn::RepeaterConn;
-use super::error::RepeaterError;
-use super::http::handle_http;
+use crate::io::*;
+use crate::proxy::*;
+use crate::repeater::prelude::*;
 
 /* Description:
  *      Function to spawn a ws task
@@ -110,43 +106,55 @@ where
         select! {
             // 2.a.1 Read from server
             result = rws.stream.next() => {
-                if let Some(frame) = result {
-                    rws.add_frame(frame.map_err(WsError::Read)?);
-                    trace!("from server");
-                    // 2.a.3 Log server
-                    rws = log_response(rws)
-                        .await
-                        .map_err(ProxyStateError::ReWriteFile)?;
-                    rws.log(Role::Client).await?;
+                match result {
+                    Some(frame) => {
+                        rws.add_frame(frame.map_err(WsError::Read)?);
+                        trace!("from server");
+                        // 2.a.3 Log server
+                        rws = log_response(rws)
+                            .await
+                            .map_err(ProxyStateError::ReWriteFile)?;
+                        rws.log(Role::Client).await?;
+                    }
+                    None => {
+                        trace!("server closed ws stream");
+                        return Ok(());
+                    }
                 }
             }
             // 2.b.1 Msg from repeater ui
             result = rws.receiver.recv() => {
-                if let Some(msg) = result {
-                    trace!("from client");
-                    match msg {
-                        RepeaterWsMsg::Read => {
-                            let mut state = RepeaterState::ReadFromFile(rws);
-                            rws = loop {
-                                state = state.next().await?;
-                                match state {
-                                    // Read from server break
-                                    RepeaterState::Receive(conn) => break conn,
-                                    _ => continue
-                                }
-                            };
-                            // 2.b.3 Log client
-                            rws.log(Role::Server).await?;
-                            rws.file_as_mut().seek(SeekFrom::Start(0)).await.
-                                map_err(|e| FileErrorInfo::from((rws.file_as_mut(),
-                                FileEvent::Seek, e)))?;
+                match result {
+                    Some(msg) => {
+                        trace!("from client");
+                        match msg {
+                            RepeaterWsMsg::Read => {
+                                let mut state = RepeaterState::ReadFromFile(rws);
+                                rws = loop {
+                                    state = state.next().await?;
+                                    match state {
+                                        // Read from server break
+                                        RepeaterState::Receive(conn) => break conn,
+                                        _ => continue
+                                    }
+                                };
+                                // 2.b.3 Log client
+                                rws.log(Role::Server).await?;
+                                rws.file_as_mut().seek(SeekFrom::Start(0)).await.
+                                    map_err(|e| FileErrorInfo::from((rws.file_as_mut(),
+                                    FileEvent::Seek, e)))?;
+                            }
+                            RepeaterWsMsg::Close => {
+                                let close_msg = Message::Close(None);
+                                rws.stream.send(close_msg).await.map_err(|_| WsError::Write)?;
+                                trace!("cls frame sent");
+                                return Ok(());
+                            }
                         }
-                        RepeaterWsMsg::Close => {
-                            let close_msg = Message::Close(None);
-                            rws.stream.send(close_msg).await.map_err(|_| WsError::Write)?;
-                            trace!("cls frame sent");
-                            return Ok(());
-                        }
+                    }
+                    None => {
+                        trace!("repeater ui receiver dropped");
+                        return Ok(());
                     }
                 }
             }

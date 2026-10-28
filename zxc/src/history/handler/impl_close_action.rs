@@ -4,8 +4,8 @@ use header_plz::abnf::LF;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 
-use super::HistoryHandler;
-use crate::builder::HISTORY_STATE_FILE;
+use crate::core::HISTORY_STATE_FILE;
+use crate::history::HistoryHandler;
 use crate::run::boundary::CloseAction;
 
 /* Steps:

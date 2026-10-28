@@ -1,5 +1,4 @@
-use super::HistoryHandler;
-use crate::history::error::HistoryError;
+use crate::history::{HistoryError, HistoryHandler};
 use crate::run::boundary::HandleCommander;
 
 impl HandleCommander for HistoryHandler {

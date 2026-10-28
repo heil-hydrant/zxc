@@ -3,8 +3,9 @@ use std::io;
 use thiserror::Error;
 use tokio::sync::mpsc::error::SendError;
 
-use super::message::from_ui::HistoryUIOps;
-use crate::io::unix_sock::error::UnixSockError;
+use crate::history::HistoryUIOps;
+use crate::id::SoldierId;
+use crate::io::UnixSockError;
 use crate::run::boundary::IsUIError;
 
 #[derive(Debug, Error)]
@@ -25,7 +26,7 @@ pub enum HistoryError {
     RegisterWs(io::Error),
 
     #[error("no id| {0} | {1}")]
-    NoId(usize, &'static str),
+    NoId(SoldierId, &'static str),
 
     #[error("needs flush")]
     NeedsFlush,
