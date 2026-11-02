@@ -13,6 +13,7 @@ use zxc_derive::{CanCommunicate, FileOps, GetRole, Id, Log, SendHistory};
 
 use crate::commander::{CommanderRequest, CommanderResponse};
 use crate::history::CommanderToHistory;
+use crate::interceptor::H2Info;
 use crate::proxy::prelude::*;
 
 #[derive(GetRole, Id, CanCommunicate, FileOps, SendHistory, Log)]
@@ -38,6 +39,7 @@ pub struct TwoConn<T> {
     pub msg_bytes: Option<BytesMut>,
     // intercept
     pub need_response: bool,
+    pub h2_pseudo: Option<H2Info>,
 }
 
 impl<T> AsMut<BytesMut> for TwoConn<T> {
@@ -73,6 +75,7 @@ impl TwoConn<RequestLine> {
             buf: BytesMut::new(),
             msg_bytes: None,
             need_response: false,
+            h2_pseudo: None,
         }
     }
 }
@@ -96,6 +99,7 @@ impl From<TwoConn<RequestLine>> for TwoConn<ResponseLine> {
             buf: request.buf,
             msg_bytes: None,
             need_response: request.need_response,
+            h2_pseudo: None,
         }
     }
 }

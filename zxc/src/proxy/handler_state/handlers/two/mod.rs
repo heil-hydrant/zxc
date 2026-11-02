@@ -165,6 +165,9 @@ async fn handle_stream(
         if let Err(e) = set_attr(path, info) {
             error!("h2 set attr| {e}");
         }
+        if let Err(e) = set_h2_attr(path, h2req.h2_pseudo.as_ref()) {
+            error!("h2 set pseudo attr| {e}");
+        }
     }
 
     let h2resp = TwoConn::<ResponseLine>::from(h2req);

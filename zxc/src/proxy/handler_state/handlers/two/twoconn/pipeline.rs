@@ -103,8 +103,23 @@ impl MsgToBytes for TwoConn<ResponseLine> {
     }
 }
 
-// Apply :authority and :scheme to a request that was parsed from its
-// origin-form log representation. Empty/absent values are left untouched.
+fn request_h2_info(req: &Request) -> Option<H2Info> {
+    let authority = req
+        .authority()
+        .filter(|authority| !authority.is_empty())
+        .map(str::to_string);
+    let scheme = req
+        .scheme()
+        .map(|scheme| scheme.as_str().to_string())
+        .filter(|scheme| !scheme.is_empty());
+
+    if authority.is_none() && scheme.is_none() {
+        None
+    } else {
+        Some(H2Info::new(authority, scheme))
+    }
+}
+
 fn set_h2_pseudo_headers(
     req: &mut Request,
     h2_info: &H2Info,
@@ -124,9 +139,6 @@ fn set_h2_pseudo_headers(
     Ok(())
 }
 
-// The log file is origin-form, so reparsing it loses :authority and :scheme.
-// Restore them from the request we already hold; any UI-provided h2_info is
-// applied afterwards and takes precedence.
 fn reparse_request(
     old: Option<&Request>,
     buf: BytesMut,
@@ -138,8 +150,6 @@ fn reparse_request(
     Ok(req)
 }
 
-// Copy pseudo headers from the request held before an origin-form log file
-// is reparsed. This keeps them when the UI does not send h2_info.
 fn copy_h2_pseudo_headers(
     from: &Request,
     to: &mut Request,
@@ -158,24 +168,10 @@ impl Intercept for TwoConn<RequestLine> {
     fn get_inter_info(&self) -> InterToUI {
         tracing::trace!("h2 intercepted| {:?}", self.msg.as_ref());
         let info = ServerInfoJson::from(&self.server_info);
-        // Extract :authority and :scheme strictly from the request URI.
-        // No fallback to HeaderMap or ServerInfo: absent pseudo-headers are
-        // reported as None.
-        let h2_info = self.msg.as_ref().and_then(|req| {
-            let authority = req
-                .authority()
-                .filter(|authority| !authority.is_empty())
-                .map(str::to_string);
-            let scheme = req
-                .scheme()
-                .map(|scheme| scheme.as_str().to_string())
-                .filter(|scheme| !scheme.is_empty());
-            if authority.is_none() && scheme.is_none() {
-                None
-            } else {
-                Some(H2Info::new(authority, scheme))
-            }
-        });
+        let h2_info = self
+            .msg
+            .as_ref()
+            .and_then(request_h2_info);
         InterToUI::build_h2_req(self.log_id, Some(info), h2_info)
     }
 }
@@ -209,6 +205,10 @@ impl ReadWrite for TwoConn<RequestLine> {
     }
 
     async fn write(mut self) -> Result<Self::State, Self::Error> {
+        self.h2_pseudo = self
+            .msg
+            .as_ref()
+            .and_then(request_h2_info);
         let msg = self.msg.take().unwrap();
         tracing::trace!("h2 outbound| {:?}", msg);
         let response_future = self.send_request.send_request(msg)?;
@@ -317,8 +317,6 @@ impl<T> ShouldRewrite for TwoConn<T> {
 impl UpdateResumeInfo for TwoConn<RequestLine> {
     fn update_resume_info(&mut self, resume_info: &ResumeInfo) {
         self.need_response = resume_info.need_response();
-        // Apply pseudo-header edits in-place for the Send path, where the
-        // frame is forwarded without being re-read from disk.
         if let Err(e) = self.apply_h2_info(resume_info.h2_info()) {
             tracing::error!("h2 info| {e}");
         }
@@ -366,6 +364,38 @@ mod tests {
             .unwrap(),
         )
         .unwrap()
+    }
+
+    #[test]
+    fn test_request_h2_info_extracts_pseudo_headers() {
+        let mut req = origin_form_request();
+        req.try_set_authority("internal.local:8443")
+            .unwrap();
+        req.try_set_scheme("https").unwrap();
+
+        let info = request_h2_info(&req).unwrap();
+
+        assert_eq!(info.authority(), Some("internal.local:8443"));
+        assert_eq!(info.scheme(), Some("https"));
+    }
+
+    #[test]
+    fn test_request_h2_info_partial() {
+        let mut req = origin_form_request();
+        req.try_set_authority("internal.local")
+            .unwrap();
+
+        let info = request_h2_info(&req).unwrap();
+
+        assert_eq!(info.authority(), Some("internal.local"));
+        assert!(info.scheme().is_none());
+    }
+
+    #[test]
+    fn test_request_h2_info_without_pseudo_headers() {
+        let req = origin_form_request();
+
+        assert!(request_h2_info(&req).is_none());
     }
 
     #[test]
@@ -461,10 +491,8 @@ mod tests {
             .unwrap();
         old.try_set_scheme("https").unwrap();
 
-        // Log files are origin-form, so this is what UpdateMsg parses.
         let buf = old.clone().into_one_rep().into_bytes();
 
-        // Without the old request the pseudo headers are lost.
         let without_old = reparse_request(None, buf.clone()).unwrap();
         assert!(without_old.authority().is_none());
         assert!(without_old.scheme().is_none());

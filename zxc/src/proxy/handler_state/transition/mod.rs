@@ -26,5 +26,5 @@ pub use update_msg::{BytesToMsg, ShouldRewrite, UpdateMsgError, update_msg};
 pub use write_history::{GetHistory, HistoryEnum, SendHistory, write_history};
 pub use write_log::{
     FileOps, Log, UpdateLogExt, set_attr, set_h2_attr, update_http_req_ext,
-    update_http_res_ext, write_log
+    update_http_res_ext, write_log,
 };
