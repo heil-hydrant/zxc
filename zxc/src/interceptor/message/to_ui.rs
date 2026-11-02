@@ -112,8 +112,6 @@ impl InterToUI {
     }
 }
 
-// HTTP/2 pseudo-header metadata. Both fields are optional: if the request
-// does not carry them, nothing is sent to the UI.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct H2Info {
     #[serde(skip_serializing_if = "Option::is_none")]

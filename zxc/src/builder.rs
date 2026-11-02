@@ -66,20 +66,21 @@ impl Builder {
         let (send_cth, recv_cth) = channel::<CommanderToHistory>(100); // Commander to History
         let (send_htc, recv_htc) = channel::<HistoryUIOps>(1); // History to Commander
 
-        let storage = if self.attach {
-            read_history_state(self.index).unwrap_or_else(|e| {
-                if !matches!(e.kind(), std::io::ErrorKind::NotFound) {
-                    error!("failed to read history state| {}", e);
-                }
+        let list = match self
+            .attach
+            .then(|| read_history_state(self.index))
+        {
+            Some(Ok(list)) => list,
+            Some(Err(e)) if e.kind() != std::io::ErrorKind::NotFound => {
+                error!("failed to read history state| {e}");
                 Vec::new()
-            })
-        } else {
-            Vec::new()
+            }
+            _ => Vec::new(),
         };
 
         self.comm_history =
             Some(HistoryComm::new(self.index, recv_htc, send_cth));
-        HistoryHandler::new(recv_cth, send_htc, storage)
+        HistoryHandler::new(recv_cth, send_htc, list)
     }
 
     pub fn build_soldier_comm(&mut self) -> Sender<CommanderRequest> {
