@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use thiserror::Error;
-use tokio::fs::{File, copy};
+use tokio::fs::File;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tracing::trace;
 
@@ -67,7 +67,7 @@ pub async fn build_repeater_dest_ws(
     let mut dst_req_file = dst.clone();
     dst_req_file.pop();
     dst_req_file.push(REPEATER_HTTP_FILENAME_REQ);
-    copy(&src_req_file, &dst_req_file).await?;
+    copy_with_request_metadata(&src_req_file, &dst_req_file).await?;
     info.server_info = Some(server_info);
     Ok(dst)
 }

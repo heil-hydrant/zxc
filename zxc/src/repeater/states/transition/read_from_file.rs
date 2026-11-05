@@ -18,6 +18,10 @@ pub trait RepeaterReadFile {
     fn file_and_buf_as_mut(&mut self) -> (&mut File, &mut BytesMut);
 }
 
+pub trait RepeaterAddRaw {
+    fn add_raw(&mut self, buf: BytesMut) -> Result<(), UpdateMsgError>;
+}
+
 /* Steps:
  *     1. Read from the file
  *     2. If should_update is true, transition to UpdateFrame [ Always true for
@@ -34,9 +38,9 @@ pub trait RepeaterReadFile {
 
 pub async fn read_from_file<T>(
     mut conn: T,
-) -> Result<RepeaterState<T>, FileErrorInfo>
+) -> Result<RepeaterState<T>, ProxyStateError>
 where
-    T: RepeaterReadFile + ShouldUpdate + AddRaw,
+    T: RepeaterReadFile + ShouldUpdate + RepeaterAddRaw,
 {
     let (file, buf) = conn.file_and_buf_as_mut();
     read_file(file, buf).await?;
@@ -46,6 +50,6 @@ where
         return Ok(RepeaterState::UpdateFrame(conn, nbuf));
     }
     trace!("should_update| N");
-    conn.add_raw(nbuf);
+    conn.add_raw(nbuf)?;
     Ok(RepeaterState::Send(conn))
 }

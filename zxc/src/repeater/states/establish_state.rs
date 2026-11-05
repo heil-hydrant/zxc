@@ -17,6 +17,7 @@ pub enum RepeaterConnState {
     EstablishServerConn(RepeaterConn<ZStream>),
     NeedConnector(RepeaterConn<TcpStream>),
     EncryptConnection(RepeaterConn<TcpStream>, Arc<TlsConnector>),
+    HandleH2(RepeaterConn<TlsStream<TcpStream>>),
     HandleTls(RepeaterConn<TlsStream<TcpStream>>),
     HandleTcp(RepeaterConn<TcpStream>),
 }
@@ -58,6 +59,10 @@ impl AsyncStep for RepeaterConnState {
              */
             Self::EncryptConnection(rconn, connector) => {
                 let rconn = rconn.encrypt(connector).await?;
+                if rconn.is_h2 {
+                    trace!("Y| h2");
+                    return Ok(Self::HandleH2(rconn));
+                }
                 trace!("Y");
                 Ok(Self::HandleTls(rconn))
             }
@@ -66,7 +71,8 @@ impl AsyncStep for RepeaterConnState {
     }
 
     fn is_ended(&self) -> bool {
-        matches!(self, Self::HandleTls(_))
+        matches!(self, Self::HandleH2(_))
+            || matches!(self, Self::HandleTls(_))
             || matches!(self, Self::HandleTcp(_))
             || matches!(self, Self::NeedConnector(_))
     }
@@ -77,6 +83,7 @@ impl Display for RepeaterConnState {
         let s = match self {
             Self::EstablishServerConn(_) => "establish_server_conn",
             Self::EncryptConnection(_, _) => "encrypt_connection",
+            Self::HandleH2(_) => "handle_h2",
             _ => "",
         };
         write!(f, "{}| ", s)

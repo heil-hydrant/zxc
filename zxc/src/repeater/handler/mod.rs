@@ -71,6 +71,14 @@ impl RepeaterHandler {
         &self,
         info: SendInfo,
     ) -> Result<RepeaterConnState, RepeaterError> {
+        trace!(
+            "send metadata| is_h2={:?} has_h2_info={}",
+            info.is_h2,
+            info.h2_info.is_some()
+        );
+        if info.is_h2 == Some(true) && !info.server_info.is_tls() {
+            return Err(RepeaterError::H2RequiresTls);
+        }
         let rconn = RepeaterConn::<ZStream>::try_from(info)?;
         let mut state = RepeaterConnState::EstablishServerConn(rconn);
         loop {
@@ -164,6 +172,10 @@ impl RepeaterHandler {
                         let mut hconn = handle_http(conn).await?;
                         hconn.get_payload()
                     }
+                    RepeaterConnState::HandleH2(conn) => {
+                        let mut hconn = handle_h2(conn).await?;
+                        hconn.get_payload()
+                    }
 
                     _ => unreachable!(),
                 };
@@ -206,6 +218,9 @@ impl RepeaterHandler {
                     }
                     RepeaterConnState::HandleTls(conn) => {
                         spawn_repeater_ws(conn, self.ws_index).await
+                    }
+                    RepeaterConnState::HandleH2(_) => {
+                        return Err(RepeaterError::H2WsUnsupported);
                     }
                     _ => unreachable!(),
                 }?;

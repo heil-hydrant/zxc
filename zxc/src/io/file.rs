@@ -1,11 +1,13 @@
 use std::io::SeekFrom;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use bytes::BytesMut;
 use thiserror::Error;
 use tokio::fs::{File, OpenOptions};
 use tokio::io::{self, AsyncReadExt, AsyncSeekExt};
 
+#[cfg(target_os = "linux")]
+use crate::core::constants::REQUEST_XATTRS;
 use crate::io::write_and_flush;
 
 #[derive(Debug, Error)]
@@ -78,6 +80,43 @@ pub async fn create_and_write_file(
     Ok(file)
 }
 
+/* Description:
+ *      Copy a file and preserve the request metadata xattrs.
+ *
+ *      Linux: copy user.host, user.http, user.sni, user.is_h2,
+ *      user.authority and user.h2_scheme.
+ *
+ *      macOS: std::fs::copy already preserves xattrs via
+ *      fclonefileat/fcopyfile, so no explicit copy is needed.
+ *
+ *      Timestamps and ownership are not copied.
+ */
+
+pub async fn copy_with_request_metadata(
+    from: impl AsRef<Path>,
+    to: impl AsRef<Path>,
+) -> io::Result<u64> {
+    let from = from.as_ref().to_owned();
+    let to = to.as_ref().to_owned();
+
+    tokio::task::spawn_blocking(move || {
+        let bytes = std::fs::copy(&from, &to)?;
+
+        #[cfg(target_os = "linux")]
+        {
+            for name in REQUEST_XATTRS {
+                if let Ok(Some(value)) = xattr::get(&from, name) {
+                    let _ = xattr::set(&to, name, &value);
+                }
+            }
+        }
+
+        Ok(bytes)
+    })
+    .await
+    .map_err(io::Error::other)?
+}
+
 pub async fn read_file(
     file: &mut File,
     buf: &mut BytesMut,
@@ -108,4 +147,65 @@ pub async fn rewrite_file(
         .await
         .map_err(|e| (FileEvent::Write, e))?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    use super::*;
+
+    fn unique_temp_dir() -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock before epoch")
+            .as_nanos();
+        std::env::temp_dir().join(format!(
+            "zxc_copy_request_metadata_{}_{}",
+            std::process::id(),
+            nanos
+        ))
+    }
+
+    #[tokio::test]
+    async fn test_copy_with_request_metadata()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let dir = unique_temp_dir();
+        std::fs::create_dir_all(&dir)?;
+        let src = dir.join("src.req");
+        let dst = dir.join("dst.req");
+        let contents = b"GET / HTTP/1.1\r\nHost: example.com\r\n\r\n";
+        std::fs::write(&src, contents)?;
+
+        // macOS preserves xattrs in std::fs::copy. Linux copies the six
+        // request xattrs explicitly in copy_with_request_metadata.
+        let attrs: [(&str, &[u8]); 6] = [
+            ("user.host", b"example.com:443".as_slice()),
+            ("user.http", b"1".as_slice()),
+            ("user.sni", b"example.com".as_slice()),
+            ("user.is_h2", b"1".as_slice()),
+            ("user.authority", b"".as_slice()),
+            ("user.h2_scheme", b"https".as_slice()),
+        ];
+        let mut xattr_supported = true;
+        for (name, value) in attrs {
+            if xattr::set(&src, name, value).is_err() {
+                xattr_supported = false;
+                break;
+            }
+        }
+
+        let bytes = copy_with_request_metadata(&src, &dst).await?;
+        assert_eq!(bytes, contents.len() as u64);
+        assert_eq!(std::fs::read(&dst)?, contents.to_vec());
+
+        if xattr_supported {
+            for (name, value) in attrs {
+                assert_eq!(xattr::get(&dst, name)?, Some(value.to_vec()));
+            }
+        }
+
+        std::fs::remove_dir_all(&dir)?;
+        Ok(())
+    }
 }

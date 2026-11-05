@@ -1,6 +1,7 @@
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 use crate::file_types::FileType;
+pub use crate::forward_info::H2Info;
 use crate::proxy::{Role, ServerInfoJson};
 
 // Different types of msgs that can be sent to Interceptor UI
@@ -10,15 +11,16 @@ use crate::proxy::{Role, ServerInfoJson};
 //      {   'id': 1,
 //          'ft': 'req',
 //          'server_info': {'host': 'www.google.com'}
-//          'ws_info': {
-//              'log_id': 1
-//              'is_bin: true
-//              }
+//          'is_h2': true,
 //          'h2_info': {
 //              'authority': 'www.google.com',
 //              'scheme': 'https'
 //              }
-//          }
+//          'ws_info': {
+//              'log_id': 1
+//              'is_bin: true
+//              }
+//      }
 
 #[derive(Debug, Serialize)]
 pub struct InterToUI {
@@ -29,9 +31,9 @@ pub struct InterToUI {
     #[serde(skip_serializing_if = "Option::is_none")]
     is_h2: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    ws_info: Option<WsInfo>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     h2_info: Option<H2Info>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    ws_info: Option<WsInfo>,
 }
 
 impl InterToUI {
@@ -49,8 +51,6 @@ impl InterToUI {
         }
     }
 
-    // HTTP/2 requests carry pseudo-header metadata that cannot be represented
-    // in the origin-form request logged to disk.
     pub fn build_h2_req(
         id: usize,
         server_info: Option<ServerInfoJson>,
@@ -109,35 +109,6 @@ impl InterToUI {
 
     pub fn file_type(&self) -> &FileType {
         &self.ft
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct H2Info {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    authority: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    scheme: Option<String>,
-}
-
-impl H2Info {
-    pub fn new(authority: Option<String>, scheme: Option<String>) -> Self {
-        Self {
-            authority,
-            scheme,
-        }
-    }
-
-    pub fn authority(&self) -> Option<&str> {
-        self.authority.as_deref()
-    }
-
-    pub fn scheme(&self) -> Option<&str> {
-        self.scheme.as_deref()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.authority.is_none() && self.scheme.is_none()
     }
 }
 

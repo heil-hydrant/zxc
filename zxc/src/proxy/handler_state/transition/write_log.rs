@@ -7,17 +7,13 @@ use tracing::trace;
 use xattr::set;
 
 use super::msg_to_bytes::MsgToBytes;
+use crate::core::constants::{
+    XATTR_AUTHORITY, XATTR_H2_SCHEME, XATTR_HOST, XATTR_HTTP, XATTR_IS_H2, XATTR_SNI
+};
 use crate::file_types::{EXT_REQ, EXT_RES};
 use crate::interceptor::H2Info;
 use crate::io::file::create_and_write_file;
 use crate::proxy::prelude::*;
-
-const XATTR_HOST: &str = "user.host";
-const XATTR_HTTP: &str = "user.http";
-const XATTR_SNI: &str = "user.sni";
-const XATTR_IS_H2: &str = "user.is_h2";
-const XATTR_AUTHORITY: &str = "user.authority";
-const XATTR_H2_SCHEME: &str = "user.h2_scheme";
 
 // Trait to perform file operations
 pub trait FileOps {
@@ -175,9 +171,9 @@ mod tests {
     }
 
     #[test]
-    fn test_set_h2_attr_ignores_empty_fields() {
+    fn test_set_h2_attr_preserves_empty_fields() {
         let path = std::env::temp_dir()
-            .join(format!("zxc_set_h2_attr_skip_{}.req", std::process::id()));
+            .join(format!("zxc_set_h2_attr_empty_{}.req", std::process::id()));
         let _ = std::fs::remove_file(&path);
         std::fs::File::create(&path).unwrap();
 
@@ -188,8 +184,14 @@ mod tests {
             xattr::get(&path, XATTR_IS_H2).unwrap(),
             Some(b"1".to_vec())
         );
-        assert_eq!(xattr::get(&path, XATTR_AUTHORITY).unwrap(), None);
-        assert_eq!(xattr::get(&path, XATTR_H2_SCHEME).unwrap(), None);
+        assert_eq!(
+            xattr::get(&path, XATTR_AUTHORITY).unwrap(),
+            Some(Vec::new())
+        );
+        assert_eq!(
+            xattr::get(&path, XATTR_H2_SCHEME).unwrap(),
+            Some(Vec::new())
+        );
 
         std::fs::remove_file(&path).unwrap();
     }

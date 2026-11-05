@@ -13,8 +13,8 @@ use crate::proxy::*;
 use crate::repeater::prelude::*;
 
 // Blanket Implementation
-impl<T> AddRaw for RWebSocket<T> {
-    fn add_raw(&mut self, _: BytesMut) {
+impl<T> RepeaterAddRaw for RWebSocket<T> {
+    fn add_raw(&mut self, _: BytesMut) -> Result<(), UpdateMsgError> {
         panic!("{}", WS_ADD_RAW_PANIC);
     }
 }

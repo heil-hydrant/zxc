@@ -24,6 +24,12 @@ pub enum ProxyStateError {
     OneOne(#[from] OneOneRWError),
     #[error("h2 Error| {0}")]
     Two(#[from] two_plz::error::OpError),
+    #[error("h2 preface| {0}")]
+    H2Preface(#[from] two_plz::preface::PrefaceError),
+    #[error("h2 connection closed before response")]
+    H2Closed,
+    #[error("h2 request is missing")]
+    H2MissingRequest,
     // WebSocket
     #[error("Ws| {0}")]
     Ws(#[from] WsError),

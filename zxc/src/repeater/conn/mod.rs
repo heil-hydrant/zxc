@@ -3,6 +3,7 @@ mod encrypt;
 
 use std::path::PathBuf;
 
+use crate::forward_info::H2Info;
 use crate::proxy::prelude::*;
 
 // Repeater connection struct
@@ -10,6 +11,8 @@ pub struct RepeaterConn<T> {
     pub path: PathBuf,
     pub stream: T,
     pub update: bool,
+    pub is_h2: bool,
+    pub h2_info: Option<H2Info>,
     server_info: ServerInfo,
 }
 

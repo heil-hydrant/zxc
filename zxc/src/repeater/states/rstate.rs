@@ -22,7 +22,7 @@ impl<T> AsyncStep for RepeaterState<T>
 where
     T: RepeaterReadFile
         + ShouldUpdate
-        + AddRaw
+        + RepeaterAddRaw
         + RepeaterBytesToFrame
         + Rewrite
         + Newrite
@@ -43,10 +43,9 @@ where
              *
              * Errors:
              *      ProxyStateError::FileIo
+             *      ProxyStateError::UpdateFrame
              */
-            Self::ReadFromFile(conn) => read_from_file(conn)
-                .await
-                .map_err(ProxyStateError::FileIo),
+            Self::ReadFromFile(conn) => read_from_file(conn).await,
 
             /* Transition:
              *      UpdateFrame -> ReWrite

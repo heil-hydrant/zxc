@@ -1,6 +1,7 @@
 pub mod conn;
 pub mod error;
 pub mod file_builder;
+pub mod h2;
 pub mod handler;
 pub mod http;
 pub mod msg_from_ui;

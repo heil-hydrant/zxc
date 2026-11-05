@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use tokio::fs::{copy, create_dir};
+use tokio::fs::create_dir;
 use tracing::trace;
 
 use crate::file_types::{EXT_REQ, EXT_WREQ};
@@ -93,8 +93,8 @@ pub async fn build_repeater_dest(
     path.push(dest_filename);
     trace!("dest_file| {}", &path.to_string_lossy());
 
-    // copy src to dest_file
-    copy(&src_file, &path)
+    // copy src to dest_file with request metadata
+    copy_with_request_metadata(src_file, &path)
         .await
         .map_err(DirError::CopyFile)?;
 

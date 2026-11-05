@@ -50,6 +50,15 @@ pub enum RepeaterError {
     // Encryption
     #[error("Encrypt| {0}")]
     Encrypt(io::Error),
+    #[error("h2 replay requires tls")]
+    H2RequiresTls,
+    #[error("alpn| expected {expected}, negotiated {negotiated:?}")]
+    UnexpectedAlpn {
+        expected: &'static str,
+        negotiated: Option<String>,
+    },
+    #[error("h2 websocket replay is not supported")]
+    H2WsUnsupported,
 
     // ----- Main State Errors -----
     #[error("main state| {0}")]

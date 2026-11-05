@@ -1,6 +1,7 @@
 pub use super::conn::RepeaterConn;
 pub use super::error::RepeaterError;
 pub use super::file_builder::*;
+pub use super::h2::handle_h2;
 pub use super::handler::RepeaterHandler;
 pub use super::http::handle_http;
 pub use super::msg_from_ui::{Operation, RepeaterMsg, SendInfo};

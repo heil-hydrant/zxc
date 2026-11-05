@@ -13,9 +13,10 @@ use crate::proxy::handler_state::handlers::read_http;
 use crate::proxy::*;
 use crate::repeater::prelude::*;
 
-impl<T> AddRaw for Roneone<T> {
-    fn add_raw(&mut self, buf: BytesMut) {
+impl<T> RepeaterAddRaw for Roneone<T> {
+    fn add_raw(&mut self, buf: BytesMut) -> Result<(), UpdateMsgError> {
         self.payload = Some(buf);
+        Ok(())
     }
 }
 

@@ -110,8 +110,7 @@ fn request_h2_info(req: &Request) -> Option<H2Info> {
         .map(str::to_string);
     let scheme = req
         .scheme()
-        .map(|scheme| scheme.as_str().to_string())
-        .filter(|scheme| !scheme.is_empty());
+        .map(|scheme| scheme.as_str().to_string());
 
     if authority.is_none() && scheme.is_none() {
         None
@@ -124,18 +123,7 @@ fn set_h2_pseudo_headers(
     req: &mut Request,
     h2_info: &H2Info,
 ) -> Result<(), UpdateMsgError> {
-    if let Some(authority) = h2_info
-        .authority()
-        .filter(|authority| !authority.is_empty())
-    {
-        req.try_set_authority(authority)?;
-    }
-    if let Some(scheme) = h2_info
-        .scheme()
-        .filter(|scheme| !scheme.is_empty())
-    {
-        req.try_set_scheme(scheme)?;
-    }
+    h2_info.apply_to_request(req)?;
     Ok(())
 }
 
@@ -392,6 +380,17 @@ mod tests {
     }
 
     #[test]
+    fn test_request_h2_info_preserves_empty_scheme() {
+        let mut req = origin_form_request();
+        req.try_set_scheme("").unwrap();
+
+        let info = request_h2_info(&req).unwrap();
+
+        assert!(info.authority().is_none());
+        assert_eq!(info.scheme(), Some(""));
+    }
+
+    #[test]
     fn test_request_h2_info_without_pseudo_headers() {
         let req = origin_form_request();
 
@@ -421,14 +420,41 @@ mod tests {
     }
 
     #[test]
-    fn test_set_h2_pseudo_headers_ignores_empty_fields() {
+    fn test_set_h2_pseudo_headers_preserves_empty_values() {
         let mut req = origin_form_request();
+        req.try_set_authority("old.local")
+            .unwrap();
+        req.try_set_scheme("https").unwrap();
+
         let h2_info = H2Info::new(Some(String::new()), Some(String::new()));
 
         set_h2_pseudo_headers(&mut req, &h2_info).unwrap();
 
         assert!(req.authority().is_none());
-        assert!(req.scheme().is_none());
+        assert_eq!(
+            req.scheme()
+                .map(|scheme| scheme.as_str()),
+            Some("")
+        );
+    }
+
+    #[test]
+    fn test_set_h2_pseudo_headers_none_leaves_existing_values() {
+        let mut req = origin_form_request();
+        req.try_set_authority("old.local")
+            .unwrap();
+        req.try_set_scheme("https").unwrap();
+
+        let h2_info = H2Info::new(None, None);
+
+        set_h2_pseudo_headers(&mut req, &h2_info).unwrap();
+
+        assert_eq!(req.authority(), Some("old.local"));
+        assert_eq!(
+            req.scheme()
+                .map(|scheme| scheme.as_str()),
+            Some("https")
+        );
     }
 
     #[test]
