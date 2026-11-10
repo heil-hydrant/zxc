@@ -2,36 +2,33 @@ use bytes::BytesMut;
 use thiserror::Error;
 use tokio::sync::mpsc::error::SendError;
 
-use crate::commander::CodecError;
+use crate::commander::{CodecError, CommanderError};
 use crate::interceptor::InterUIOps;
-use crate::io::UnixSockError;
-use crate::run::boundary::IsUIError;
+use crate::run::boundary::UiError;
 
 #[derive(Debug, Error)]
 pub enum InterceptorError {
     // ----- Commander -----
-    // commander send
-    #[error("Message to Commander| {0}")]
-    CommanderSend(#[from] SendError<InterUIOps>),
+    #[error(transparent)]
+    Commander(#[from] CommanderError),
 
     // ------ UI ------
-    // serde decode
-    #[error("Message Encode| {0}")]
-    MsgSerialize(#[from] serde_json::Error),
-    #[error("Message Decode| {0}| {1}")]
-    MsgDeserialize(String, serde_json::Error),
-
-    #[error("UI Closed")]
-    UIclosed,
+    #[error("invalid interceptor message ({0}): {1}")]
+    MsgDeserialize(String, #[source] serde_json::Error),
 
     // ----- codec_op ------
-    #[error("{0}")]
+    #[error(transparent)]
     Codec(#[from] CodecError),
-    // unknown
-    #[error("{0}")]
-    UIError(#[from] UnixSockError),
-    #[error("no ui")]
-    NoUI,
+    #[error(transparent)]
+    Ui(#[from] UiError),
+}
+
+crate::impl_ui_error!(InterceptorError);
+
+impl From<SendError<InterUIOps>> for InterceptorError {
+    fn from(_: SendError<InterUIOps>) -> Self {
+        Self::Commander(CommanderError::Send)
+    }
 }
 
 impl From<(&BytesMut, serde_json::Error)> for InterceptorError {
@@ -40,15 +37,5 @@ impl From<(&BytesMut, serde_json::Error)> for InterceptorError {
             String::from_utf8_lossy(val).to_string(),
             e,
         )
-    }
-}
-
-impl IsUIError for InterceptorError {
-    fn is_ui_error(&self) -> bool {
-        matches!(self, InterceptorError::UIError(_))
-    }
-
-    fn needs_flush(&self) -> bool {
-        false
     }
 }

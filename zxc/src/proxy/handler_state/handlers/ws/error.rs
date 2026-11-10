@@ -7,15 +7,15 @@ use crate::history::*;
 
 #[derive(Debug, Error)]
 pub enum WsCreationError {
-    #[error("create dir| {0}")]
+    #[error("directory create: {0}")]
     CreateDir(#[from] std::io::Error),
-    #[error("send| {0}")]
+    #[error("commander send")]
     Send(#[from] SendError<CommanderRequest>),
-    #[error("No Reply")]
+    #[error("commander reply missing")]
     NoReply,
-    #[error("wrong command| {0}")]
+    #[error(transparent)]
     WrongCommand(#[from] WrongMessage),
-    #[error("history send| {0}")]
+    #[error("history send")]
     HistorySend(#[from] SendError<CommanderToHistory>),
 }
 
@@ -30,12 +30,12 @@ pub enum WsCreationError {
  */
 #[derive(Debug, Error)]
 pub enum WsError {
-    #[error("creation| {0}")]
+    #[error(transparent)]
     Create(#[from] WsCreationError),
-    #[error("read| {0}")]
+    #[error("read: {0}")]
     Read(#[from] tungstenite::Error),
     #[error("write")]
     Write,
-    #[error("close")]
+    #[error("closed")]
     Close,
 }

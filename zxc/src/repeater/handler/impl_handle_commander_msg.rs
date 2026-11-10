@@ -1,7 +1,7 @@
 use crate::file_types::{EXT_REQ, EXT_WREQ};
 use crate::forward_info::{ForwardInfo, Module};
 use crate::repeater::prelude::*;
-use crate::run::boundary::{FromCommander, HandleCommander};
+use crate::run::boundary::{FromCommander, HandleCommander, UiError, UiReply};
 
 impl HandleCommander for RepeaterHandler {
     type Error = RepeaterError;
@@ -10,7 +10,7 @@ impl HandleCommander for RepeaterHandler {
         &mut self,
         _: <Self as FromCommander>::Message,
     ) -> Result<(), Self::Error> {
-        Err(RepeaterError::NoUI)
+        Err(RepeaterError::from(UiError::NoUI))
     }
 
     /* Steps:
@@ -34,7 +34,7 @@ impl HandleCommander for RepeaterHandler {
     async fn handle_commander_ui(
         &mut self,
         mut msg: ForwardInfo,
-    ) -> Result<Option<String>, Self::Error> {
+    ) -> Result<UiReply, Self::Error> {
         if let Module::Repeater = msg.to_module() {
             let ext = msg
                 .file_extension()
@@ -46,9 +46,9 @@ impl HandleCommander for RepeaterHandler {
                 EXT_WREQ => build_repeater_dest_ws(&mut msg).await?,
                 _ => Err(RepeaterError::UnknownExtension(msg.file.clone()))?,
             };
-            return Ok(Some(serde_json::to_string(&msg)?));
+            return Ok(UiReply::push(serde_json::to_string(&msg)?));
         }
         self.to_commander.send(msg).await?;
-        Ok(None)
+        Ok(UiReply::None)
     }
 }

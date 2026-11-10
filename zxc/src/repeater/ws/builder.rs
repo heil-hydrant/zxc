@@ -15,15 +15,15 @@ use crate::repeater::prelude::*;
 
 #[derive(Debug, Error)]
 pub enum RWsBuildError {
-    #[error("BuilDir| {0}")]
+    #[error(transparent)]
     DirError(#[from] DirError),
-    #[error("Not Enough Components| {0}")]
+    #[error("not enough path components: {0}")]
     NotEnoughComponents(String),
-    #[error("Server Info Read| {0}")]
+    #[error(transparent)]
     ServerInfoRead(#[from] ServerInfoReadError),
-    #[error("Id Not Valid| {0}")]
+    #[error("invalid repeater id: {0}")]
     IdNotValid(String),
-    #[error("Copy request| {0}")]
+    #[error("request file copy: {0}")]
     CopyFile(#[from] std::io::Error),
 }
 
@@ -74,11 +74,11 @@ pub async fn build_repeater_dest_ws(
 
 #[derive(Debug, Error)]
 pub enum ServerInfoReadError {
-    #[error("File Read| {0}")]
+    #[error("websocket history file read: {0}")]
     FileRead(#[from] std::io::Error),
-    #[error("No Host for id| {0}")]
+    #[error("no host for websocket id {0}")]
     NoHost(String),
-    #[error("Not Valid Scheme| {0}")]
+    #[error("invalid websocket scheme: {0}")]
     NotValidScheme(String),
 }
 

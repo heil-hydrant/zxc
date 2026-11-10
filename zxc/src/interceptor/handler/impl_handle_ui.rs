@@ -2,12 +2,10 @@ use crate::commander::perform_codec_op;
 use crate::interceptor::{
     InterUIOps, InterUImsg, InterceptorError, InterceptorHandler
 };
-use crate::run::boundary::HandleUI;
+use crate::run::boundary::{HandleUI, UiError, UiReply};
 
 impl HandleUI for InterceptorHandler {
-    async fn handle_ui(
-        &mut self,
-    ) -> Result<Option<(usize, String)>, InterceptorError> {
+    async fn handle_ui(&mut self) -> Result<UiReply, InterceptorError> {
         let msg = serde_json::from_slice::<InterUImsg>(&self.buf)
             .map_err(|e| InterceptorError::from((&self.buf, e)))?;
         let id = msg.id;
@@ -25,7 +23,9 @@ impl HandleUI for InterceptorHandler {
                 None
             }
 
-            InterUIOps::Close => return Err(InterceptorError::UIclosed),
+            InterUIOps::Close => {
+                return Err(InterceptorError::from(UiError::Closed));
+            }
             InterUIOps::Encode {
                 codec,
                 data,
@@ -42,8 +42,8 @@ impl HandleUI for InterceptorHandler {
             }
         };
         if let Some(result) = result {
-            return Ok(Some((id, result.to_string())));
+            return Ok(UiReply::Reply(id, result.to_string()));
         }
-        Ok(None)
+        Ok(UiReply::None)
     }
 }

@@ -25,28 +25,27 @@ const CLOSE_MSG: &[u8] = br#"[0,{"Action": "Close"}]"#;
  *
  *          b. Receive msg from commander, call handle_commander_ui and match
  *          result
- *              1. Ok(None)         => continue
+ *              1. UiReply::None            => continue
  *
- *              2. Ok(Some(data))   => buil_slice_and_write(0, data) to stream
- *                                     0, default ui handler needs to be called
+ *              2. UiReply::Reply(id, data) => build_slice_and_write(id, data)
  *
- *              3. Err(..)          => if err.needs_flush() (history only),
- *                                     call flush_storage() on stream.
+ *              3. UiReply::Flush           => call flush_storage()
  *
- *                                     else, print error
+ *              4. Err(..)                  => print error
  *
  *          c. Read from stream
  *              1. If Err is Block, continue for other types return
- *              2. Call handle_ui() to get resutl.
+ *              2. Call handle_ui() to get result.
  *              3. Clear buffer
  *              4. match result
- *                  a. Ok(None)             => continue
+ *                  a. UiReply::None             => continue
  *
- *                  b. Ok(Some((id,data))   => buil_slice_and_write(id, data)
- *                                             to stream
+ *                  b. UiReply::Reply(id, data)  => build_slice_and_write(id, data)
  *
- *                  c. Err(..)              => If is_ui_error() return,
- *                                             else continue
+ *                  c. UiReply::Flush            => call flush_storage()
+ *
+ *                  d. Err(..)                   => If is_ui_error() return,
+ *                                                  else continue
  *
  *          d. Check token cancelled,
  *              1. write CLOSE_MSG to stream
@@ -96,16 +95,15 @@ where
                     Some(msg) => {
                         match handler.handle_commander_ui(msg).await
                         {
-                            Ok(None) => (),
-                            Ok(Some(data)) => build_slice_and_write(0, data, &mut stream).await?,
-                            Err(e) => {
-                                if e.needs_flush() {
-                                    trace!("needs flush");
-                                    handler.flush_storage(&mut stream).await?;
-                                    continue;
-                                }
-                                error!("handle commander| {}", e);
+                            Ok(UiReply::None) => (),
+                            Ok(UiReply::Reply(id, data)) => {
+                                build_slice_and_write(id, data, &mut stream).await?;
                             }
+                            Ok(UiReply::Flush) => {
+                                trace!("needs flush");
+                                handler.flush_storage(&mut stream).await?;
+                            }
+                            Err(e) => error!("handle commander| {}", e),
                         }
                     }
                     None => {
@@ -129,9 +127,13 @@ where
                 handler.buf_as_mut().clear();
                 trace!("buffer cleared");
                 match result {
-                    Ok(None) => (),
-                    Ok(Some((id, data))) => {
+                    Ok(UiReply::None) => (),
+                    Ok(UiReply::Reply(id, data)) => {
                         build_slice_and_write(id, data, &mut stream).await?;
+                    }
+                    Ok(UiReply::Flush) => {
+                        trace!("needs flush");
+                        handler.flush_storage(&mut stream).await?;
                     }
                     Err(e) => {
                         if e.is_ui_error() {

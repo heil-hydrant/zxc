@@ -15,10 +15,13 @@ use crate::interceptor::H2Info;
 use crate::io::file::create_and_write_file;
 use crate::proxy::prelude::*;
 
-// Trait to perform file operations
-pub trait FileOps {
+// Trait to get mutable references to the file and buffer.
+pub trait FileBuf {
     fn file_and_buf_as_mut(&mut self) -> (&mut File, &mut BytesMut);
+}
 
+// Trait to perform file operations.
+pub trait FileOps: FileBuf {
     fn attach_file(&mut self, file: File);
 }
 

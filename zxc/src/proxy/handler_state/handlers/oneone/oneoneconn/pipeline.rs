@@ -33,8 +33,9 @@ impl<T, E, U> AddRaw for OneOneConn<T, E, U>
 where
     U: OneInfoLine,
 {
-    fn add_raw(&mut self, buf: BytesMut) {
+    fn add_raw(&mut self, buf: BytesMut) -> Result<(), UpdateMsgError> {
         self.msg_bytes = Some(buf);
+        Ok(())
     }
 }
 
@@ -109,17 +110,17 @@ impl<T, E> UpdateLogExt for OneOneConn<T, E, OneResponseLine> {
 // --- ReadWrite ---
 #[derive(Debug, Error)]
 pub enum OneOneRWError {
-    #[error("read| {0}")]
-    Read(io::Error),
-    #[error("write| {0}")]
-    Write(io::Error),
-    #[error("request parse| {0}")]
+    #[error("read: {0}")]
+    Read(#[source] io::Error),
+    #[error("write: {0}")]
+    Write(#[source] io::Error),
+    #[error("request parse: {0}")]
     RequestParse(#[from] oneone_plz::error::Error<OneRequestLine>),
-    #[error("response parse| {0}")]
+    #[error("response parse: {0}")]
     ResponseParse(#[from] oneone_plz::error::Error<OneResponseLine>),
-    #[error("decompress| {0}")]
+    #[error("decompression: {0}")]
     Decompress(#[from] MultiDecompressErrorReason),
-    #[error("incorrect state| {0}")]
+    #[error("state: {0}")]
     IncorrectState(#[from] oneone_plz::error::IncorrectState),
 }
 

@@ -2,6 +2,7 @@ use std::fmt::Display;
 use std::io;
 
 use bytes::BytesMut;
+use thiserror::Error;
 use tokio::net::UnixStream;
 
 use crate::io::UnixSockError;
@@ -30,7 +31,7 @@ pub trait HandleCommander: FromCommander {
     async fn handle_commander_ui(
         &mut self,
         msg: <Self as FromCommander>::Message,
-    ) -> Result<Option<String>, Self::Error>;
+    ) -> Result<UiReply, Self::Error>;
 }
 
 /* Description:
@@ -71,7 +72,7 @@ pub trait Buffer {
 pub trait HandleUI: HandleCommander {
     async fn handle_ui(
         &mut self,
-    ) -> Result<Option<(usize, String)>, <Self as HandleCommander>::Error>;
+    ) -> Result<UiReply, <Self as HandleCommander>::Error>;
 }
 
 /* Description:
@@ -92,7 +93,82 @@ pub trait NotifyCommander: HandleCommander {
 }
 
 pub trait IsUIError {
-    fn is_ui_error(&self) -> bool;
+    fn is_ui_error(&self) -> bool {
+        false
+    }
+}
 
-    fn needs_flush(&self) -> bool;
+/* Description:
+ *      Reply returned by UI handlers.
+ *
+ *      None  : nothing to send.
+ *      Reply : send data to UI. id 0 is a push, any other id is an RPC reply.
+ *      Flush : flush queued storage to the UI.
+ */
+pub enum UiReply {
+    None,
+    Reply(usize, String),
+    Flush,
+}
+
+impl UiReply {
+    pub fn push(data: String) -> Self {
+        Self::Reply(0, data)
+    }
+}
+
+/* Description:
+ *      Errors shared by all UI handlers.
+ *
+ *      Only Socket errors terminate the UI runner. NoUI, Closed and Message
+ *      errors are logged and the runner continues.
+ */
+#[derive(Debug, Error)]
+pub enum UiError {
+    #[error("no UI connected")]
+    NoUI,
+    #[error("UI closed")]
+    Closed,
+    #[error("UI message error: {0}")]
+    Message(#[from] serde_json::Error),
+    #[error("ui socket: {0}")]
+    Socket(#[from] UnixSockError),
+}
+
+impl IsUIError for UiError {
+    fn is_ui_error(&self) -> bool {
+        matches!(self, UiError::Socket(_))
+    }
+}
+
+/* Description:
+ *      Generates the shared UI error conversions for a handler error enum.
+ *
+ *      The enum must have a `Ui(UiError)` variant.
+ */
+#[macro_export]
+macro_rules! impl_ui_error {
+    ($err:ty) => {
+        impl From<$crate::io::UnixSockError> for $err {
+            fn from(e: $crate::io::UnixSockError) -> Self {
+                Self::Ui($crate::run::boundary::UiError::Socket(e))
+            }
+        }
+
+        impl From<serde_json::Error> for $err {
+            fn from(e: serde_json::Error) -> Self {
+                Self::Ui($crate::run::boundary::UiError::Message(e))
+            }
+        }
+
+        impl $crate::run::boundary::IsUIError for $err {
+            fn is_ui_error(&self) -> bool {
+                matches!(
+                    self,
+                    Self::Ui(e)
+                        if $crate::run::boundary::IsUIError::is_ui_error(e)
+                )
+            }
+        }
+    };
 }

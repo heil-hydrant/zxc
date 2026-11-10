@@ -12,19 +12,22 @@ use crate::proxy::prelude::*;
 #[derive(Error, Debug)]
 pub enum HandleOneOneError<T, E> {
     // client/server state
-    #[error("proxy state error| {0}")]
+    #[error(transparent)]
     ProxyError(#[from] ProxyStateError),
     // ----- client state => client conn
-    #[error("http read")]
-    SendToServer(OneOneConn<T, E, OneRequestLine>, ProxyStateError),
-    #[error("new connection")]
+    #[error("server send: {1}")]
+    SendToServer(OneOneConn<T, E, OneRequestLine>, #[source] ProxyStateError),
+    #[error("new connection required")]
     NeedNewConnection(OneOneConn<T, E, OneRequestLine>, ServerInfoJson),
     // server state
-    #[error("http read")]
-    ReadFromServer(OneOneConn<E, T, OneResponseLine>, ProxyStateError),
+    #[error("server read: {1}")]
+    ReadFromServer(
+        OneOneConn<E, T, OneResponseLine>,
+        #[source] ProxyStateError,
+    ),
     // ws upgrade
-    #[error("{0}")]
+    #[error(transparent)]
     InfoLine(#[from] InfoLineError),
-    #[error("{0}")]
+    #[error(transparent)]
     StatusCode(#[from] InvalidStatusCode),
 }

@@ -11,7 +11,7 @@ use http_plz::{OneMessageHead, OneOne};
 use oneone_plz::state::State;
 pub use oneoneconn::*;
 use tokio::io::{
-    AsyncReadExt, AsyncWriteExt, BufReader, copy_bidirectional_with_sizes,
+    AsyncReadExt, AsyncWriteExt, BufReader, copy_bidirectional_with_sizes
 };
 use tracing::{error, trace};
 
@@ -55,7 +55,7 @@ where
                         .commander_recvr
                         .recv()
                         .await
-                        .ok_or(StateError::CommanderRecv("ShouldProxyWs"))?;
+                        .ok_or(CommanderError::RecvContext("ShouldProxyWs"))?;
                     let result: bool = resp.try_into()?;
                     if result {
                         trace!("proxy ws| Y");

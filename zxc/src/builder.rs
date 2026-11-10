@@ -6,8 +6,7 @@ use tracing::{error, trace};
 
 use crate::addons::AddonHandler;
 use crate::commander::{
-    CaptainCrypto, Commander, CommanderRequest, HistoryComm, InterceptorComm,
-    RepeaterComm,
+    CaptainCrypto, Commander, CommanderRequest, HistoryComm, InterceptorComm, RepeaterComm
 };
 use crate::config::{Config, GlobalConfig, ProxyArgs, parse_global_config};
 use crate::core::HISTORY_STATE_FILE;

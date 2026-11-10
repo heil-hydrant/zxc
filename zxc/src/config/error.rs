@@ -5,12 +5,12 @@ use thiserror::Error;
 #[derive(Debug, Error)]
 pub enum ConfigError {
     // ----- Local Config -----
-    #[error("Unable to read config| {0}")]
+    #[error("config read: {0}")]
     FileRead(#[from] std::io::Error),
-    #[error("Unable to Parse config| {0}")]
+    #[error("config parse: {0}")]
     ParseConfig(#[from] toml::de::Error),
 
     // ----- Global Config -----
-    #[error("Home env | {0}")]
+    #[error("home directory lookup: {0}")]
     Env(#[from] VarError),
 }

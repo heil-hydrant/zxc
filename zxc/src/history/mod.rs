@@ -3,9 +3,9 @@ pub mod handler;
 pub mod message;
 pub mod wshistory;
 
-pub use error::HistoryError;
+pub use error::{HistoryError, HistoryWsError};
 pub use handler::HistoryHandler;
 pub use message::{
-    CommanderToHistory, HistoryUIOps, HistoryUImsg, HistoryWsRegisterInfo,
+    CommanderToHistory, HistoryUIOps, HistoryUImsg, HistoryWsRegisterInfo
 };
 pub use wshistory::{HISTORY_WS_HIS, WsHistory};

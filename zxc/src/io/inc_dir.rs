@@ -6,16 +6,16 @@ use tokio::fs::read_dir;
 
 #[derive(Debug, Error)]
 pub enum DirError {
-    #[error("unknown ext| {0}")]
+    #[error("unknown file extension: {0}")]
     UnknownExt(String),
-    #[error("Top Dir not found| {0}")]
+    #[error("top directory not found: {0}")]
     NoTop(String),
-    #[error("Build Http| {0}")]
-    IncrementalDir(io::Error),
-    #[error("Create Dir| {0}")]
-    CreateDir(io::Error),
-    #[error("Copy File| {0}")]
-    CopyFile(io::Error),
+    #[error("incremental directory build: {0}")]
+    IncrementalDir(#[source] io::Error),
+    #[error("directory create: {0}")]
+    CreateDir(#[source] io::Error),
+    #[error("file copy: {0}")]
+    CopyFile(#[source] io::Error),
 }
 
 pub async fn incremental<T>(

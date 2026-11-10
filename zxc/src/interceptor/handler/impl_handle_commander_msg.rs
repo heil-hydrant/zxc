@@ -1,7 +1,7 @@
 use crate::interceptor::{
     InterToUI, InterUIOps, InterceptorError, InterceptorHandler
 };
-use crate::run::boundary::HandleCommander;
+use crate::run::boundary::{HandleCommander, UiError, UiReply};
 
 impl HandleCommander for InterceptorHandler {
     type Error = InterceptorError;
@@ -16,13 +16,13 @@ impl HandleCommander for InterceptorHandler {
                 .send(InterUIOps::Toggle)
                 .await?
         }
-        Err(InterceptorError::NoUI)
+        Err(InterceptorError::from(UiError::NoUI))
     }
 
     async fn handle_commander_ui(
         &mut self,
         info: InterToUI,
-    ) -> Result<Option<String>, Self::Error> {
-        Ok(Some(serde_json::to_string(&info)?))
+    ) -> Result<UiReply, Self::Error> {
+        Ok(UiReply::push(serde_json::to_string(&info)?))
     }
 }

@@ -167,7 +167,7 @@ where
             .receiver()
             .recv()
             .await
-            .ok_or(ProxyStateError::CommanderResponse(SHOULD_LOG))?;
+            .ok_or(CommanderError::RecvContext(SHOULD_LOG))?;
         if let Some(result) = conn.parse_log_response(response)? {
             trace!("log| Y");
             conn.update_path(result);

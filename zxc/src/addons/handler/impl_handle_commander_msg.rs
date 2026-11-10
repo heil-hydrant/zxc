@@ -1,7 +1,7 @@
 use super::AddonHandler;
 use crate::addons::AddonError;
 use crate::forward_info::ForwardInfo;
-use crate::run::boundary::HandleCommander;
+use crate::run::boundary::{HandleCommander, UiError, UiReply};
 
 impl HandleCommander for AddonHandler {
     type Error = AddonError;
@@ -11,14 +11,14 @@ impl HandleCommander for AddonHandler {
         &mut self,
         _: ForwardInfo,
     ) -> Result<(), Self::Error> {
-        Err(AddonError::NoUI)
+        Err(AddonError::from(UiError::NoUI))
     }
 
     async fn handle_commander_ui(
         &mut self,
         msg: ForwardInfo,
-    ) -> Result<Option<String>, Self::Error> {
+    ) -> Result<UiReply, Self::Error> {
         let cmd = self.build_cmd_string(msg).await?;
-        Ok(Some(cmd))
+        Ok(UiReply::push(cmd))
     }
 }

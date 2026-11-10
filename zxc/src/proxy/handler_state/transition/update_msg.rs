@@ -31,7 +31,7 @@ pub enum UpdateMsgError {
     InvalidWsFrame,
     #[error("invalid uri")]
     InvalidUri(#[from] header_plz::uri::InvalidUri),
-    #[error("invalid uri")]
+    #[error("invalid status code")]
     InvalidStatusCode(#[from] header_plz::status::InvalidStatusCode),
 }
 

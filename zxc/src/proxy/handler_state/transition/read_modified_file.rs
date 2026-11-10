@@ -17,7 +17,7 @@ pub const WS_ADD_RAW_PANIC: &str = "No add raw for ws";
 // ws frames are always updated. (Blanket implementation)
 
 pub trait AddRaw {
-    fn add_raw(&mut self, buf: BytesMut);
+    fn add_raw(&mut self, buf: BytesMut) -> Result<(), UpdateMsgError>;
 }
 
 pub async fn read_mod_file<T>(
@@ -38,7 +38,7 @@ where
         return Ok(ProxyState::UpdateMsg(conn, fbuf, resume_info));
     } else {
         trace!("update| N");
-        conn.add_raw(fbuf);
+        conn.add_raw(fbuf)?;
     }
 
     if let Some(server_info) = resume_info.into_server_info() {

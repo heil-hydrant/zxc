@@ -7,9 +7,10 @@ use tracing::trace;
 use crate::proxy::prelude::*;
 
 #[derive(Debug, Error)]
-#[error("{address}| {error}")]
+#[error("connect to {address}: {error}")]
 pub struct ConnectError {
     address: String,
+    #[source]
     error: io::Error,
 }
 

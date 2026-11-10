@@ -14,11 +14,13 @@ use zxc_derive::{Buffer, NotifyCommander};
 
 use crate::CAPACITY_2MB;
 use crate::history::{
-    CommanderToHistory, HISTORY_WS_HIS, HistoryError, HistoryUIOps, WsHistory,
+    CommanderToHistory, HISTORY_WS_HIS, HistoryError, HistoryUIOps, HistoryWsError, WsHistory
 };
 use crate::id::Id;
 use crate::io::write_and_flush;
-use crate::run::boundary::{Buffer, HandleCommander, NotifyCommander};
+use crate::run::boundary::{
+    Buffer, HandleCommander, NotifyCommander, UiReply
+};
 
 const WS_HISTORY: &str = "ws_history";
 const WS_REMOVE: &str = "ws_remove";
@@ -61,20 +63,19 @@ impl HistoryHandler {
      *      2. Else, reverse msg_storage to maintain order, pop elements and
      *         store response for each message in storage.
      *
-     *          a. If with_sock, return Err(HistoryError::NeedsFlush), to
-     *             write_vectored()
+     *          a. If with_sock, return UiReply::Flush, to write_vectored()
      */
     pub async fn handle_commander(
         &mut self,
         size: usize,
         with_sock: bool,
-    ) -> Result<Option<String>, HistoryError> {
+    ) -> Result<UiReply, HistoryError> {
         if size == 1 {
             trace!("recv| 1");
             let msg = self.msg_storage.pop().unwrap();
             if let Some(res) = self.get_response(msg).await? {
                 if with_sock {
-                    return Ok(Some(res));
+                    return Ok(UiReply::push(res));
                 } else {
                     self.ui_storage.push(res);
                 }
@@ -88,10 +89,10 @@ impl HistoryHandler {
                 }
             }
             if with_sock {
-                return Err(HistoryError::NeedsFlush);
+                return Ok(UiReply::Flush);
             }
         };
-        Ok(None)
+        Ok(UiReply::None)
     }
 
     pub async fn get_response(
@@ -122,9 +123,9 @@ impl HistoryHandler {
              *         and add to self.ws_storage
              *
              * Error:
-             *      HistoryError::CreateWs   [1]
-             *      HistoryError::WsWrite    [2]
-             *      HistoryError::RegisterWs [3]
+             *      HistoryWsError::FileCreate [1]
+             *      HistoryWsError::Write      [2]
+             *      HistoryWsError::Register   [3]
              */
             CommanderToHistory::RegisterWs(reginfo) => {
                 trace!("ws register");
@@ -134,7 +135,7 @@ impl HistoryHandler {
                         .append(true)
                         .open(HISTORY_WS_HIS)
                         .await
-                        .map_err(HistoryError::CreateWs)?;
+                        .map_err(HistoryWsError::FileCreate)?;
                     self.ws_his = Some(hfile);
                     trace!("ws.whis| attached");
                     // 2
@@ -149,11 +150,11 @@ impl HistoryHandler {
                     reginfo.log_data().as_bytes(),
                 )
                 .await
-                .map_err(HistoryError::WsWrite)?;
+                .map_err(HistoryWsError::Write)?;
 
                 let wshis = WsHistory::new(reginfo)
                     .await
-                    .map_err(HistoryError::RegisterWs)?;
+                    .map_err(HistoryWsError::Register)?;
                 self.ws_storage.push(wshis);
                 rply
             }
@@ -164,7 +165,7 @@ impl HistoryHandler {
              *
              * Error:
              *      HistoryError::NoId      [1]
-             *      HistoryError::WsWrite   [2]
+             *      HistoryWsError::Write   [2]
              */
             CommanderToHistory::WebSocket(id, logdata) => {
                 trace!("ws write");
@@ -175,7 +176,7 @@ impl HistoryHandler {
                     .ok_or(HistoryError::NoId(id, WS_HISTORY))?;
                 write_and_flush(wslog.file_as_mut(), logdata.as_bytes())
                     .await
-                    .map_err(HistoryError::WsWrite)?;
+                    .map_err(HistoryWsError::Write)?;
                 None
             }
 

@@ -68,7 +68,7 @@ impl Debug for CommanderResponse {
 }
 
 #[derive(Debug, Error)]
-#[error("wrong response| {0}")]
+#[error("unexpected commander response: {0}")]
 pub struct WrongMessage(String);
 
 // Various TryFrom implementations to get associated values from

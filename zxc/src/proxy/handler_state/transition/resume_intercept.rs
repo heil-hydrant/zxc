@@ -1,6 +1,7 @@
 use tracing::trace;
 
 use super::can_communicate::CanCommunicate;
+use crate::commander::CommanderError;
 use crate::interceptor::*;
 use crate::proxy::prelude::*;
 
@@ -19,7 +20,7 @@ where
         .receiver()
         .recv()
         .await
-        .ok_or(ProxyStateError::CommanderResponse("resume_intercept"))?;
+        .ok_or(CommanderError::RecvContext("resume_intercept"))?;
     if response.is_drop_msg() {
         return Ok(ProxyState::Drop(conn));
     }

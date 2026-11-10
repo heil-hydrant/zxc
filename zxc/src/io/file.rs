@@ -11,21 +11,27 @@ use crate::core::constants::REQUEST_XATTRS;
 use crate::io::write_and_flush;
 
 #[derive(Debug, Error)]
-#[error("Event")]
 pub enum FileEvent {
+    #[error("create")]
     Create,
+    #[error("write")]
     Write,
+    #[error("read")]
     Read,
+    #[error("open")]
     Open,
+    #[error("seek")]
     Seek,
+    #[error("truncate")]
     SetLen,
 }
 
 #[derive(Debug, Error)]
-#[error("file| {0}| {1}", self.name.to_string_lossy(), self.error)]
+#[error("file {event}: {name}: {error}", name = self.name.to_string_lossy())]
 pub struct FileErrorInfo {
     name: PathBuf,
     event: FileEvent,
+    #[source]
     error: io::Error,
 }
 

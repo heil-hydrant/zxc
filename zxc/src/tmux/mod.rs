@@ -5,8 +5,7 @@ use std::time::{Duration, Instant};
 mod cmd;
 mod constants;
 use cmd::{
-    attach_session, create_session, create_window, list_sessions,
-    list_windows, rename_window, run_module, set_env,
+    attach_session, create_session, create_window, list_sessions, list_windows, rename_window, run_module, set_env
 };
 use constants::*;
 

@@ -20,7 +20,7 @@ use crate::proxy::prelude::*;
 // Blank implementation. No add_raw for ws
 impl<T, E> AddRaw for WsConn<T, E> {
     #[inline(always)]
-    fn add_raw(&mut self, _: BytesMut) {
+    fn add_raw(&mut self, _: BytesMut) -> Result<(), UpdateMsgError> {
         panic!("{}", WS_ADD_RAW_PANIC);
     }
 }

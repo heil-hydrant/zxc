@@ -13,60 +13,68 @@ use crate::proxy::prelude::*;
 #[derive(Error, Debug)]
 pub enum StateError {
     // ----- Read Initial Client Data -----
-    #[error("initial read| {0}")]
+    #[error("http: {0}")]
     InitialRead(#[from] OneOneRWError),
 
     // ----- Determine Server -----
-    #[error("parse address| {0}")]
+    #[error(transparent)]
     Address(#[from] AddressError),
 
     // ----- Establish Conn -----
-    #[error("connect| {0}")]
+    #[error(transparent)]
     ServerConnect(#[from] ConnectError),
 
-    // ---- Should Proxy -----
-    #[error("should proxy| {0}")]
-    ShouldProxy(#[from] RecvError),
-
     // Proxy Write
-    #[error("writing proxy established| {0}")]
-    ClientWrite(io::Error),
+    #[error("proxy established response write: {0}")]
+    ClientWrite(#[source] io::Error),
     // Server Write
-    #[error("writing server establishment| {0}")]
-    ServerWrite(io::Error),
+    #[error("server establishment write: {0}")]
+    ServerWrite(#[source] io::Error),
 
     // ----- Client Encrypt -----
     // Client Handshake
-    #[error("client handshake| {0}")]
-    ClientHandshake(io::Error),
+    #[error("client handshake: {0}")]
+    ClientHandshake(#[source] io::Error),
 
     // ----- Server Encrypt -----
-    #[error("invalid dns| {0}")]
+    #[error(transparent)]
     InvalidDns(#[from] InvalidDnsNameError),
-    #[error("server encrypt| {0}")]
+    #[error(transparent)]
     ServerEncrypt(#[from] ServerEncryptError),
 
     // ----- Complete Handshake -----
     #[error("no peer certificate")]
     NoPeerCertificate,
-    #[error("client cert gen| {0}")]
+    #[error(transparent)]
     ClientCertificateGen(#[from] CertError),
-    #[error("complete handshake| {0}")]
-    ClientEncrypt(io::Error),
+    #[error("client handshake completion: {0}")]
+    ClientEncrypt(#[source] io::Error),
 
     // ----- Protocol Handler -----
-    #[error("handler| {0}")]
+    #[error(transparent)]
     Handler(#[from] ProxyStateError),
 
     // ----- Communicate -----
-    #[error("wrong response| {0}")]
-    WrongMessage(#[from] WrongMessage),
-    // mpsc sender error
-    #[error("commander send| {0}")]
-    CommanderSend(#[from] SendError<CommanderRequest>),
-    // mpsc recvr
-    #[error("commander recv| {0}")]
-    CommanderRecv(&'static str),
+    #[error(transparent)]
+    Commander(#[from] CommanderError),
+}
+
+impl From<RecvError> for StateError {
+    fn from(_: RecvError) -> Self {
+        Self::Commander(CommanderError::Recv)
+    }
+}
+
+impl From<SendError<CommanderRequest>> for StateError {
+    fn from(_: SendError<CommanderRequest>) -> Self {
+        Self::Commander(CommanderError::Send)
+    }
+}
+
+impl From<WrongMessage> for StateError {
+    fn from(e: WrongMessage) -> Self {
+        Self::Commander(CommanderError::WrongMessage(e))
+    }
 }
 
 impl StateError {

@@ -2,7 +2,7 @@ use serde_json::json;
 use tracing::error;
 
 use crate::repeater::prelude::*;
-use crate::run::boundary::HandleUI;
+use crate::run::boundary::{HandleUI, UiReply};
 
 /* Steps:
  *      1. Parse the buf into RepeaterMsg.
@@ -21,9 +21,7 @@ use crate::run::boundary::HandleUI;
  */
 
 impl HandleUI for RepeaterHandler {
-    async fn handle_ui(
-        &mut self,
-    ) -> Result<Option<(usize, String)>, RepeaterError> {
+    async fn handle_ui(&mut self) -> Result<UiReply, RepeaterError> {
         let msg = serde_json::from_slice::<RepeaterMsg>(&self.buf)?; // 1
         let id = if msg.to_repeater() {
             0
@@ -39,8 +37,8 @@ impl HandleUI for RepeaterHandler {
             Ok(None) => None,
         };
         if let Some(data) = to_send {
-            return Ok(Some((id, data)));
+            return Ok(UiReply::Reply(id, data));
         }
-        Ok(None)
+        Ok(UiReply::None)
     }
 }

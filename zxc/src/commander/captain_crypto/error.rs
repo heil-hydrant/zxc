@@ -6,27 +6,27 @@ use tokio_rustls::rustls::server::VerifierBuilderError;
 
 #[derive(Debug, Error)]
 pub enum CertError {
-    #[error("rcgen| {0}")]
+    #[error("certificate generation: {0}")]
     Rcgen(#[from] rcgen::Error),
-    #[error("rustls| {0}")]
+    #[error("TLS configuration: {0}")]
     Rustls(#[from] rustls::Error),
-    #[error("x509 parse| {0}")]
+    #[error("x509 parse: {0}")]
     X509(String),
 }
 
 #[derive(Debug, Error)]
 pub enum CryptoBuildError {
-    #[error("home var| {0}")]
+    #[error("home directory lookup: {0}")]
     Var(#[from] env::VarError),
-    #[error("verifierbuild| {0}")]
+    #[error("verifier build: {0}")]
     VerifierBuild(#[from] VerifierBuilderError),
-    #[error("read file| {0}")]
+    #[error("file read: {0}")]
     Read(#[from] io::Error),
-    #[error("rcgen| {0}")]
+    #[error("certificate generation: {0}")]
     Rcgen(#[from] rcgen::Error),
-    #[error("read private key| {0}")]
+    #[error("private key read: {0}")]
     ReadPrivateKey(String),
-    #[error("no private.key")]
+    #[error("private.key not found")]
     NoKeyFound,
     #[error("unknown private key type")]
     UnknownPrivateKeyType,
