@@ -13,7 +13,7 @@ use crate::proxy::*;
 use crate::repeater::prelude::*;
 
 // Blanket Implementation
-impl<T> RepeaterAddRaw for RWebSocket<T> {
+impl<T> AddRaw for RWebSocket<T> {
     fn add_raw(&mut self, _: BytesMut) -> Result<(), UpdateMsgError> {
         panic!("{}", WS_ADD_RAW_PANIC);
     }
@@ -80,24 +80,21 @@ impl<T> RepeaterBytesToFrame for RWebSocket<T> {
     }
 }
 
-impl<T> Rewrite for RWebSocket<T> {
+impl<T> Persist for RWebSocket<T> {
     #[inline(always)]
     fn should_rewrite(&self) -> bool {
         false
     }
 
     // No rewrite for ws, so always return data None
-    fn get_write_data_and_file(&mut self) -> (&[u8], &mut File) {
+    fn file_and_data(&mut self) -> (&mut File, &[u8]) {
         panic!("No rewrite for ws");
     }
-}
 
-/* Steps:
- *        1. update path to id.wreq
- *        2. increment id
- */
-
-impl<T> Newrite for RWebSocket<T> {
+    /* Steps:
+     *        1. update path to id.wreq
+     *        2. increment id
+     */
     fn update_path(&mut self) {
         self.path
             .set_file_name(self.log_id.to_string());

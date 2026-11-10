@@ -1,26 +1,9 @@
-use bytes::BytesMut;
-use tokio::fs::File;
 use tracing::trace;
 
 use super::should_update::ShouldUpdate;
 use crate::io::*;
 use crate::proxy::*;
 use crate::repeater::prelude::*;
-
-/* Description:
- *     Trait to read from file.
- *
- * Implemented in (as derive macro):
- *     zxc-derive/src/repeater_read_from_file.rs
- */
-
-pub trait RepeaterReadFile {
-    fn file_and_buf_as_mut(&mut self) -> (&mut File, &mut BytesMut);
-}
-
-pub trait RepeaterAddRaw {
-    fn add_raw(&mut self, buf: BytesMut) -> Result<(), UpdateMsgError>;
-}
 
 /* Steps:
  *     1. Read from the file
@@ -40,7 +23,7 @@ pub async fn read_from_file<T>(
     mut conn: T,
 ) -> Result<RepeaterState<T>, ProxyStateError>
 where
-    T: RepeaterReadFile + ShouldUpdate + RepeaterAddRaw,
+    T: FileBuf + ShouldUpdate + AddRaw,
 {
     let (file, buf) = conn.file_and_buf_as_mut();
     read_file(file, buf).await?;

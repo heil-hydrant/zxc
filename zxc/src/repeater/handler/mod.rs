@@ -22,7 +22,7 @@ use crate::io::*;
 use crate::proxy::*;
 use crate::repeater::prelude::*;
 use crate::run::boundary::{
-    Buffer, CloseAction, FlushStorage, HandleCommander, NotifyCommander
+    Buffer, CloseAction, FlushStorage, HandleCommander, NotifyCommander, UiReply
 };
 
 // Handler for Repeater side of the PROXY
@@ -106,11 +106,13 @@ impl RepeaterHandler {
              *      info: ForwardInfo
              *
              * Steps:
-             *      Since, result from handle_commander_ui() is Option<String>,
+             *      Since, result from handle_commander_ui() is UiReply,
              *      return it directly.
              */
             Operation::Forward(info) => {
-                if let Some(result) = self.handle_commander_ui(info).await? {
+                if let UiReply::Reply(_, result) =
+                    self.handle_commander_ui(info).await?
+                {
                     return Ok(Some(result));
                 }
                 None

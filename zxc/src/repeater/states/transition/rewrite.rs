@@ -6,35 +6,22 @@ use tracing::trace;
 use crate::io::*;
 
 /* Description:
- *      Trait to rewrite file.
- *      Get mutable reference to file and reference to data
+ *      Trait to persist the payload to disk.
+ *      Either rewrite the existing file or write a new one.
  *
  * Transition:
  *     ReWrite -> Send
  *
  * NOTE:
- *      ONLY http implementation is used.
- *      ws implementation to satify trait bound.
+ *      HTTP implementations rewrite the existing file.
+ *      WS implementations write a new file and update the path.
  */
 
-pub trait Rewrite {
+pub trait Persist {
     fn should_rewrite(&self) -> bool;
 
-    fn get_write_data_and_file(&mut self) -> (&[u8], &mut File);
-}
+    fn file_and_data(&mut self) -> (&mut File, &[u8]);
 
-/* Description:
- *      Trait to write new file.
- *
- * Transition:
- *      ReWrite -> Send
- *
- * NOTE:
- *      ONLY WS implementation is used.
- *      http implementation to satify trait bound.
- */
-
-pub trait Newrite {
     fn update_path(&mut self);
 
     fn data_as_ref(&self) -> &[u8];
@@ -43,7 +30,7 @@ pub trait Newrite {
 }
 
 /* Description:
- *      Function to rewrite or newrite file.
+ *      Function to persist the payload to disk.
  *
  * Steps:
  *      1. Check if should rewrite,
@@ -65,12 +52,12 @@ pub trait Newrite {
 
 pub async fn rewrite<T>(mut conn: T) -> Result<T, FileErrorInfo>
 where
-    T: Rewrite + Newrite,
+    T: Persist,
 {
     // 1
     if conn.should_rewrite() {
         // 2
-        let (data, file) = conn.get_write_data_and_file();
+        let (file, data) = conn.file_and_data();
         trace!("rewrite| {:?}", file);
         rewrite_file(file, data)
             .await

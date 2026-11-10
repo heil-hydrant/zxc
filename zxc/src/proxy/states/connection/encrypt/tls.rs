@@ -69,7 +69,7 @@ where
         let res = recvr
             .recv()
             .await
-            .ok_or(StateError::CommanderRecv(COMPLETE_HANDSHAKE))?;
+            .ok_or(CommanderError::RecvContext(COMPLETE_HANDSHAKE))?;
         let verifier = Arc::<WebPkiServerVerifier>::try_from(res)?;
 
         let verify = verifier
@@ -98,7 +98,7 @@ where
         let res = recvr
             .recv()
             .await
-            .ok_or(StateError::CommanderRecv(COMPLETE_HANDSHAKE))?;
+            .ok_or(CommanderError::RecvContext(COMPLETE_HANDSHAKE))?;
         let recvd_config = Option::<Arc<ServerConfig>>::try_from(res)?;
 
         let server_config = match recvd_config {
@@ -120,7 +120,7 @@ where
                 let res = recvr
                     .recv()
                     .await
-                    .ok_or(StateError::CommanderRecv(COMPLETE_HANDSHAKE))?;
+                    .ok_or(CommanderError::RecvContext(COMPLETE_HANDSHAKE))?;
                 let result =
                     Result::<Arc<ServerConfig>, CertError>::try_from(res)?;
                 result?
@@ -191,14 +191,22 @@ where
 
 #[derive(Debug, Error)]
 pub enum ServerEncryptError {
-    #[error("commander send")]
-    Send(#[from] SendError<CommanderRequest>),
-    #[error("commander recv")]
-    Recv,
-    #[error("wrong msg| {0}")]
-    WrongMessage(#[from] WrongMessage),
-    #[error("io| {0}")]
+    #[error(transparent)]
+    Commander(#[from] CommanderError),
+    #[error("server encryption: {0}")]
     Io(#[from] io::Error),
+}
+
+impl From<SendError<CommanderRequest>> for ServerEncryptError {
+    fn from(_: SendError<CommanderRequest>) -> Self {
+        Self::Commander(CommanderError::Send)
+    }
+}
+
+impl From<WrongMessage> for ServerEncryptError {
+    fn from(e: WrongMessage) -> Self {
+        Self::Commander(CommanderError::WrongMessage(e))
+    }
 }
 
 pub async fn server_encrypt(
@@ -214,7 +222,7 @@ pub async fn server_encrypt(
     let res = recvr
         .recv()
         .await
-        .ok_or(ServerEncryptError::Recv)?;
+        .ok_or(CommanderError::Recv)?;
     let connector = Arc::<TlsConnector>::try_from(res)?;
     if only_h1 {
         connector

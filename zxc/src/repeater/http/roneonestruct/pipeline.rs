@@ -13,7 +13,7 @@ use crate::proxy::handler_state::handlers::read_http;
 use crate::proxy::*;
 use crate::repeater::prelude::*;
 
-impl<T> RepeaterAddRaw for Roneone<T> {
+impl<T> AddRaw for Roneone<T> {
     fn add_raw(&mut self, buf: BytesMut) -> Result<(), UpdateMsgError> {
         self.payload = Some(buf);
         Ok(())
@@ -60,29 +60,29 @@ impl<T> RepeaterBytesToFrame for Roneone<T> {
     }
 }
 
-impl<T> Rewrite for Roneone<T> {
+const NEWRITE_ERROR: &str = "No new Write for http";
+impl<T> Persist for Roneone<T> {
     // If frame was uploaded, then rewrite
     #[inline]
     fn should_rewrite(&self) -> bool {
         self.update
     }
-    fn get_write_data_and_file(&mut self) -> (&[u8], &mut File) {
+
+    fn file_and_data(&mut self) -> (&mut File, &[u8]) {
         // safe to unwrap,
         // since data is set in read_from_file / update frame state
-        (self.payload.as_ref().unwrap(), &mut self.file)
-    }
-}
-
-const NEWRITE_ERROR: &str = "No new Write for http";
-impl<T> Newrite for Roneone<T> {
-    fn data_as_ref(&self) -> &[u8] {
-        panic!("{}", NEWRITE_ERROR)
-    }
-    fn path_as_ref(&self) -> &PathBuf {
-        panic!("{}", NEWRITE_ERROR)
+        (&mut self.file, self.payload.as_ref().unwrap())
     }
 
     fn update_path(&mut self) {
+        panic!("{}", NEWRITE_ERROR)
+    }
+
+    fn data_as_ref(&self) -> &[u8] {
+        panic!("{}", NEWRITE_ERROR)
+    }
+
+    fn path_as_ref(&self) -> &PathBuf {
         panic!("{}", NEWRITE_ERROR)
     }
 }

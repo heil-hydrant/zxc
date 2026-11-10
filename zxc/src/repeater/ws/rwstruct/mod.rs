@@ -8,14 +8,14 @@ use tokio::sync::mpsc::Receiver;
 use tokio_tungstenite::WebSocketStream;
 use tokio_tungstenite::tungstenite::Message;
 use tracing::trace;
-use zxc_derive::RepeaterReadFile;
+use zxc_derive::FileBuf;
 
 use crate::io::*;
 use crate::proxy::*;
 use crate::repeater::prelude::*;
 
 // RepeaterWs Handler
-#[derive(RepeaterReadFile)]
+#[derive(FileBuf)]
 pub struct RWebSocket<T> {
     pub stream: WebSocketStream<T>,
     pub receiver: Receiver<RepeaterWsMsg>,

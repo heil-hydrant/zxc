@@ -4,6 +4,7 @@ use bytes::BytesMut;
 
 use super::transition::*;
 use crate::async_step::AsyncStep;
+use crate::proxy::handler_state::transition::FileBuf;
 use crate::proxy::*;
 
 // All possible Repeater States
@@ -20,12 +21,11 @@ pub enum RepeaterState<T> {
 
 impl<T> AsyncStep for RepeaterState<T>
 where
-    T: RepeaterReadFile
+    T: FileBuf
         + ShouldUpdate
-        + RepeaterAddRaw
+        + AddRaw
         + RepeaterBytesToFrame
-        + Rewrite
-        + Newrite
+        + Persist
         + ReadWrite
         + WriteResponse
         + ReadWrite<State = Self>,
@@ -39,7 +39,7 @@ where
              *      ReadFromFile -> UpdateFrame | Send
              *
              * Trait Bound:
-             *      RepeaterReadFile + ShouldUpdate + AddRaw
+             *      FileBuf + ShouldUpdate + AddRaw
              *
              * Errors:
              *      ProxyStateError::FileIo
@@ -65,7 +65,7 @@ where
              *      ReWrite -> Send
              *
              * Trait Bound:
-             *      Rewrite + Newrite,
+             *      Persist,
              *
              * Errors:
              *      ProxyStateError::RewriteFile

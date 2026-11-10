@@ -6,6 +6,7 @@ use header_plz::{RequestLine, ResponseLine};
 use http_plz::Request;
 use thiserror::Error;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::sync::mpsc::error::SendError;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::oneshot;
 use tokio::task::JoinSet;
@@ -23,22 +24,30 @@ use crate::proxy::prelude::*;
 
 #[derive(Debug, Error)]
 pub enum Http2Error {
-    #[error("preface| {0}")]
+    #[error("preface: {0}")]
     Preface(#[from] PrefaceError),
-    #[error("op| {0}")]
+    #[error("operation: {0}")]
     Op(#[from] OpError),
-    #[error("user| {0}")]
+    #[error("user: {0}")]
     User(#[from] UserError),
-    #[error("proxy state| {0}")]
+    #[error(transparent)]
     Proxy(#[from] ProxyStateError),
-    #[error("commander send| {0}")]
-    CommanderSend(
-        #[from] tokio::sync::mpsc::error::SendError<CommanderRequest>,
-    ),
-    #[error("unexpected h2 request state")]
+    #[error(transparent)]
+    Commander(#[from] CommanderError),
+    #[error("unexpected request state")]
     UnexpectedState,
-    #[error("commander recv| {0}")]
-    CommanderRecv(#[from] tokio::sync::oneshot::error::RecvError),
+}
+
+impl From<SendError<CommanderRequest>> for Http2Error {
+    fn from(_: SendError<CommanderRequest>) -> Self {
+        Self::Commander(CommanderError::Send)
+    }
+}
+
+impl From<tokio::sync::oneshot::error::RecvError> for Http2Error {
+    fn from(_: tokio::sync::oneshot::error::RecvError) -> Self {
+        Self::Commander(CommanderError::Recv)
+    }
 }
 
 pub async fn handle_http2<T, E>(

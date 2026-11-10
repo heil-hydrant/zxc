@@ -1,13 +1,13 @@
 mod buffer;
 mod can_communicate;
 mod close_action;
+mod file_buf;
 mod file_ops;
 mod flush_storage;
 mod get_path;
 mod id;
 mod log;
 mod notify;
-mod repeater_read_from_file;
 mod role;
 mod send_history;
 
@@ -15,10 +15,10 @@ use proc_macro::TokenStream;
 use quote::{format_ident, quote};
 use syn::{DeriveInput, parse_macro_input};
 
-#[proc_macro_derive(RepeaterReadFile)]
-pub fn repeaterreadfile(input: TokenStream) -> TokenStream {
+#[proc_macro_derive(FileBuf)]
+pub fn filebuf(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as DeriveInput);
-    repeater_read_from_file::impl_repeater_read_from_file(&ast)
+    file_buf::impl_file_buf(&ast)
 }
 
 #[proc_macro_derive(GetPath)]

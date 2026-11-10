@@ -14,8 +14,9 @@ use crate::proxy::prelude::*;
 
 // --- AddRaw ---
 impl<T> AddRaw for TwoConn<T> {
-    fn add_raw(&mut self, buf: BytesMut) {
+    fn add_raw(&mut self, buf: BytesMut) -> Result<(), UpdateMsgError> {
         self.msg_bytes = Some(buf);
+        Ok(())
     }
 }
 

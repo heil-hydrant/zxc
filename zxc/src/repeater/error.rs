@@ -6,53 +6,48 @@ use header_plz::status::InvalidStatusCode;
 use thiserror::Error;
 use tokio::sync::mpsc::error::SendError;
 
+use crate::commander::CommanderError;
 use crate::commander::codec::error::CodecError;
 use crate::forward_info::ForwardInfo;
 use crate::io::*;
 use crate::proxy::server_info::address::error::AddressError;
 use crate::proxy::*;
 use crate::repeater::ws::*;
-use crate::run::boundary::IsUIError;
+use crate::run::boundary::UiError;
 
 #[derive(Debug, Error)]
 pub enum RepeaterError {
     // ----- Handle Commander -----
-    #[error("commander send message")]
-    CommanderSend(#[from] SendError<ForwardInfo>),
-    #[error("no extension| {0}")]
+    #[error(transparent)]
+    Commander(#[from] CommanderError),
+    #[error("repeater file has no extension: {0}")]
     NoExtension(PathBuf),
-    #[error("unknown extension| {0}")]
+    #[error("unknown repeater file extension: {0}")]
     UnknownExtension(PathBuf),
-    #[error("no ui")]
-    NoUI,
 
-    // ----- Parsing message from ui -----
-    #[error("Parse message| {0}")]
-    MsgSerializing(#[from] serde_json::Error),
-
-    // ----- Socket -----
-    #[error("ui | {0}")]
-    UI(#[from] UnixSockError),
+    // ----- UI -----
+    #[error(transparent)]
+    Ui(#[from] UiError),
 
     // ----- Codec -----
-    #[error("{0}")]
+    #[error(transparent)]
     Codec(#[from] CodecError),
 
     // ----- Initial State Machine -----
     // Invalid Dns
-    #[error("Invalid Address| {0}")]
+    #[error(transparent)]
     InvalidAddress(#[from] AddressError),
 
     // Establishing Server Connection
-    #[error("connect| {0}")]
+    #[error(transparent)]
     Connection(#[from] ConnectError),
 
     // Encryption
-    #[error("Encrypt| {0}")]
-    Encrypt(io::Error),
-    #[error("h2 replay requires tls")]
+    #[error("encryption: {0}")]
+    Encrypt(#[source] io::Error),
+    #[error("h2 replay requires TLS")]
     H2RequiresTls,
-    #[error("alpn| expected {expected}, negotiated {negotiated:?}")]
+    #[error("ALPN mismatch: expected {expected}, negotiated {negotiated:?}")]
     UnexpectedAlpn {
         expected: &'static str,
         negotiated: Option<String>,
@@ -61,44 +56,42 @@ pub enum RepeaterError {
     H2WsUnsupported,
 
     // ----- Main State Errors -----
-    #[error("main state| {0}")]
+    #[error(transparent)]
     Proxy(#[from] ProxyStateError),
 
     // ----- Get status code -----
-    #[error("{0}")]
+    #[error(transparent)]
     InfoLine(#[from] InfoLineError),
-    #[error("{0}")]
+    #[error(transparent)]
     StatusCode(#[from] InvalidStatusCode),
 
     // ----- Ws -----
     // send
-    #[error("ws commander Send| {0}")]
+    #[error("websocket commander send")]
     WsSend(#[from] SendError<RepeaterWsMsg>),
     // wrong scode
-    #[error("ws wrong scode| {0}")]
+    #[error("unexpected websocket status code: {0}")]
     WsWrongScode(u16),
 
     // Build
-    #[error("Dir| {0}")]
+    #[error(transparent)]
     DirError(#[from] DirError),
 
     // ws build
-    #[error("ws build| {0}")]
+    #[error(transparent)]
     WsBuild(#[from] RWsBuildError),
-    #[error("scratch file| {0}")]
-    ScratchFile(io::Error),
-    #[error("history file| {0}")]
-    HistoryFile(io::Error),
-    #[error("ws id not found| {0}")]
+    #[error("scratch file error: {0}")]
+    ScratchFile(#[source] io::Error),
+    #[error("history file error: {0}")]
+    HistoryFile(#[source] io::Error),
+    #[error("websocket id not found: {0}")]
     WsIdNotFound(usize),
 }
 
-impl IsUIError for RepeaterError {
-    fn is_ui_error(&self) -> bool {
-        matches!(self, RepeaterError::UI(_))
-    }
+crate::impl_ui_error!(RepeaterError);
 
-    fn needs_flush(&self) -> bool {
-        false
+impl From<SendError<ForwardInfo>> for RepeaterError {
+    fn from(_: SendError<ForwardInfo>) -> Self {
+        Self::Commander(CommanderError::Send)
     }
 }

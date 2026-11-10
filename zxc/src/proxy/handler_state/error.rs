@@ -11,55 +11,63 @@ use crate::proxy::prelude::*;
 #[derive(Error, Debug)]
 pub enum ProxyStateError {
     // Communication Error
-    #[error("Commander Request| {0}")]
-    CommanderRequest(#[from] SendError<CommanderRequest>),
-    #[error("Commander Response| {0}")]
-    CommanderResponse(&'static str),
-    #[error("wrong command| {0}")]
-    WrongMessage(#[from] WrongMessage),
+    #[error(transparent)]
+    Commander(#[from] CommanderError),
 
     // ----- Read Write -----
     // HTTP
-    #[error("HTTP Error| {0}")]
+    #[error("http: {0}")]
     OneOne(#[from] OneOneRWError),
-    #[error("h2 Error| {0}")]
+    #[error("h2: {0}")]
     Two(#[from] two_plz::error::OpError),
-    #[error("h2 preface| {0}")]
+    #[error("h2 preface: {0}")]
     H2Preface(#[from] two_plz::preface::PrefaceError),
     #[error("h2 connection closed before response")]
     H2Closed,
     #[error("h2 request is missing")]
     H2MissingRequest,
     // WebSocket
-    #[error("Ws| {0}")]
+    #[error("websocket: {0}")]
     Ws(#[from] WsError),
 
     // ----- Write History -----
-    #[error("Serialize| {0}")]
+    #[error("serialize: {0}")]
     Serialize(#[from] serde_json::Error),
-    #[error("ws History Send")]
+    #[error("history channel closed")]
     HistorySend(#[from] SendError<CommanderToHistory>),
 
     // ----- File Ops -----
-    #[error("file| {0}")]
+    #[error(transparent)]
     FileIo(#[from] FileErrorInfo),
-    #[error("rewrite file| {0}")]
+    #[error(transparent)]
     ReWriteFile(FileErrorInfo),
 
     // ----- Should Intercept -----
-    #[error("Ws Should Intercept")]
+    #[error("websocket should-intercept check")]
     WsShouldIntercept,
 
     // ----- Update Frame -----
-    #[error("Update Frame| {0}")]
+    #[error(transparent)]
     UpdateFrame(#[from] UpdateMsgError),
 
     // ----- NewConnection -----
-    #[error("Reconnect| {0}")]
+    #[error(transparent)]
     Reconnect(#[from] ConnectError),
 
-    #[error("Server Encrypt| {0}")]
+    #[error(transparent)]
     ServerEncrypt(#[from] ServerEncryptError),
-    #[error("msg drop")]
+    #[error("message dropped by user")]
     Drop,
+}
+
+impl From<SendError<CommanderRequest>> for ProxyStateError {
+    fn from(_: SendError<CommanderRequest>) -> Self {
+        Self::Commander(CommanderError::Send)
+    }
+}
+
+impl From<WrongMessage> for ProxyStateError {
+    fn from(e: WrongMessage) -> Self {
+        Self::Commander(CommanderError::WrongMessage(e))
+    }
 }

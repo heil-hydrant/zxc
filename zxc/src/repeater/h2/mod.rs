@@ -7,7 +7,7 @@ use http_plz::Request;
 use tokio::fs::{File, OpenOptions};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use two_plz::client::{ClientConnection, ResponseFuture};
-use zxc_derive::RepeaterReadFile;
+use zxc_derive::FileBuf;
 
 use crate::async_step::async_run;
 use crate::forward_info::H2Info;
@@ -16,7 +16,7 @@ use crate::proxy::*;
 use crate::repeater::prelude::*;
 
 // repeater h2 handler struct
-#[derive(RepeaterReadFile)]
+#[derive(FileBuf)]
 pub struct Rh2<T> {
     buf: BytesMut,
     path: PathBuf,

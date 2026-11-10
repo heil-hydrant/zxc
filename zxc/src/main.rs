@@ -263,23 +263,23 @@ fn create_session_dirs(sname: &str) -> Result<(), Error> {
 
 #[derive(Debug, thiserror::Error)]
 enum MainError {
-    #[error("create session dir| {}", .0)]
+    #[error("session directory: {}", .0)]
     CreateSessionDir(Error),
-    #[error("invalid session name| {0}")]
+    #[error("invalid session name: {0}")]
     InvalidSessionName(String),
-    #[error("set current dir| {}", .0)]
+    #[error("current directory: {}", .0)]
     CurrentDir(Error),
-    #[error("bind to port| {}| {}", .0, .1)]
+    #[error("bind to port {0}: {1}")]
     PortBind(u16, Error),
-    #[error("create temp dir| {}", .0)]
+    #[error("temporary directory: {}", .0)]
     TempDir(Error),
-    #[error("failed to get largest index, May lead to data overwriting| {}", .0)]
+    #[error("largest index (data may be overwritten): {}", .0)]
     LargestIndex(Error),
-    #[error("proxy| {}", .0)]
+    #[error("proxy: {}", .0)]
     Proxy(Error),
-    #[error("build session| {}", .0)]
+    #[error("session build: {}", .0)]
     BuildSession(Error),
-    #[error("attach session| {}", .0)]
+    #[error("session attach: {}", .0)]
     AttachSession(Error),
 }
 
@@ -326,5 +326,143 @@ mod tests {
 
         let default = resolve_session_name(None, false).unwrap();
         assert!(default.starts_with("zxs-"));
+    }
+
+    #[test]
+    fn test_error_display_messages() {
+        use crate::addons::AddonError;
+        use crate::commander::{CommanderError, CommunicateError};
+        use crate::config::ConfigError;
+        use crate::history::HistoryError;
+        use crate::id::SoldierId;
+        use crate::interceptor::InterceptorError;
+        use crate::io::DirError;
+        use crate::proxy::states::error::StateError;
+        use crate::repeater::error::RepeaterError;
+        use crate::run::boundary::UiError;
+
+        assert_eq!(
+            MainError::InvalidSessionName("bad".to_string()).to_string(),
+            "invalid session name: bad"
+        );
+        assert_eq!(
+            ConfigError::Env(std::env::VarError::NotPresent).to_string(),
+            "home directory lookup: environment variable not found"
+        );
+        assert_eq!(
+            DirError::UnknownExt("txt".to_string()).to_string(),
+            "unknown file extension: txt"
+        );
+        assert_eq!(
+            CommunicateError::ShouldProxy.to_string(),
+            "should-proxy request receiver dropped"
+        );
+        assert_eq!(
+            InterceptorError::from(UiError::NoUI).to_string(),
+            "no UI connected"
+        );
+        assert_eq!(
+            HistoryError::NoId(SoldierId::Connection(7), "resume").to_string(),
+            "no history entry for conn:7 (resume)"
+        );
+        assert_eq!(
+            AddonError::from(UiError::NoUI).to_string(),
+            "no UI connected"
+        );
+        assert_eq!(
+            AddonError::AddonNotFound("ffuf".to_string()).to_string(),
+            "addon not found: ffuf"
+        );
+        assert_eq!(
+            RepeaterError::from(UiError::NoUI).to_string(),
+            "no UI connected"
+        );
+        assert_eq!(
+            RepeaterError::H2RequiresTls.to_string(),
+            "h2 replay requires TLS"
+        );
+        assert_eq!(
+            RepeaterError::WsWrongScode(400).to_string(),
+            "unexpected websocket status code: 400"
+        );
+        assert_eq!(
+            RepeaterError::UnexpectedAlpn {
+                expected: "h2",
+                negotiated: Some("http/1.1".to_string()),
+            }
+            .to_string(),
+            "ALPN mismatch: expected h2, negotiated Some(\"http/1.1\")"
+        );
+        assert_eq!(
+            RepeaterError::DirError(DirError::UnknownExt("txt".to_string()))
+                .to_string(),
+            "unknown file extension: txt"
+        );
+        assert_eq!(
+            StateError::NoPeerCertificate.to_string(),
+            "no peer certificate"
+        );
+        assert_eq!(
+            StateError::from(CommanderError::RecvContext("timeout"))
+                .to_string(),
+            "commander response channel closed: timeout"
+        );
+
+        let json_error =
+            serde_json::from_str::<serde_json::Value>("{").unwrap_err();
+        assert!(
+            InterceptorError::MsgDeserialize(
+                "payload".to_string(),
+                json_error
+            )
+            .to_string()
+            .starts_with("invalid interceptor message (payload): ")
+        );
+    }
+
+    fn collect_rust_sources(
+        dir: &std::path::Path,
+        files: &mut Vec<std::path::PathBuf>,
+    ) {
+        for entry in std::fs::read_dir(dir).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                collect_rust_sources(&path, files);
+            } else if path
+                .extension()
+                .is_some_and(|ext| ext == "rs")
+            {
+                files.push(path);
+            }
+        }
+    }
+
+    #[test]
+    fn test_error_attributes_have_no_pipe_separators() {
+        let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        let mut files = Vec::new();
+        collect_rust_sources(&src, &mut files);
+
+        let mut violations = Vec::new();
+        for file in files {
+            let source = std::fs::read_to_string(&file).unwrap();
+            for (line_no, line) in source.lines().enumerate() {
+                let trimmed = line.trim_start();
+                if trimmed.starts_with("#[error(") && trimmed.contains('|') {
+                    violations.push(format!(
+                        "{}:{}: {}",
+                        file.display(),
+                        line_no + 1,
+                        trimmed
+                    ));
+                }
+            }
+        }
+
+        assert!(
+            violations.is_empty(),
+            "noisy error attributes:\n{}",
+            violations.join("\n")
+        );
     }
 }

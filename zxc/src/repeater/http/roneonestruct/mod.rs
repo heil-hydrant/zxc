@@ -5,12 +5,12 @@ use std::path::PathBuf;
 
 use bytes::BytesMut;
 use tokio::fs::File;
-use zxc_derive::RepeaterReadFile;
+use zxc_derive::FileBuf;
 
 use crate::repeater::prelude::*;
 
 // repeater http handler struct
-#[derive(RepeaterReadFile)]
+#[derive(FileBuf)]
 pub struct Roneone<T> {
     buf: BytesMut,
     path: PathBuf,
