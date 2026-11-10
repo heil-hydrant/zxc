@@ -292,6 +292,11 @@ impl HttpRequestLog for TwoConn<RequestLine> {
 
 impl ShouldLog for TwoConn<ResponseLine> {
     type LogResult = ();
+
+    #[inline(always)]
+    fn commander_log_request(&self) -> Option<CommanderRequest> {
+        None
+    }
 }
 
 // --- ShouldRewrite ---

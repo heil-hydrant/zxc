@@ -14,7 +14,6 @@ use crate::history::*;
 use crate::id::SoldierId;
 use crate::proxy::prelude::*;
 
-const SHOULD_LOG: &str = "ShouldLog";
 const SHOULD_LOG_UNREACHABLE: &str = "shouldlog| not applicable for response";
 
 // Trait to check if request/response can be logged.
@@ -22,14 +21,6 @@ const SHOULD_LOG_UNREACHABLE: &str = "shouldlog| not applicable for response";
 pub trait CanLog {
     fn can_log(&self) -> bool;
 }
-
-// Trait to check if request/response should be logged.
-//
-// Associated type:
-//     LogResult   : type of the result of the log query
-//
-//         http    => (usize, PathBuf, Sender<CommanderToHistory>)
-//         ws      => usize
 
 pub fn http_log_request<H, P>(
     id: SoldierId,
@@ -69,6 +60,14 @@ where
     };
     Some(CommanderRequest::ShouldLogHttp(id, ext))
 }
+
+// Trait to check if request/response should be logged.
+//
+// Associated type:
+//     LogResult   : type of the result of the log query
+//
+//         http    => (usize, PathBuf, Sender<CommanderToHistory>)
+//         ws      => usize
 
 pub trait ShouldLog {
     type LogResult;
@@ -167,7 +166,7 @@ where
             .receiver()
             .recv()
             .await
-            .ok_or(CommanderError::RecvContext(SHOULD_LOG))?;
+            .ok_or(CommanderError::RecvContext("ShouldLog"))?;
         if let Some(result) = conn.parse_log_response(response)? {
             trace!("log| Y");
             conn.update_path(result);
