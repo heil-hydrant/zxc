@@ -8,7 +8,7 @@ pub mod soldiers;
 use std::path::PathBuf;
 
 pub use captain_crypto::{
-    ALPN_H1, ALPN_H2, Alpn, CaptainCrypto, CertDigest, CertError
+    ALPN_H1, ALPN_H2, Alpn, CaptainCrypto, CertDigest, CertError,
 };
 pub use codec::{Codec, CodecError, perform_codec_op};
 pub use communicate::request::CommanderRequest;
@@ -257,7 +257,7 @@ impl Commander {
                         let result = self
                             .config
                             .as_ref()
-                            .is_none_or(|config| config.should_log(ext)); // 1
+                            .is_none_or(|config| config.should_log(ext));
                         trace!("http should log| {}| {}", id, result);
                         let tosend = if result {
                             self.get_http_log_path(id).await
@@ -274,7 +274,7 @@ impl Commander {
                      *
                      * Steps:
                      *      1. if config is_some call
-                     *         config.in_excluded_content_types() with
+                     *         !config.in_excluded_content_types() with
                      *         ContentType
                      *
                      *      2. if true, call self.get_http_log_path() with id
@@ -285,7 +285,7 @@ impl Commander {
                             self.config
                                 .as_ref()
                                 .is_none_or(|config| {
-                                    config.in_excluded_content_types(ct)
+                                    !config.in_excluded_content_types(ct)
                                 });
                         trace!(
                             "http should log ct| {}| {} | {}",
