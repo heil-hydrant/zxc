@@ -9,7 +9,8 @@ use tracing::{debug, error, info, trace};
 
 use super::boundary::*;
 use crate::io::{
-    UnixSockError, build_slice_and_write, read_from_unix, write_and_flush
+    UnixSockError, build_slice_and_write, read_from_unix, split_json_frame,
+    write_and_flush
 };
 
 const CLOSE_MSG: &[u8] = br#"[0,{"Action": "Close"}]"#;
@@ -35,17 +36,18 @@ const CLOSE_MSG: &[u8] = br#"[0,{"Action": "Close"}]"#;
  *
  *          c. Read from stream
  *              1. If Err is Block, continue for other types return
- *              2. Call handle_ui() to get result.
- *              3. Clear buffer
- *              4. match result
- *                  a. UiReply::None             => continue
+ *              2. While a complete frame is buffered:
+ *                  a. Call handle_ui() to get result.
+ *                  b. Replace buffer with the unconsumed tail.
+ *                  c. match result:
+ *                      UiReply::None             => continue
  *
- *                  b. UiReply::Reply(id, data)  => build_slice_and_write(id, data)
+ *                      UiReply::Reply(id, data)  => build_slice_and_write
  *
- *                  c. UiReply::Flush            => call flush_storage()
+ *                      UiReply::Flush            => call flush_storage()
  *
- *                  d. Err(..)                   => If is_ui_error() return,
- *                                                  else continue
+ *                      Err(..)                   => If is_ui_error() return,
+ *                                                   else continue
  *
  *          d. Check token cancelled,
  *              1. write CLOSE_MSG to stream
@@ -123,23 +125,25 @@ where
                         return Err(e.into());
                     }
                 }
-                let result = handler.handle_ui().await;
-                handler.buf_as_mut().clear();
-                trace!("buffer cleared");
-                match result {
-                    Ok(UiReply::None) => (),
-                    Ok(UiReply::Reply(id, data)) => {
-                        build_slice_and_write(id, data, &mut stream).await?;
-                    }
-                    Ok(UiReply::Flush) => {
-                        trace!("needs flush");
-                        handler.flush_storage(&mut stream).await?;
-                    }
-                    Err(e) => {
-                        if e.is_ui_error() {
-                            return Err(e);
+                while let Some(tail) = split_json_frame(handler.buf_as_mut()) {
+                    let result = handler.handle_ui().await;
+                    *handler.buf_as_mut() = tail;
+                    trace!("frame consumed");
+                    match result {
+                        Ok(UiReply::None) => (),
+                        Ok(UiReply::Reply(id, data)) => {
+                            build_slice_and_write(id, data, &mut stream).await?;
                         }
-                        error!("handle ui| {}", e);
+                        Ok(UiReply::Flush) => {
+                            trace!("needs flush");
+                            handler.flush_storage(&mut stream).await?;
+                        }
+                        Err(e) => {
+                            if e.is_ui_error() {
+                                return Err(e);
+                            }
+                            error!("handle ui| {}", e);
+                        }
                     }
                 }
             }
