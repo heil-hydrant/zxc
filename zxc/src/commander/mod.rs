@@ -5,7 +5,8 @@ pub mod error;
 mod protocol;
 pub mod soldiers;
 
-use std::path::PathBuf;
+use std::io::ErrorKind;
+use std::path::{Path, PathBuf};
 
 pub use captain_crypto::{
     ALPN_H1, ALPN_H2, Alpn, CaptainCrypto, CertDigest, CertError,
@@ -321,30 +322,15 @@ impl Commander {
         &mut self,
         id: SoldierId,
     ) -> Option<(usize, PathBuf, Sender<CommanderToHistory>)> {
-        let mut path = self.comm_history.path();
-        path.push(
-            self.comm_history
-                .http_log_index
-                .to_string(),
-        );
+        let (index, path) = create_http_log_dir(
+            &self.comm_history.path(),
+            self.comm_history.http_log_index,
+            MAX_HTTP_LOG_INDEX_ATTEMPTS,
+        )
+        .await?;
         trace!("log path| {}| {}", id, path.to_string_lossy());
-        match create_dir(&path).await {
-            Ok(_) => {
-                let result = Some((
-                    self.comm_history.http_log_index,
-                    path,
-                    self.comm_history.to_history.clone(),
-                ));
-                self.comm_history.http_log_index += 1;
-                result
-            }
-            // Error printed, so we can send None to soldier
-            // Should check Folder with index already exists ?
-            Err(e) => {
-                error!("creating directory| {:?}", e);
-                None
-            }
-        }
+        self.comm_history.http_log_index = index + 1;
+        Some((index, path, self.comm_history.to_history.clone()))
     }
 
     pub async fn empty_resume_queue(
@@ -485,6 +471,48 @@ impl Commander {
     }
 }
 
+const MAX_HTTP_LOG_INDEX_ATTEMPTS: usize = 1024;
+
+/* Steps:
+ *      1. Build <base>/<index>.
+ *      2. Try create_dir.
+ *          a. Ok, return the index and path.
+ *          b. AlreadyExists, increment index and retry.
+ *          c. Other error, log and return None.
+ *      3. Return None after max_attempts is exhausted.
+ */
+async fn create_http_log_dir(
+    base: &Path,
+    start_index: usize,
+    max_attempts: usize,
+) -> Option<(usize, PathBuf)> {
+    let mut index = start_index;
+    for _ in 0..max_attempts {
+        let mut path = base.to_path_buf();
+        path.push(index.to_string());
+        match create_dir(&path).await {
+            Ok(()) => return Some((index, path)),
+            Err(e) if e.kind() == ErrorKind::AlreadyExists => {
+                trace!(
+                    "history dir exists| {}| {}",
+                    index,
+                    path.to_string_lossy()
+                );
+                index += 1;
+            }
+            Err(e) => {
+                error!("creating directory| {:?}", e);
+                return None;
+            }
+        }
+    }
+    error!(
+        "creating directory| no free index from {} in {} attempts",
+        start_index, max_attempts
+    );
+    None
+}
+
 pub async fn run_commander(mut comm: Commander, token: CancellationToken) {
     debug!("[+] commander started");
     loop {
@@ -531,5 +559,82 @@ pub async fn run_commander(mut comm: Commander, token: CancellationToken) {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    use super::*;
+
+    fn unique_temp_dir(name: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock before epoch")
+            .as_nanos();
+        std::env::temp_dir().join(format!(
+            "zxc_http_log_{}_{}_{}",
+            name,
+            std::process::id(),
+            nanos
+        ))
+    }
+
+    #[tokio::test]
+    async fn test_create_http_log_dir_uses_start_index() {
+        let base = unique_temp_dir("start");
+        std::fs::create_dir_all(&base).unwrap();
+
+        let (index, path) =
+            create_http_log_dir(&base, 3, 8).await.unwrap();
+
+        assert_eq!(index, 3);
+        assert_eq!(path, base.join("3"));
+        assert!(path.is_dir());
+
+        std::fs::remove_dir_all(&base).unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_create_http_log_dir_skips_existing() {
+        let base = unique_temp_dir("existing");
+        std::fs::create_dir_all(&base).unwrap();
+        std::fs::create_dir(base.join("7")).unwrap();
+        std::fs::create_dir(base.join("8")).unwrap();
+
+        let (index, path) =
+            create_http_log_dir(&base, 7, 8).await.unwrap();
+
+        assert_eq!(index, 9);
+        assert_eq!(path, base.join("9"));
+        assert!(path.is_dir());
+
+        std::fs::remove_dir_all(&base).unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_create_http_log_dir_stops_at_attempt_limit() {
+        let base = unique_temp_dir("limit");
+        std::fs::create_dir_all(&base).unwrap();
+        std::fs::create_dir(base.join("1")).unwrap();
+        std::fs::create_dir(base.join("2")).unwrap();
+
+        let result = create_http_log_dir(&base, 1, 2).await;
+
+        assert!(result.is_none());
+        assert!(!base.join("3").exists());
+
+        std::fs::remove_dir_all(&base).unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_create_http_log_dir_returns_none_on_other_error() {
+        let base = unique_temp_dir("missing");
+
+        let result = create_http_log_dir(&base, 1, 8).await;
+
+        assert!(result.is_none());
+        assert!(!base.exists());
     }
 }
