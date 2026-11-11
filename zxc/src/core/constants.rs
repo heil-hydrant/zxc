@@ -1,3 +1,7 @@
+use std::net::{IpAddr, Ipv4Addr};
+
+pub const DEFAULT_LISTEN: IpAddr = IpAddr::V4(Ipv4Addr::LOCALHOST);
+
 pub const CAPACITY_2MB: usize = 65536 * 32;
 
 pub const PROXY: &str = "proxy";

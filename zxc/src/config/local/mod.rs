@@ -2,6 +2,8 @@ pub mod io;
 pub mod proxy;
 mod session;
 
+use std::net::IpAddr;
+
 use clap::Parser;
 
 use self::session::SessionArgs;
@@ -14,6 +16,9 @@ pub struct CliArgs {
     pub session_args: Option<SessionArgs>,
     #[command(flatten)]
     pub proxy_args: Option<ProxyArgs>,
+    /// Interface to bind the proxy listener to
+    #[arg(short, long = "listen")]
+    pub listen: Option<IpAddr>,
     /// Debug mode
     #[arg(short, long = "debug")]
     pub debug: bool,
@@ -34,6 +39,7 @@ impl CliArgs {
         if self.debug
             || self.session_args.is_some()
             || self.proxy_args.is_some()
+            || self.listen.is_some()
         {
             Some(self)
         } else {
@@ -85,6 +91,15 @@ mod tests {
             ..Default::default()
         };
         assert!(args.sanitize().is_none());
+    }
+
+    #[test]
+    fn test_sanitize_listen() {
+        let args = CliArgs {
+            listen: Some("0.0.0.0".parse().unwrap()),
+            ..Default::default()
+        };
+        assert!(args.sanitize().is_some());
     }
 
     #[test]

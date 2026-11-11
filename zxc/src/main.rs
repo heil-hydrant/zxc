@@ -20,6 +20,7 @@ mod tmux;
 
 use std::fs::{create_dir, remove_dir_all};
 use std::io::Error;
+use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -60,12 +61,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .and_then(|proxy_arg| proxy_arg.port.take())
         .unwrap_or(8080);
 
+    let listen = args.listen.unwrap_or(DEFAULT_LISTEN);
+
     let local_config = args
         .proxy_args
         .take()
         .and_then(|proxy_args| write_local_config(attach, proxy_args));
 
-    let addr = format!("0.0.0.0:{}", port);
+    let addr = SocketAddr::new(listen, port);
     let proxy_listener = TcpListener::bind(addr)
         .await
         .map_err(|e| MainError::PortBind(port, e))?;
@@ -326,6 +329,29 @@ mod tests {
 
         let default = resolve_session_name(None, false).unwrap();
         assert!(default.starts_with("zxs-"));
+    }
+
+    #[test]
+    fn test_cli_listen_parses_ip() {
+        let args = CliArgs::parse_from(["zxc", "--listen", "0.0.0.0"]);
+        assert_eq!(args.listen, Some(IpAddr::V4(Ipv4Addr::UNSPECIFIED)));
+    }
+
+    #[test]
+    fn test_cli_listen_absent() {
+        let args = CliArgs::parse_from(["zxc"]);
+        assert_eq!(args.listen, None);
+        assert_eq!(
+            args.listen.unwrap_or(DEFAULT_LISTEN),
+            IpAddr::V4(Ipv4Addr::LOCALHOST)
+        );
+    }
+
+    #[test]
+    fn test_cli_listen_rejects_host_and_port() {
+        let result =
+            CliArgs::try_parse_from(["zxc", "--listen", "0.0.0.0:8080"]);
+        assert!(result.is_err());
     }
 
     #[test]
