@@ -1,5 +1,6 @@
 use thiserror::Error;
 use tokio::sync::mpsc::error::SendError;
+use two_plz::codec::UserError;
 
 use crate::commander::*;
 use crate::history::*;
@@ -20,6 +21,8 @@ pub enum ProxyStateError {
     OneOne(#[from] OneOneRWError),
     #[error("h2: {0}")]
     Two(#[from] two_plz::error::OpError),
+    #[error("h2 send response: {0}")]
+    H2SendResponse(#[from] UserError),
     #[error("h2 preface: {0}")]
     H2Preface(#[from] two_plz::preface::PrefaceError),
     #[error("h2 connection closed before response")]
@@ -69,5 +72,16 @@ impl From<SendError<CommanderRequest>> for ProxyStateError {
 impl From<WrongMessage> for ProxyStateError {
     fn from(e: WrongMessage) -> Self {
         Self::Commander(CommanderError::WrongMessage(e))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_h2_send_response_error_display() {
+        let err = ProxyStateError::from(UserError::InactiveStreamId);
+        assert_eq!(err.to_string(), "h2 send response: inactive stream");
     }
 }

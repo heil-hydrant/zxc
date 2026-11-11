@@ -227,9 +227,11 @@ impl ReadWrite for TwoConn<ResponseLine> {
     }
 
     async fn write(mut self) -> Result<Self::State, Self::Error> {
-        self.send_response
-            .send_response(self.msg.take().unwrap())
-            .unwrap(); //TODO
+        let msg = self
+            .msg
+            .take()
+            .ok_or(ProxyStateError::H2MissingRequest)?;
+        self.send_response.send_response(msg)?;
         Ok(ProxyState::End(self))
     }
 }

@@ -288,6 +288,8 @@ enum MainError {
 
 #[cfg(test)]
 mod tests {
+    use std::net::{IpAddr, Ipv4Addr};
+
     use super::*;
 
     #[test]
