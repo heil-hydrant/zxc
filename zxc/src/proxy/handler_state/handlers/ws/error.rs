@@ -36,6 +36,8 @@ pub enum WsError {
     Read(#[from] tungstenite::Error),
     #[error("write")]
     Write,
+    #[error("message missing")]
+    NoMsg,
     #[error("closed")]
     Close,
 }

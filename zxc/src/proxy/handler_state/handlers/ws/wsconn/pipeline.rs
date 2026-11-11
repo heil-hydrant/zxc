@@ -124,15 +124,17 @@ where
     type State = ProxyState<Self>;
 
     async fn read(mut self) -> Result<ProxyState<Self>, WsError> {
-        if let Some(msg) = self.reader.next().await {
-            self.msg = Some(msg?);
-        }
+        let Some(msg) = self.reader.next().await else {
+            trace!("eof");
+            return Ok(ProxyState::End(self));
+        };
+        self.msg = Some(msg?);
         trace!("Y");
         Ok(ProxyState::ShouldLog(self))
     }
 
     async fn write(mut self) -> Result<ProxyState<Self>, WsError> {
-        let data = self.msg.take().unwrap(); // safe to unwrap
+        let data = self.msg.take().ok_or(WsError::NoMsg)?;
         let is_close = data.is_close();
         self.writer
             .send(data)
@@ -205,9 +207,8 @@ impl<T, E> ShouldLog for WsConn<T, E> {
     type LogResult = usize;
 
     fn commander_log_request(&self) -> Option<CommanderRequest> {
-        if self.msg.as_ref().unwrap().is_text()
-            || self.msg.as_ref().unwrap().is_binary()
-        {
+        let msg = self.msg.as_ref()?;
+        if msg.is_text() || msg.is_binary() {
             return Some(CommanderRequest::WsLog(self.id, self.role));
         }
         None
