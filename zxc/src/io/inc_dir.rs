@@ -31,18 +31,22 @@ where
 
     while let Some(entry) = dir_list.next_entry().await? {
         let name = entry.file_name();
+        let file_type = entry.file_type().await?;
 
-        let dir_str = if for_dir && entry.file_type().await?.is_dir() {
+        let dir_str = if for_dir && file_type.is_dir() {
             name
-        } else if entry.file_type().await?.is_file() {
+        } else if !for_dir && file_type.is_file() {
             let path: &Path = name.as_ref();
-            path.file_stem().unwrap().into()
+            let Some(stem) = path.file_stem() else {
+                continue;
+            };
+            stem.into()
         } else {
             continue;
         };
         let high: usize = dir_str
             .to_str()
-            .and_then(|s| s.split(prefix).nth(1))
+            .and_then(|s| s.strip_prefix(prefix))
             .and_then(|s| s.parse::<usize>().ok())
             .unwrap_or(0);
         if high > id {
@@ -58,6 +62,7 @@ where
 pub mod tests {
 
     use std::path::PathBuf;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     use super::*;
 
@@ -91,6 +96,33 @@ pub mod tests {
             path.pop();
             path.pop();
         }
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_incremental_strict_prefix_and_entry_kind()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)?
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!(
+            "zxc_inc_dir_{}_{}",
+            std::process::id(),
+            nanos
+        ));
+        tokio::fs::create_dir_all(&dir).await?;
+
+        tokio::fs::create_dir(dir.join("r-2")).await?;
+        tokio::fs::create_dir(dir.join("x-r-9")).await?;
+        tokio::fs::write(dir.join("r-5.req"), b"").await?;
+        assert_eq!(incremental(&dir, "r-", true).await?, 3);
+
+        tokio::fs::write(dir.join("q-3.req"), b"").await?;
+        tokio::fs::write(dir.join("x-q-8.req"), b"").await?;
+        tokio::fs::create_dir(dir.join("q-9")).await?;
+        assert_eq!(incremental(&dir, "q-", false).await?, 4);
+
+        tokio::fs::remove_dir_all(&dir).await?;
         Ok(())
     }
 }
