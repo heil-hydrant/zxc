@@ -152,8 +152,11 @@ fn generate_domain_cert(
     use rcgen::string::Ia5String;
     use x509_parser::extensions::GeneralName;
 
+    let leaf_der = cert
+        .first()
+        .ok_or(CertError::NoCertificate)?;
     let (_, real_cert) =
-        x509_parser::certificate::X509Certificate::from_der(cert[0].as_ref())
+        x509_parser::certificate::X509Certificate::from_der(leaf_der.as_ref())
             .map_err(|e| CertError::X509(e.to_string()))?;
     let subject_alt_names = real_cert
         .subject_alternative_name()
@@ -208,4 +211,21 @@ fn generate_server_config(
         .map(|p| vec![p.to_vec()])
         .unwrap_or_default();
     Ok(server_config)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_generate_domain_cert_empty_chain() {
+        let keypair = KeyPair::generate().unwrap();
+        let signer = Issuer::new(
+            CertificateParams::default(),
+            KeyPair::generate().unwrap(),
+        );
+
+        let result = generate_domain_cert(&keypair, Vec::new(), &signer);
+        assert!(matches!(result, Err(CertError::NoCertificate)));
+    }
 }

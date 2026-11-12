@@ -12,6 +12,8 @@ pub enum CertError {
     Rustls(#[from] rustls::Error),
     #[error("x509 parse: {0}")]
     X509(String),
+    #[error("certificate chain empty")]
+    NoCertificate,
 }
 
 #[derive(Debug, Error)]
