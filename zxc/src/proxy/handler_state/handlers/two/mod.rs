@@ -6,6 +6,7 @@ use header_plz::{RequestLine, ResponseLine};
 use http_plz::Request;
 use thiserror::Error;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::select;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::oneshot;
@@ -77,52 +78,75 @@ where
     let conn_id = conn.id;
     let commander_tx = conn.commander.clone();
 
-    while let Some(result) = server_conn.accept().await {
-        let (request, send_response) = match result {
-            Ok(pair) => pair,
-            Err(e) => {
-                error!("h2 accept error| {e}");
-                continue;
+    loop {
+        select! {
+            result = server_conn.accept() => {
+                let Some(result) = result else {
+                    break;
+                };
+                let (request, send_response) = match result {
+                    Ok(pair) => pair,
+                    Err(e) => {
+                        error!("h2 accept error| {e}");
+                        continue;
+                    }
+                };
+
+                let stream_id: u32 = send_response.stream_id().into();
+                let soldier_id = SoldierId::H2Stream {
+                    conn_id,
+                    stream_id,
+                };
+                let send_request = client.clone();
+                let commander_tx = commander_tx.clone();
+                let server_info = server_info.clone();
+                let stream_span = tracing::span!(
+                    tracing::Level::TRACE,
+                    "H2Stream",
+                    conn = conn_id,
+                    stream = stream_id
+                );
+
+                h2_tasks.spawn(
+                    async move {
+                        let res = handle_stream(
+                            soldier_id,
+                            request,
+                            send_response,
+                            send_request,
+                            commander_tx.clone(),
+                            server_info,
+                        )
+                        .await;
+
+                        let _ = commander_tx
+                            .send(CommanderRequest::Close(soldier_id))
+                            .await;
+
+                        if let Err(e) = res {
+                            error!("h2 stream error| {e}");
+                        }
+                    }
+                    .instrument(stream_span),
+                );
             }
-        };
-
-        let stream_id: u32 = send_response.stream_id().into();
-        let soldier_id = SoldierId::H2Stream {
-            conn_id,
-            stream_id,
-        };
-        let send_request = client.clone();
-        let commander_tx = commander_tx.clone();
-        let server_info = server_info.clone();
-        let stream_span = tracing::span!(
-            tracing::Level::TRACE,
-            "H2Stream",
-            conn = conn_id,
-            stream = stream_id
-        );
-
-        h2_tasks.spawn(
-            async move {
-                let res = handle_stream(
-                    soldier_id,
-                    request,
-                    send_response,
-                    send_request,
-                    commander_tx.clone(),
-                    server_info,
-                )
-                .await;
-
-                let _ = commander_tx
-                    .send(CommanderRequest::Close(soldier_id))
-                    .await;
-
-                if let Err(e) = res {
-                    error!("h2 stream error| {e}");
+            res = h2_tasks.join_next(), if !h2_tasks.is_empty() => {
+                if let Some(Err(e)) = res
+                    && !e.is_cancelled()
+                {
+                    error!("h2 task panicked| {e}");
                 }
             }
-            .instrument(stream_span),
-        );
+        }
+    }
+
+    h2_tasks.abort_all();
+    while let Some(res) = h2_tasks.join_next().await {
+        if let Err(e) = res
+            && !e.is_cancelled()
+        {
+            error!("h2 task shutdown| {e}");
+        }
     }
 
     Ok(())
@@ -181,8 +205,7 @@ async fn handle_stream(
 
     let h2resp = TwoConn::<ResponseLine>::from(h2req);
     let server_state = ProxyState::Receive(h2resp);
-    let server_state = async_run(server_state).await?;
-    let _ = TwoConn::<ResponseLine>::try_from(server_state)?;
+    let _ = async_run(server_state).await?;
 
     Ok(())
 }
