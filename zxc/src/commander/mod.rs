@@ -175,10 +175,7 @@ impl Commander {
              *         CommanderToHistory::RemoveWs to history
              */
             CommanderRequest::Close(id) => {
-                if let SoldierId::Connection(conn_id) = id {
-                    self.comm_interceptor
-                        .purge_connection(conn_id);
-                }
+                self.comm_interceptor.purge_soldier(id);
                 if self.soldiers.remove_from_http_store(id) {
                     trace!("removed| http| {}", id);
                 } else if self.soldiers.remove_from_ws_store(id) {

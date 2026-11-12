@@ -96,6 +96,18 @@ impl InterceptorComm {
         self.wres_queue
             .retain(|_, sid| sid.conn_id() != conn_id);
     }
+
+    pub fn purge_soldier(&mut self, id: SoldierId) {
+        match id {
+            SoldierId::Connection(conn_id) => self.purge_connection(conn_id),
+            SoldierId::H2Stream {
+                ..
+            } => {
+                self.http_queue
+                    .retain(|_, sid| *sid != id);
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -147,5 +159,56 @@ mod tests {
 
         comm.purge_connection(2);
         assert_eq!(comm.http_queue.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_purge_soldier_h2_stream_removes_only_that_stream() {
+        let (_from_tx, from_rx) = channel(1);
+        let (to_tx, _to_rx) = channel(10);
+        let mut comm = InterceptorComm::new(from_rx, to_tx);
+
+        let conn = SoldierId::Connection(1);
+        let stream1 = SoldierId::H2Stream {
+            conn_id: 1,
+            stream_id: 1,
+        };
+        let stream3 = SoldierId::H2Stream {
+            conn_id: 1,
+            stream_id: 3,
+        };
+
+        comm.send_to_interceptor(conn, InterToUI::build_http_res(100))
+            .await
+            .unwrap();
+        comm.send_to_interceptor(stream1, InterToUI::build_http_res(101))
+            .await
+            .unwrap();
+        comm.send_to_interceptor(stream3, InterToUI::build_http_res(102))
+            .await
+            .unwrap();
+
+        assert_eq!(comm.http_queue.len(), 3);
+
+        comm.purge_soldier(stream1);
+        assert_eq!(comm.http_queue.len(), 2);
+        assert!(
+            !comm
+                .http_queue
+                .values()
+                .any(|sid| *sid == stream1)
+        );
+        assert!(
+            comm.http_queue
+                .values()
+                .any(|sid| *sid == stream3)
+        );
+        assert!(
+            comm.http_queue
+                .values()
+                .any(|sid| *sid == conn)
+        );
+
+        comm.purge_soldier(conn);
+        assert!(comm.http_queue.is_empty());
     }
 }
