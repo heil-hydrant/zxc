@@ -31,19 +31,24 @@ where
      *
      *  Error:
      *      WsError::Read
+     *      WsError::Close
      */
 
     async fn read(mut self) -> Result<RepeaterState<Self>, WsError> {
-        if let Some(msg) = self.stream.next().await {
-            self.frame = Some(msg?);
-        }
+        let Some(msg) = self.stream.next().await else {
+            return Err(WsError::Close);
+        };
+        self.frame = Some(msg?);
         trace!("Y");
         Ok(RepeaterState::WriteResponse(self))
     }
 
     // Transition: WriteResponse -> Receive | End
     async fn write(mut self) -> Result<RepeaterState<Self>, WsError> {
-        let frame = self.frame.take().unwrap();
+        let frame = self
+            .frame
+            .take()
+            .ok_or(WsError::NoMsg)?;
         let is_close = frame.is_close();
         self.stream
             .send(frame)
