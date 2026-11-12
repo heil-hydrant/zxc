@@ -4,8 +4,6 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum UnixSockError {
-    #[error("accept: {0}")]
-    Accept(#[source] io::Error),
     #[error("closed")]
     Closed,
     #[error("end of file")]

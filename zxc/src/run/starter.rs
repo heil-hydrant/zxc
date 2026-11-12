@@ -38,7 +38,7 @@ pub async fn start_module<T>(
                         if let Err(e) = handler.flush_storage(&mut conn).await{
                             error!("flush storage| {}", e);
                         }
-                        match run_module(&mut handler, &listener, conn, &token).await {
+                        match run_module(&mut handler, conn, &token).await {
                             Ok(()) => {
                                 run_close_action(&mut handler).await;
                                 trace!("start cancelled");

@@ -1,16 +1,16 @@
 use std::time::Duration;
 
 use tokio::io::AsyncReadExt;
-use tokio::net::{UnixListener, UnixStream};
+use tokio::net::UnixStream;
 use tokio::select;
 use tokio::time::timeout;
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, error, info, trace};
+use tracing::{error, info, trace};
 
 use super::boundary::*;
 use crate::io::{
     UnixSockError, build_slice_and_write, read_from_unix, split_json_frame,
-    write_and_flush
+    write_and_flush,
 };
 
 const CLOSE_MSG: &[u8] = br#"[0,{"Action": "Close"}]"#;
@@ -18,13 +18,7 @@ const CLOSE_MSG: &[u8] = br#"[0,{"Action": "Close"}]"#;
 /* Steps:
  * ----- loop -----
  *      ----- select -----
- *          a. Accept new connections
- *              1. Try to write &[0], if err old connection closed, accept
- *              new connection
- *              2. set it to stream
- *              3. flush storage
- *
- *          b. Receive msg from commander, call handle_commander_ui and match
+ *          a. Receive msg from commander, call handle_commander_ui and match
  *          result
  *              1. UiReply::None            => continue
  *
@@ -34,7 +28,7 @@ const CLOSE_MSG: &[u8] = br#"[0,{"Action": "Close"}]"#;
  *
  *              4. Err(..)                  => print error
  *
- *          c. Read from stream
+ *          b. Read from stream
  *              1. If Err is Block, continue for other types return
  *              2. While a complete frame is buffered:
  *                  a. Call handle_ui() to get result.
@@ -49,19 +43,18 @@ const CLOSE_MSG: &[u8] = br#"[0,{"Action": "Close"}]"#;
  *                      Err(..)                   => If is_ui_error() return,
  *                                                   else continue
  *
- *          d. Check token cancelled,
+ *          c. Check token cancelled,
  *              1. write CLOSE_MSG to stream
- *              2. check if ui closed properly by writing &[0] to stream is err
- *              3. If not err, sleep 500 ms and recheck
+ *              2. read one byte to detect peer close, bounded by timeout
+ *              3. return Ok
  *
  *  Errors:
- *      UnixSocketError::Accept     [1.a]
- *      UnixSocketError::Write      [4]
+ *      UnixSocketError::Read       [b]
+ *      UnixSocketError::Write      [a, b]
  */
 
 pub async fn run_module<T>(
     handler: &mut T,
-    listener: &UnixListener,
     mut stream: UnixStream,
     token: &CancellationToken,
 ) -> Result<(), <T as HandleCommander>::Error>
@@ -69,6 +62,7 @@ where
     T: FromCommander + HandleCommander + Buffer + HandleUI + FlushStorage,
 {
     info!("running");
+    handler.buf_as_mut().clear();
     loop {
         select! {
             biased;
@@ -81,15 +75,6 @@ where
                 let _ = timeout(Duration::from_millis(300), stream.read(&mut eof_buf)).await;
                 trace!("runner| cancelled cleanly");
                 return Ok(());
-            }
-            result = listener.accept() => {
-                if stream.try_write(&[0]).is_err() {
-                    stream = result.map_err(UnixSockError::Accept)?.0;
-                    trace!("new connection");
-                    handler.flush_storage(&mut stream).await?;
-                } else {
-                    debug!("socket already bound");
-                }
             }
             result = handler.recv() => {
                 trace!("from commander");
