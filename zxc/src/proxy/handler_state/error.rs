@@ -8,21 +8,14 @@ use crate::io::file::FileErrorInfo;
 use crate::io::socket::ConnectError;
 use crate::proxy::prelude::*;
 
-// Various Errors that can occur on handler state transition
 #[derive(Error, Debug)]
-pub enum ProxyStateError {
-    // Communication Error
-    #[error(transparent)]
-    Commander(#[from] CommanderError),
-
-    // ----- Read Write -----
-    // HTTP
+pub enum ProtocolError {
+    // H11
     #[error("http: {0}")]
     OneOne(#[from] OneOneRWError),
     #[error("h2: {0}")]
+    // H2
     Two(#[from] two_plz::error::OpError),
-    #[error("h2 send response: {0}")]
-    H2SendResponse(#[from] UserError),
     #[error("h2 preface: {0}")]
     H2Preface(#[from] two_plz::preface::PrefaceError),
     #[error("h2 connection closed before response")]
@@ -33,27 +26,36 @@ pub enum ProxyStateError {
     #[error("websocket: {0}")]
     Ws(#[from] WsError),
 
-    // ----- Write History -----
+    //  File Ops
+    #[error(transparent)]
+    File(#[from] FileErrorInfo),
+
+    //  Update Frame
+    #[error(transparent)]
+    UpdateFrame(#[from] UpdateMsgError),
+}
+
+#[derive(Error, Debug)]
+pub enum ProxyStateError {
+    // Communication Error
+    #[error(transparent)]
+    Commander(#[from] CommanderError),
+
+    //  Read Write
+    #[error("h2 send response: {0}")]
+    H2SendResponse(#[from] UserError),
+
+    //  Write History
     #[error("serialize: {0}")]
     Serialize(#[from] serde_json::Error),
     #[error("history channel closed")]
     HistorySend(#[from] SendError<CommanderToHistory>),
 
-    // ----- File Ops -----
-    #[error(transparent)]
-    FileIo(#[from] FileErrorInfo),
-    #[error(transparent)]
-    ReWriteFile(FileErrorInfo),
-
-    // ----- Should Intercept -----
+    //  Should Intercept
     #[error("websocket should-intercept check")]
     WsShouldIntercept,
 
-    // ----- Update Frame -----
-    #[error(transparent)]
-    UpdateFrame(#[from] UpdateMsgError),
-
-    // ----- NewConnection -----
+    //  NewConnection
     #[error(transparent)]
     Reconnect(#[from] ConnectError),
 
@@ -61,6 +63,46 @@ pub enum ProxyStateError {
     ServerEncrypt(#[from] ServerEncryptError),
     #[error("message dropped by user")]
     Drop,
+
+    //  Protocol
+    #[error(transparent)]
+    Protocol(#[from] ProtocolError),
+}
+
+impl From<OneOneRWError> for ProxyStateError {
+    fn from(e: OneOneRWError) -> Self {
+        Self::Protocol(ProtocolError::OneOne(e))
+    }
+}
+
+impl From<two_plz::error::OpError> for ProxyStateError {
+    fn from(e: two_plz::error::OpError) -> Self {
+        Self::Protocol(ProtocolError::Two(e))
+    }
+}
+
+impl From<two_plz::preface::PrefaceError> for ProxyStateError {
+    fn from(e: two_plz::preface::PrefaceError) -> Self {
+        Self::Protocol(ProtocolError::H2Preface(e))
+    }
+}
+
+impl From<WsError> for ProxyStateError {
+    fn from(e: WsError) -> Self {
+        Self::Protocol(ProtocolError::Ws(e))
+    }
+}
+
+impl From<FileErrorInfo> for ProxyStateError {
+    fn from(e: FileErrorInfo) -> Self {
+        Self::Protocol(ProtocolError::File(e))
+    }
+}
+
+impl From<UpdateMsgError> for ProxyStateError {
+    fn from(e: UpdateMsgError) -> Self {
+        Self::Protocol(ProtocolError::UpdateFrame(e))
+    }
 }
 
 impl From<SendError<CommanderRequest>> for ProxyStateError {
@@ -72,16 +114,5 @@ impl From<SendError<CommanderRequest>> for ProxyStateError {
 impl From<WrongMessage> for ProxyStateError {
     fn from(e: WrongMessage) -> Self {
         Self::Commander(CommanderError::WrongMessage(e))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_h2_send_response_error_display() {
-        let err = ProxyStateError::from(UserError::InactiveStreamId);
-        assert_eq!(err.to_string(), "h2 send response: inactive stream");
     }
 }

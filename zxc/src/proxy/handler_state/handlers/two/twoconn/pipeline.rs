@@ -230,7 +230,7 @@ impl ReadWrite for TwoConn<ResponseLine> {
         let msg = self
             .msg
             .take()
-            .ok_or(ProxyStateError::H2MissingRequest)?;
+            .ok_or(ProtocolError::H2MissingRequest)?;
         self.send_response.send_response(msg)?;
         Ok(ProxyState::End(self))
     }

@@ -1,11 +1,9 @@
-use crate::proxy::prelude::*;
-
 // Trait to read and write data from stream based on the protocol.
 pub trait ReadWrite
 where
     Self: Sized,
 {
-    type Error: Into<ProxyStateError>;
+    type Error;
 
     type State;
 

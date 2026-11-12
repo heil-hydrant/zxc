@@ -16,12 +16,13 @@ use crate::repeater::prelude::*;
  *     ReadFromFile -> UpdateFrame | Send
  *
  * Error:
- *      FileErrorInfo   [1]
+ *      ProtocolError::File         [1]
+ *      ProtocolError::UpdateFrame  [3]
  */
 
 pub async fn read_from_file<T>(
     mut conn: T,
-) -> Result<RepeaterState<T>, ProxyStateError>
+) -> Result<RepeaterState<T>, ProtocolError>
 where
     T: FileBuf + ShouldUpdate + AddRaw,
 {

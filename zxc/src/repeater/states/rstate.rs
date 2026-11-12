@@ -29,9 +29,9 @@ where
         + ReadWrite
         + WriteResponse
         + ReadWrite<State = Self>,
-    <T as ReadWrite>::Error: Into<ProxyStateError>,
+    <T as ReadWrite>::Error: Into<ProtocolError>,
 {
-    type Error = ProxyStateError;
+    type Error = ProtocolError;
 
     async fn next(self) -> Result<Self, Self::Error> {
         match self {
@@ -42,8 +42,8 @@ where
              *      FileBuf + ShouldUpdate + AddRaw
              *
              * Errors:
-             *      ProxyStateError::FileIo
-             *      ProxyStateError::UpdateFrame
+             *      ProtocolError::File
+             *      ProtocolError::UpdateFrame
              */
             Self::ReadFromFile(conn) => read_from_file(conn).await,
 
@@ -54,7 +54,7 @@ where
              *      RepeaterBytesToFrame
              *
              * Errors:
-             *      ProxyStateError::UpdateFrame
+             *      ProtocolError::UpdateFrame
              */
             Self::UpdateFrame(mut conn, buf) => {
                 let frame = conn.parse_frame(buf)?;
@@ -68,12 +68,10 @@ where
              *      Persist,
              *
              * Errors:
-             *      ProxyStateError::RewriteFile
+             *      ProtocolError::File
              */
             Self::ReWrite(mut conn) => {
-                conn = rewrite(conn)
-                    .await
-                    .map_err(ProxyStateError::ReWriteFile)?;
+                conn = rewrite(conn).await?;
                 Ok(Self::Send(conn))
             }
 
@@ -106,12 +104,10 @@ where
              *      WriteResponse
              *
              * Errors:
-             *      RepeaterError::LogResponse
+             *      ProtocolError::File
              */
             Self::WriteResponse(mut conn) => {
-                conn = log_response(conn)
-                    .await
-                    .map_err(ProxyStateError::ReWriteFile)?;
+                conn = log_response(conn).await?;
                 Ok(Self::End(conn))
             }
             Self::End(conn) => Ok(Self::End(conn)),

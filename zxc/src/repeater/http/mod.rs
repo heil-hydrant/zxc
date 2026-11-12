@@ -11,7 +11,7 @@ use crate::repeater::prelude::*;
 
 pub async fn handle_http<T>(
     conn: RepeaterConn<T>,
-) -> Result<Roneone<T>, ProxyStateError>
+) -> Result<Roneone<T>, ProtocolError>
 where
     T: AsyncWriteExt + AsyncReadExt + Unpin,
 {

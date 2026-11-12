@@ -11,11 +11,10 @@ use http_plz::{OneMessageHead, OneOne};
 use oneone_plz::state::State;
 pub use oneoneconn::*;
 use tokio::io::{
-    AsyncReadExt, AsyncWriteExt, BufReader, copy_bidirectional_with_sizes
+    AsyncReadExt, AsyncWriteExt, BufReader, copy_bidirectional_with_sizes,
 };
 use tracing::{error, trace};
 
-use self::error::HandleOneOneError;
 use super::handle_websocket;
 use crate::CAPACITY_2MB;
 use crate::async_step::async_run;
@@ -24,6 +23,7 @@ use crate::interceptor::*;
 use crate::io::socket::fill_buffer;
 use crate::proxy::prelude::*;
 use crate::proxy::states::*;
+use error::HandleOneOneError;
 
 // client type alias
 type OneOneRequest<T, E> = OneOneConn<T, E, OneRequestLine>;
@@ -209,7 +209,9 @@ where
         + Reconnect
         + Into<OneOneResponse<E, T>>
         + ReadWrite<State = ClientState<T, E>>,
+    <OneOneRequest<T, E> as ReadWrite>::Error: Into<ProxyStateError>,
     OneOneResponse<E, T>: ReadWrite<State = ServerState<E, T>>,
+    <OneOneResponse<E, T> as ReadWrite>::Error: Into<ProxyStateError>,
 {
     client_state = async_run(client_state).await?;
     let mut client_conn = OneOneRequest::<T, E>::try_from(client_state)?;

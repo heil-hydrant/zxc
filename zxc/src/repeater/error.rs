@@ -57,7 +57,7 @@ pub enum RepeaterError {
 
     // ----- Main State Errors -----
     #[error(transparent)]
-    Proxy(#[from] ProxyStateError),
+    Protocol(#[from] ProtocolError),
 
     // ----- Get status code -----
     #[error(transparent)]
@@ -89,6 +89,18 @@ pub enum RepeaterError {
 }
 
 crate::impl_ui_error!(RepeaterError);
+
+impl From<WsError> for RepeaterError {
+    fn from(e: WsError) -> Self {
+        Self::Protocol(ProtocolError::Ws(e))
+    }
+}
+
+impl From<FileErrorInfo> for RepeaterError {
+    fn from(e: FileErrorInfo) -> Self {
+        Self::Protocol(ProtocolError::File(e))
+    }
+}
 
 impl From<SendError<ForwardInfo>> for RepeaterError {
     fn from(_: SendError<ForwardInfo>) -> Self {

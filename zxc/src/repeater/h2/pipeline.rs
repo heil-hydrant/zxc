@@ -77,28 +77,28 @@ impl<T> ReadWrite for Rh2<T>
 where
     T: AsyncReadExt + AsyncWriteExt + Unpin,
 {
-    type Error = ProxyStateError;
+    type Error = ProtocolError;
     type State = RepeaterState<Self>;
 
     async fn read(mut self) -> Result<RepeaterState<Self>, Self::Error> {
         let mut client_conn = self
             .client_conn
             .take()
-            .ok_or(ProxyStateError::H2MissingRequest)?;
+            .ok_or(ProtocolError::H2MissingRequest)?;
         let mut response_future = self
             .response_future
             .take()
-            .ok_or(ProxyStateError::H2MissingRequest)?;
+            .ok_or(ProtocolError::H2MissingRequest)?;
 
         // No tokio::spawn: keep driving the connection while waiting for the
         // single response so flow control and SETTINGS are still processed.
         let response = tokio::select! {
             response = &mut response_future => {
-                response.map_err(|_| ProxyStateError::H2Closed)?
+                response.map_err(|_| ProtocolError::H2Closed)?
             }
             result = &mut client_conn => {
                 result?;
-                return Err(ProxyStateError::H2Closed);
+                return Err(ProtocolError::H2Closed);
             }
         };
 
@@ -111,11 +111,11 @@ where
         let request = self
             .pending_request
             .take()
-            .ok_or(ProxyStateError::H2MissingRequest)?;
+            .ok_or(ProtocolError::H2MissingRequest)?;
         let stream = self
             .stream
             .take()
-            .ok_or(ProxyStateError::H2MissingRequest)?;
+            .ok_or(ProtocolError::H2MissingRequest)?;
         let (client_conn, mut send_request) = ClientBuilder::new()
             .handshake(stream)
             .await?;

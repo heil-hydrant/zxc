@@ -57,7 +57,6 @@ where
     match scode {
         101 => {
             let span = span!(Level::INFO, "repeater_ws", index);
-            let _ = span.enter();
             let (tx, rx) = mpsc::channel::<RepeaterWsMsg>(1);
             let task = spawn(async move {
                 if let Err(e) = repeater_handle_ws(hconn, rx)
@@ -93,13 +92,13 @@ where
 pub async fn repeater_handle_ws<T, E>(
     conn: T,
     receiver: Receiver<RepeaterWsMsg>,
-) -> Result<(), ProxyStateError>
+) -> Result<(), RepeaterError>
 where
     T: ToRepeaterWs<E>,
     E: AsyncRead + AsyncWrite + Unpin,
 {
     // 1. convert <T> to RWebSocket
-    let mut rws = conn.to_rws(receiver).await.unwrap();
+    let mut rws = conn.to_rws(receiver).await?;
     trace!("ws start");
     // 2. Loop
     loop {
@@ -111,9 +110,7 @@ where
                         rws.add_frame(frame.map_err(WsError::Read)?);
                         trace!("from server");
                         // 2.a.3 Log server
-                        rws = log_response(rws)
-                            .await
-                            .map_err(ProxyStateError::ReWriteFile)?;
+                        rws = log_response(rws).await?;
                         rws.log(Role::Client).await?;
                     }
                     None => {

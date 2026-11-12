@@ -40,7 +40,7 @@ impl<T> Rh2<T> {
 // response future are polled directly by the repeater state machine.
 pub async fn handle_h2<T>(
     conn: RepeaterConn<T>,
-) -> Result<Rh2<T>, ProxyStateError>
+) -> Result<Rh2<T>, ProtocolError>
 where
     T: AsyncReadExt + AsyncWriteExt + Unpin,
 {
