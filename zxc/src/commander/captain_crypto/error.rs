@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::{env, io};
 
 use thiserror::Error;
@@ -22,13 +23,17 @@ pub enum CryptoBuildError {
     Var(#[from] env::VarError),
     #[error("verifier build: {0}")]
     VerifierBuild(#[from] VerifierBuilderError),
-    #[error("file read: {0}")]
-    Read(#[from] io::Error),
+    #[error("file read: {}: {source}", path.display())]
+    Read {
+        path: PathBuf,
+        #[source]
+        source: io::Error,
+    },
     #[error("certificate generation: {0}")]
     Rcgen(#[from] rcgen::Error),
-    #[error("private key read: {0}")]
+    #[error("private key parse: {0}")]
     ReadPrivateKey(String),
-    #[error("private.key not found")]
+    #[error("private key: no PKCS#8 key found")]
     NoKeyFound,
     #[error("unknown private key type")]
     UnknownPrivateKeyType,

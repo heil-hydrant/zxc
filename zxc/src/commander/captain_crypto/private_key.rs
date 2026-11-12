@@ -26,5 +26,8 @@ pub fn str_to_private(
 pub fn read_private() -> Result<String, CryptoBuildError> {
     let mut path = global_config_path()?;
     path.push("private.key");
-    Ok(read_to_string(path)?)
+    read_to_string(&path).map_err(|source| CryptoBuildError::Read {
+        path,
+        source,
+    })
 }

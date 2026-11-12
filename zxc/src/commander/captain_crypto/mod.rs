@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 pub use error::*;
 use rcgen::{CertificateParams, Issuer, KeyPair, SanType};
-use rustls_pki_types::{CertificateDer, PrivateKeyDer};
+use rustls_pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
 use tokio_rustls::TlsConnector;
 use tokio_rustls::rustls::client::WebPkiServerVerifier;
 use tokio_rustls::rustls::client::danger::ServerCertVerifier;
@@ -58,37 +58,60 @@ pub struct CaptainCrypto {
     web_pki: Arc<WebPkiServerVerifier>,
 }
 
+struct CryptoMaterial {
+    key_pair: KeyPair,
+    private_key: PrivateKeyDer<'static>,
+    trusted_ca: CA,
+    untrusted_ca: CA,
+}
+
 impl CaptainCrypto {
     pub fn new() -> Result<Self, CryptoBuildError> {
-        let root_cert_store = RootCertStore::from_iter(
-            webpki_roots::TLS_SERVER_ROOTS
-                .iter()
-                .cloned(),
-        );
-        let web_pki =
-            WebPkiServerVerifier::builder(root_cert_store.into()).build()?;
-        let verifier = CertVerifier::new(web_pki.supported_verify_schemes());
-        let mut client_config = ClientConfig::builder()
-            .dangerous()
-            .with_custom_certificate_verifier(Arc::new(verifier))
-            .with_no_client_auth();
-        client_config.alpn_protocols =
-            vec![ALPN_H2.to_vec(), ALPN_H1.to_vec()];
-        let tls_connector = TlsConnector::from(Arc::new(client_config));
-        let connector = Arc::new(tls_connector);
+        let (connector, web_pki) = build_base()?;
+        let material = match Self::user_material() {
+            Ok(material) => material,
+            Err(e) => {
+                eprintln!("CA initialization: {e}");
+                eprintln!("temporary session CA in use");
+                Self::ephemeral_material()?
+            }
+        };
+        Ok(CaptainCrypto {
+            connector,
+            web_pki,
+            key_pair: material.key_pair,
+            private_key: material.private_key,
+            trusted_ca: material.trusted_ca,
+            untrusted_ca: material.untrusted_ca,
+        })
+    }
 
+    fn user_material() -> Result<CryptoMaterial, CryptoBuildError> {
         let pk_str = read_private()?;
         let key_pair = KeyPair::from_pem(&pk_str)?;
         let trusted_ca = CA::trusted(KeyPair::from_pem(&pk_str)?)?;
         let untrusted_ca = CA::untrusted(KeyPair::from_pem(&pk_str)?)?;
         let private_key = str_to_private(&pk_str)?;
-        Ok(CaptainCrypto {
-            connector,
+        Ok(CryptoMaterial {
             key_pair,
             private_key,
             trusted_ca,
             untrusted_ca,
-            web_pki,
+        })
+    }
+
+    fn ephemeral_material() -> Result<CryptoMaterial, CryptoBuildError> {
+        let key_pair = KeyPair::generate()?;
+        let private_key: PrivateKeyDer<'static> = PrivateKeyDer::Pkcs8(
+            PrivatePkcs8KeyDer::from(key_pair.serialize_der()),
+        );
+        let trusted_ca = CA::ephemeral()?;
+        let untrusted_ca = CA::ephemeral()?;
+        Ok(CryptoMaterial {
+            key_pair,
+            private_key,
+            trusted_ca,
+            untrusted_ca,
         })
     }
 
@@ -140,6 +163,25 @@ impl CaptainCrypto {
         ca.add_config(digest, alpn, arc_config.clone());
         Ok(arc_config)
     }
+}
+
+fn build_base()
+-> Result<(Arc<TlsConnector>, Arc<WebPkiServerVerifier>), CryptoBuildError> {
+    let root_cert_store = RootCertStore::from_iter(
+        webpki_roots::TLS_SERVER_ROOTS
+            .iter()
+            .cloned(),
+    );
+    let web_pki =
+        WebPkiServerVerifier::builder(root_cert_store.into()).build()?;
+    let verifier = CertVerifier::new(web_pki.supported_verify_schemes());
+    let mut client_config = ClientConfig::builder()
+        .dangerous()
+        .with_custom_certificate_verifier(Arc::new(verifier))
+        .with_no_client_auth();
+    client_config.alpn_protocols = vec![ALPN_H2.to_vec(), ALPN_H1.to_vec()];
+    let tls_connector = TlsConnector::from(Arc::new(client_config));
+    Ok((Arc::new(tls_connector), web_pki))
 }
 
 fn generate_domain_cert(
