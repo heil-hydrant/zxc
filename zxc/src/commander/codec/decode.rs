@@ -1,6 +1,3 @@
-use std::borrow::Cow;
-use std::io::Write;
-
 use base64::Engine;
 use base64::engine::general_purpose;
 
@@ -26,41 +23,53 @@ fn base64_decode(data: &[u8]) -> Result<Vec<u8>, DecodeError> {
 }
 
 fn url_decode(encoded_str: &[u8]) -> Vec<u8> {
-    let val: Vec<(Cow<'_, str>, Cow<'_, str>)> =
-        form_urlencoded::parse(encoded_str).collect();
-    val.iter()
-        .fold(Vec::new(), |mut acc: Vec<u8>, (left, right)| {
-            let _ = write!(acc, "{}{}", left, right);
-            acc
-        })
+    let mut out = Vec::with_capacity(encoded_str.len());
+    let mut i = 0;
+    while i < encoded_str.len() {
+        match encoded_str[i] {
+            b'+' => {
+                out.push(b' ');
+                i += 1;
+            }
+            b'%' if i + 2 < encoded_str.len() => {
+                if let Ok(hex) =
+                    std::str::from_utf8(&encoded_str[i + 1..i + 3])
+                    && let Ok(val) = u8::from_str_radix(hex, 16)
+                {
+                    out.push(val);
+                    i += 3;
+                    continue;
+                }
+                out.push(encoded_str[i]);
+                i += 1;
+            }
+            b => {
+                out.push(b);
+                i += 1;
+            }
+        }
+    }
+    out
 }
 
 fn url_decode_all_characters(
     encoded_str: &[u8],
 ) -> Result<Vec<u8>, DecodeError> {
-    let mut decoded = String::new();
-    let mut chars = std::str::from_utf8(encoded_str)?.chars();
-    while let Some(c) = chars.next() {
-        if c == '%' {
-            // Attempt to decode the next two characters as hexadecimal
-            let hex_chars: String = chars.by_ref().take(2).collect();
-            if hex_chars.len() != 2 {
-                //return Ok(decoded.into());
-                break;
+    let _ = std::str::from_utf8(encoded_str)?;
+    let mut decoded = Vec::with_capacity(encoded_str.len());
+    let mut i = 0;
+    while i < encoded_str.len() {
+        if encoded_str[i] == b'%' && i + 2 < encoded_str.len() {
+            if let Ok(hex) = std::str::from_utf8(&encoded_str[i + 1..i + 3])
+                && let Ok(val) = u8::from_str_radix(hex, 16)
+            {
+                decoded.push(val);
+                i += 3;
+                continue;
             }
-
-            if let Ok(hex_value) = u8::from_str_radix(&hex_chars, 16) {
-                // Successfully decoded a hexadecimal value, append it as a
-                // character
-                decoded.push(char::from(hex_value));
-            } else {
-                //return Ok(decoded.into());
-                break;
-            }
-        } else {
-            // Not an encoded character, append it as is
-            decoded.push(c);
         }
+        decoded.push(encoded_str[i]);
+        i += 1;
     }
-    Ok(decoded.into())
+    Ok(decoded)
 }

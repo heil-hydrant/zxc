@@ -1,3 +1,5 @@
+use std::fmt::Write;
+
 use base64::Engine;
 use base64::engine::general_purpose;
 use form_urlencoded::byte_serialize;
@@ -31,9 +33,10 @@ fn url_encode(input: &[u8]) -> Vec<u8> {
 }
 
 fn url_encode_all_characters(input: &[u8]) -> Result<Vec<u8>, EncodeError> {
-    let mut encoded = String::new();
-    for c in std::str::from_utf8(input)?.chars() {
-        encoded.push_str(&format!("%{:02X}", c as u32));
+    let s = std::str::from_utf8(input)?;
+    let mut encoded = String::with_capacity(s.len() * 3);
+    for &b in s.as_bytes() {
+        let _ = write!(encoded, "%{:02X}", b);
     }
     Ok(encoded.into())
 }

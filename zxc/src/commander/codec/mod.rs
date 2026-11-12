@@ -68,4 +68,52 @@ mod tests {
         let decoded = decode::perform_decode(&codec, &encoded).unwrap();
         assert_eq!(data, decoded.as_slice());
     }
+
+    #[test]
+    fn test_url_decode_preserves_delimiters() {
+        let codec = Codec::Url;
+        let data = b"a=1&b=2%203";
+        let decoded = decode::perform_decode(&codec, data).unwrap();
+        assert_eq!(decoded.as_slice(), b"a=1&b=2 3".as_slice());
+    }
+
+    #[test]
+    fn test_url_all_decode_multibyte_and_stray_percent() {
+        let codec = Codec::UrlAll;
+
+        let decoded = decode::perform_decode(&codec, b"%E2%82%AC").unwrap();
+        assert_eq!(decoded.as_slice(), "€".as_bytes());
+
+        let decoded = decode::perform_decode(&codec, b"abc%zz").unwrap();
+        assert_eq!(decoded.as_slice(), b"abc%zz".as_slice());
+
+        let decoded = decode::perform_decode(&codec, b"abc%2").unwrap();
+        assert_eq!(decoded.as_slice(), b"abc%2".as_slice());
+
+        let decoded = decode::perform_decode(&codec, b"abc%").unwrap();
+        assert_eq!(decoded.as_slice(), b"abc%".as_slice());
+    }
+
+    #[test]
+    fn test_url_all_encode_multibyte() {
+        let codec = Codec::UrlAll;
+
+        let encoded = encode::perform_encode(&codec, "é".as_bytes()).unwrap();
+        assert_eq!(encoded.as_slice(), b"%C3%A9".as_slice());
+
+        let encoded = encode::perform_encode(&codec, "€".as_bytes()).unwrap();
+        assert_eq!(encoded.as_slice(), b"%E2%82%AC".as_slice());
+
+        let encoded = encode::perform_encode(&codec, "😀".as_bytes()).unwrap();
+        assert_eq!(encoded.as_slice(), b"%F0%9F%98%80".as_slice());
+    }
+
+    #[test]
+    fn test_url_all_roundtrip_multibyte() {
+        let codec = Codec::UrlAll;
+        let data = "héllo € 😀".as_bytes();
+        let encoded = encode::perform_encode(&codec, data).unwrap();
+        let decoded = decode::perform_decode(&codec, &encoded).unwrap();
+        assert_eq!(decoded.as_slice(), data);
+    }
 }
