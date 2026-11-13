@@ -277,7 +277,7 @@ where
                     &mut addinfo.receiver,
                     sni,
                     tcp,
-                    false, // TODO
+                    true, // HTTP/1.1 pipeline: negotiate h1 only
                 )
                 .await?;
                 let conn = Connection::from((conn, tls));

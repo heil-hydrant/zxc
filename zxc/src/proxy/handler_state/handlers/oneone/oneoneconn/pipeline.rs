@@ -200,7 +200,7 @@ where
             &mut self.commander_recvr,
             server_name,
             tcp,
-            false, // TODO
+            true, // HTTP/1.1 pipeline: negotiate h1 only
         )
         .await?;
         trace!("Encrypted");
