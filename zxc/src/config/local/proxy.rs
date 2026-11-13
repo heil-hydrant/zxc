@@ -86,10 +86,7 @@ impl Add for ProxyArgs {
                 None
             };
 
-        let excluded_domains = if included_domains.is_none()
-            || self.excluded_domains.is_some()
-            || rhs.excluded_domains.is_some()
-        {
+        let excluded_domains = if included_domains.is_none() {
             add_option_vec(self.excluded_domains, rhs.excluded_domains)
         } else {
             None
@@ -261,5 +258,59 @@ pub mod tests {
             ..Default::default()
         };
         assert_eq!(new + old.clone(), verify);
+    }
+
+    // include precedence over exclude
+    #[test]
+    fn test_proxyargs_add_new_included_domains_old_excluded_domains() {
+        let new = ProxyArgs {
+            included_domains: Some(vec!["a".to_string()]),
+            ..Default::default()
+        };
+        let old = ProxyArgs {
+            excluded_domains: Some(vec!["b".to_string()]),
+            ..Default::default()
+        };
+        let verify = ProxyArgs {
+            included_domains: Some(vec!["a".to_string()]),
+            ..Default::default()
+        };
+        assert_eq!(new + old, verify);
+    }
+
+    #[test]
+    fn test_proxyargs_add_new_excluded_domains_old_included_domains() {
+        let new = ProxyArgs {
+            excluded_domains: Some(vec!["a".to_string()]),
+            ..Default::default()
+        };
+        let old = ProxyArgs {
+            included_domains: Some(vec!["b".to_string()]),
+            ..Default::default()
+        };
+        let verify = ProxyArgs {
+            included_domains: Some(vec!["b".to_string()]),
+            ..Default::default()
+        };
+        assert_eq!(new + old, verify);
+    }
+
+    #[test]
+    fn test_proxyargs_add_included_domains_win_over_excluded_domains() {
+        let new = ProxyArgs {
+            included_domains: Some(vec!["a".to_string()]),
+            excluded_domains: Some(vec!["c".to_string()]),
+            ..Default::default()
+        };
+        let old = ProxyArgs {
+            included_domains: Some(vec!["b".to_string()]),
+            excluded_domains: Some(vec!["d".to_string()]),
+            ..Default::default()
+        };
+        let verify = ProxyArgs {
+            included_domains: Some(vec!["a".to_string(), "b".to_string()]),
+            ..Default::default()
+        };
+        assert_eq!(new + old, verify);
     }
 }
