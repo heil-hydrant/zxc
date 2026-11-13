@@ -5,6 +5,7 @@ use std::fmt::Debug;
 
 use buffer_plz::Cursor;
 use bytes::BytesMut;
+use error::HandleOneOneError;
 use header_plz::body_headers::parse::ParseBodyHeaders;
 use header_plz::{OneInfoLine, OneRequestLine, OneResponseLine};
 use http_plz::{OneMessageHead, OneOne};
@@ -23,7 +24,6 @@ use crate::interceptor::*;
 use crate::io::socket::fill_buffer;
 use crate::proxy::prelude::*;
 use crate::proxy::states::*;
-use error::HandleOneOneError;
 
 // client type alias
 type OneOneRequest<T, E> = OneOneConn<T, E, OneRequestLine>;
@@ -132,72 +132,72 @@ where
 }
 
 /* Description:
-*       Function to handle a http/1.1 connection cycle.
-*
-* Args:
-*       client_state: ProxyState<OneOneHandler<T, E, Request>>
-*
-* Trait Bound:
-*       - T,E: AsyncReadExt + AsyncWriteExt + Unpin
-*
-*       - OneOneRequest<T, E>:  ReadWrite
-*                               + Reconnect
-*                               + Into<OneOneResponse<E, T>>
-*                               + ReadWrite<State = ClientState<T, E>>
-*
-*       - OneOneResponse<T, E>: ReadWrite,
-*
-* Steps:
-*      1. Run client_state until it ends.
-*
-*      2. Convert ClientState to OneOneRequest
-*         [ TryFrom trait in convert/try_from_proxy_state ]
-*
-*           ProxyState<OneOneRequest> -> OneOneRequest
-*
-*          a. If client_state is NeedNewConnection
-*              return HandleOneOneError::NeedNewConnection
-*
-*          b. If client_state is ServerClose
-*              return HandleOneOneError::SendToServer
-*
-*      3. Check If client is logged,
-*
-*      4. If client is logged, set the extended attributes to the request file.
-*
-*      5. Convert OneOneRequest to OneOneResponse [ From trait in
-*         convert/request_to_response ] and create new server_state,
-*         ProxyState::Receive.
-*
-*      6. Run server_state until it ends.
-*
-*      7. Convert ServerState to OneOneResponse [ TryFrom trait in
-*         convert/try_from_proxy_state ]
-*
-*               ProxyState<OneOneResponse> -> OneOneResponse
-*
-*           a. If server_state is ServerClose
-*               return HandleOneOneError::ReadFromServer
-*
-*      8. Get the status code from server_state.
-*
-*      9. If the status code is 101, return ProxyState::SwitchProtocol(Ws)
-*
-*      10. else, return ProxyState::End
-*
-*      11. Else if client not not logged, Relay
-*
-* Returns:
-*      Ok(ProxyState<OneOneHandler<E, T, Response>>)
-*
-* Error:
-*      HandleOneOneError::ProxyError            [1] [5]
-*      HandleOneOneError::SendToServer          [2]
-*      HandleOneOneError::NeedNewConnection     [2]
-*      HandleOneOneError::ReadFromServer        [7]
-*      HandleOneOneError::StatusCode            [8]
-*      HandleOneOneError::Relay                 [11]
-*/
+ *       Function to handle a http/1.1 connection cycle.
+ *
+ * Args:
+ *       client_state: ProxyState<OneOneHandler<T, E, Request>>
+ *
+ * Trait Bound:
+ *       - T,E: AsyncReadExt + AsyncWriteExt + Unpin
+ *
+ *       - OneOneRequest<T, E>:  ReadWrite
+ *                               + Reconnect
+ *                               + Into<OneOneResponse<E, T>>
+ *                               + ReadWrite<State = ClientState<T, E>>
+ *
+ *       - OneOneResponse<T, E>: ReadWrite,
+ *
+ * Steps:
+ *      1. Run client_state until it ends.
+ *
+ *      2. Convert ClientState to OneOneRequest
+ *         [ TryFrom trait in convert/try_from_proxy_state ]
+ *
+ *           ProxyState<OneOneRequest> -> OneOneRequest
+ *
+ *          a. If client_state is NeedNewConnection
+ *              return HandleOneOneError::NeedNewConnection
+ *
+ *          b. If client_state is ServerClose
+ *              return HandleOneOneError::SendToServer
+ *
+ *      3. Check If client is logged,
+ *
+ *      4. If client is logged, set the extended attributes to the request file.
+ *
+ *      5. Convert OneOneRequest to OneOneResponse [ From trait in
+ *         convert/request_to_response ] and create new server_state,
+ *         ProxyState::Receive.
+ *
+ *      6. Run server_state until it ends.
+ *
+ *      7. Convert ServerState to OneOneResponse [ TryFrom trait in
+ *         convert/try_from_proxy_state ]
+ *
+ *               ProxyState<OneOneResponse> -> OneOneResponse
+ *
+ *           a. If server_state is ServerClose
+ *               return HandleOneOneError::ReadFromServer
+ *
+ *      8. Get the status code from server_state.
+ *
+ *      9. If the status code is 101, return ProxyState::SwitchProtocol(Ws)
+ *
+ *      10. else, return ProxyState::End
+ *
+ *      11. Else if client not not logged, Relay
+ *
+ * Returns:
+ *      Ok(ProxyState<OneOneHandler<E, T, Response>>)
+ *
+ * Error:
+ *      HandleOneOneError::ProxyError            [1] [5]
+ *      HandleOneOneError::SendToServer          [2]
+ *      HandleOneOneError::NeedNewConnection     [2]
+ *      HandleOneOneError::ReadFromServer        [7]
+ *      HandleOneOneError::StatusCode            [8]
+ *      HandleOneOneError::Relay                 [11]
+ */
 
 pub async fn handle_one_one<T, E>(
     mut client_state: ClientState<T, E>,

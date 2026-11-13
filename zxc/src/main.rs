@@ -27,6 +27,7 @@ use std::time::Duration;
 use builder::*;
 use chrono::Local;
 use clap::Parser;
+use commander::captain_crypto::CryptoBuildError;
 use commander::run_commander;
 use config::{CliArgs, write_local_config};
 use run::starter::start_module;
@@ -38,7 +39,14 @@ use tokio_util::task::TaskTracker;
 use tracing::{Instrument, Level, debug, error, span};
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() {
+    if let Err(e) = run().await {
+        eprintln!("Error: {e}");
+        std::process::exit(1);
+    }
+}
+
+async fn run() -> Result<(), MainError> {
     let mut args = CliArgs::parse()
         .sanitize()
         .unwrap_or_default();
@@ -85,7 +93,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         1
     };
 
-    let mut builder = Builder::new(index, session_name.clone());
+    let mut builder = Builder::new(index, session_name.clone())
+        .map_err(MainError::Crypto)?;
 
     let set = TaskTracker::new();
     let token = CancellationToken::new();
@@ -157,10 +166,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Err(e) => error!("build {}| {}", ADDONS, e),
     }
 
-    let soldier_tx = builder.build_soldier_comm();
+    let (soldier_tx, soldier_rx) = builder.build_soldier_comm();
     // Commander
     let ctoken = token.clone();
-    let commander = builder.build_commander(local_config);
+    let commander = builder
+        .build_commander(local_config, soldier_rx)
+        .map_err(MainError::Builder)?;
     let _commander_handle = set.spawn(async move {
         let span = span!(Level::INFO, COMMANDER);
         let _ = span.enter();
@@ -268,6 +279,10 @@ fn create_session_dirs(sname: &str) -> Result<(), Error> {
 enum MainError {
     #[error("session directory: {}", .0)]
     CreateSessionDir(Error),
+    #[error("CA initialization: {0}")]
+    Crypto(CryptoBuildError),
+    #[error("builder: {0}")]
+    Builder(BuilderError),
     #[error("invalid session name: {0}")]
     InvalidSessionName(String),
     #[error("current directory: {}", .0)]

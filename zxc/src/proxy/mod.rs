@@ -8,9 +8,7 @@ pub use handler_state::handlers::OneOneRWError;
 pub use handler_state::handlers::error::WsError;
 pub use handler_state::read_write::ReadWrite;
 pub use handler_state::role::Role;
-pub use handler_state::transition::{
-    AddRaw, HistoryEnum, UpdateMsgError, WS_ADD_RAW_PANIC,
-};
+pub use handler_state::transition::{AddRaw, HistoryEnum, UpdateMsgError};
 pub use server_info::{ServerInfo, ServerInfoJson};
 pub use states::ZStream;
 use tokio::net::{TcpListener, TcpStream};

@@ -1,20 +1,37 @@
 use std::io::{BufRead, BufReader, Error, Read};
+use std::path::PathBuf;
 
 use tokio::net::UnixListener;
 use tokio::sync::mpsc::{Receiver, Sender, channel};
 use tracing::{error, trace};
 
 use crate::addons::AddonHandler;
+use crate::commander::captain_crypto::CryptoBuildError;
 use crate::commander::{
-    CaptainCrypto, Commander, CommanderRequest, HistoryComm, InterceptorComm, RepeaterComm
+    CaptainCrypto, Commander, CommanderRequest, HistoryComm, InterceptorComm,
+    RepeaterComm,
 };
 use crate::config::{Config, GlobalConfig, ProxyArgs, parse_global_config};
-use crate::core::HISTORY_STATE_FILE;
+use crate::core::{
+    ADDONS, HISTORY, HISTORY_STATE_FILE, INTERCEPTOR, REPEATER,
+};
 use crate::forward_info::ForwardInfo;
 use crate::history::{CommanderToHistory, HistoryHandler, HistoryUIOps};
 use crate::interceptor::{InterToUI, InterUIOps, InterceptorHandler};
 use crate::proxy::HistoryEnum;
 use crate::repeater::RepeaterHandler;
+
+#[derive(Debug, thiserror::Error)]
+pub enum BuilderError {
+    #[error("listener {path}: {source}")]
+    Listener {
+        path: PathBuf,
+        #[source]
+        source: Error,
+    },
+    #[error("module not built: {0}")]
+    MissingModule(&'static str),
+}
 
 pub struct Builder {
     attach: bool,
@@ -23,27 +40,28 @@ pub struct Builder {
     comm_history: Option<HistoryComm>,
     comm_interceptor: Option<InterceptorComm>,
     comm_repeater: Option<RepeaterComm>,
-    comm_soldiers: Option<Receiver<CommanderRequest>>,
     global_config: Option<GlobalConfig>,
     index: usize,
     sname: String,
 }
 
 impl Builder {
-    pub fn new(index: usize, sname: String) -> Builder {
+    pub fn new(
+        index: usize,
+        sname: String,
+    ) -> Result<Builder, CryptoBuildError> {
         let attach = index != 1;
-        Builder {
+        Ok(Builder {
             attach,
-            captain_crypto: CaptainCrypto::new().unwrap(),
+            captain_crypto: CaptainCrypto::new()?,
             comm_addons: None,
             comm_history: None,
             comm_interceptor: None,
             comm_repeater: None,
-            comm_soldiers: None,
             global_config: None,
             index,
             sname,
-        }
+        })
     }
 
     pub fn parse_global_config(&mut self) {
@@ -56,9 +74,13 @@ impl Builder {
     pub fn build_listener(
         &self,
         mod_name: &str,
-    ) -> Result<UnixListener, Error> {
-        let sock = format!("/tmp/{}/{}.sock", self.sname, mod_name);
-        UnixListener::bind(sock)
+    ) -> Result<UnixListener, BuilderError> {
+        let path =
+            PathBuf::from(format!("/tmp/{}/{}.sock", self.sname, mod_name));
+        UnixListener::bind(&path).map_err(|source| BuilderError::Listener {
+            path,
+            source,
+        })
     }
 
     pub fn build_history(&mut self) -> HistoryHandler {
@@ -82,10 +104,10 @@ impl Builder {
         HistoryHandler::new(recv_cth, send_htc, list)
     }
 
-    pub fn build_soldier_comm(&mut self) -> Sender<CommanderRequest> {
-        let (tx, rx) = channel::<CommanderRequest>(100);
-        self.comm_soldiers = Some(rx);
-        tx
+    pub fn build_soldier_comm(
+        &self,
+    ) -> (Sender<CommanderRequest>, Receiver<CommanderRequest>) {
+        channel::<CommanderRequest>(100)
     }
 
     pub fn build_interceptor(&mut self) -> InterceptorHandler {
@@ -117,7 +139,8 @@ impl Builder {
     pub fn build_commander(
         self,
         local_config: Option<ProxyArgs>,
-    ) -> Commander {
+        comm_soldiers: Receiver<CommanderRequest>,
+    ) -> Result<Commander, BuilderError> {
         let config = Config::build(local_config, self.global_config);
         if let Some(c) = config.as_ref() {
             trace!("config| {:?}", c);
@@ -125,15 +148,28 @@ impl Builder {
             trace!("config| None");
         }
 
-        Commander::new(
+        let comm_addons = self
+            .comm_addons
+            .ok_or(BuilderError::MissingModule(ADDONS))?;
+        let comm_history = self
+            .comm_history
+            .ok_or(BuilderError::MissingModule(HISTORY))?;
+        let comm_interceptor = self
+            .comm_interceptor
+            .ok_or(BuilderError::MissingModule(INTERCEPTOR))?;
+        let comm_repeater = self
+            .comm_repeater
+            .ok_or(BuilderError::MissingModule(REPEATER))?;
+
+        Ok(Commander::new(
             self.captain_crypto,
-            self.comm_addons.unwrap(),
-            self.comm_history.unwrap(),
-            self.comm_interceptor.unwrap(),
-            self.comm_repeater.unwrap(),
-            self.comm_soldiers.unwrap(),
+            comm_addons,
+            comm_history,
+            comm_interceptor,
+            comm_repeater,
+            comm_soldiers,
             config,
-        )
+        ))
     }
 }
 

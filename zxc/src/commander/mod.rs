@@ -583,8 +583,9 @@ mod tests {
         let base = unique_temp_dir("start");
         std::fs::create_dir_all(&base).unwrap();
 
-        let (index, path) =
-            create_http_log_dir(&base, 3, 8).await.unwrap();
+        let (index, path) = create_http_log_dir(&base, 3, 8)
+            .await
+            .unwrap();
 
         assert_eq!(index, 3);
         assert_eq!(path, base.join("3"));
@@ -600,8 +601,9 @@ mod tests {
         std::fs::create_dir(base.join("7")).unwrap();
         std::fs::create_dir(base.join("8")).unwrap();
 
-        let (index, path) =
-            create_http_log_dir(&base, 7, 8).await.unwrap();
+        let (index, path) = create_http_log_dir(&base, 7, 8)
+            .await
+            .unwrap();
 
         assert_eq!(index, 9);
         assert_eq!(path, base.join("9"));

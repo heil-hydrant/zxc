@@ -62,8 +62,7 @@ mod tests {
 
     #[test]
     fn vim_channel_read_two_frames_in_one_read() {
-        let mut buf =
-            BytesMut::from(&b"[1,\"Toggle\"]\n[2,\"Close\"]\n"[..]);
+        let mut buf = BytesMut::from(&b"[1,\"Toggle\"]\n[2,\"Close\"]\n"[..]);
 
         let frames = drain_frames(&mut buf);
 
@@ -90,9 +89,8 @@ mod tests {
 
     #[test]
     fn vim_channel_read_multiple_frames_and_partial_tail() {
-        let mut buf = BytesMut::from(
-            &b"[1,\"Toggle\"]\n[2,\"Close\"]\n[3,\"To"[..],
-        );
+        let mut buf =
+            BytesMut::from(&b"[1,\"Toggle\"]\n[2,\"Close\"]\n[3,\"To"[..]);
 
         let frames = drain_frames(&mut buf);
 
@@ -104,17 +102,13 @@ mod tests {
 
     #[test]
     fn vim_channel_read_escaped_newline_in_string() {
-        let mut buf = BytesMut::from(
-            &b"[1,{\"Encode\":{\"data\":\"a\\nb\"}}]\n"[..],
-        );
+        let mut buf =
+            BytesMut::from(&b"[1,{\"Encode\":{\"data\":\"a\\nb\"}}]\n"[..]);
 
         let frames = drain_frames(&mut buf);
 
         assert_eq!(frames.len(), 1);
-        assert_eq!(
-            &frames[0][..],
-            b"[1,{\"Encode\":{\"data\":\"a\\nb\"}}]\n"
-        );
+        assert_eq!(&frames[0][..], b"[1,{\"Encode\":{\"data\":\"a\\nb\"}}]\n");
         let value: serde_json::Value =
             serde_json::from_slice(&frames[0]).unwrap();
         assert_eq!(value[1]["Encode"]["data"], "a\nb");

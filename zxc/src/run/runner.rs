@@ -9,8 +9,7 @@ use tracing::{error, info, trace};
 
 use super::boundary::*;
 use crate::io::{
-    UnixSockError, build_slice_and_write, read_from_unix, split_json_frame,
-    write_and_flush,
+    UnixSockError, build_slice_and_write, read_from_unix, split_json_frame, write_and_flush
 };
 
 const CLOSE_MSG: &[u8] = br#"[0,{"Action": "Close"}]"#;

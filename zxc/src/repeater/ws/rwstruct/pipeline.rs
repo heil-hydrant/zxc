@@ -9,6 +9,7 @@ use tracing::trace;
 
 use super::RWebSocket;
 use crate::file_types::{EXT_WREQ, EXT_WRES};
+use crate::proxy::handler_state::WS_ADD_RAW_PANIC;
 use crate::proxy::*;
 use crate::repeater::prelude::*;
 
