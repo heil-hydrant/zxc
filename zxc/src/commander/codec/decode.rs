@@ -59,14 +59,14 @@ fn url_decode_all_characters(
     let mut decoded = Vec::with_capacity(encoded_str.len());
     let mut i = 0;
     while i < encoded_str.len() {
-        if encoded_str[i] == b'%' && i + 2 < encoded_str.len() {
-            if let Ok(hex) = std::str::from_utf8(&encoded_str[i + 1..i + 3])
-                && let Ok(val) = u8::from_str_radix(hex, 16)
-            {
-                decoded.push(val);
-                i += 3;
-                continue;
-            }
+        if encoded_str[i] == b'%'
+            && i + 2 < encoded_str.len()
+            && let Ok(hex) = std::str::from_utf8(&encoded_str[i + 1..i + 3])
+            && let Ok(val) = u8::from_str_radix(hex, 16)
+        {
+            decoded.push(val);
+            i += 3;
+            continue;
         }
         decoded.push(encoded_str[i]);
         i += 1;
