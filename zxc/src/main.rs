@@ -108,7 +108,6 @@ async fn run() -> Result<(), MainError> {
             let token = token.clone();
             let _abort_history = set.spawn(async move {
                 let span = span!(Level::INFO, HISTORY);
-                let _ = span.enter();
                 let _ = start_module(history_handler, listener, token)
                     .instrument(span)
                     .await;
@@ -124,7 +123,6 @@ async fn run() -> Result<(), MainError> {
             let token = token.clone();
             let _abort_interceptor = set.spawn(async move {
                 let span = span!(Level::INFO, INTERCEPTOR);
-                let _ = span.enter();
                 let _ = start_module(interceptor_handler, listener, token)
                     .instrument(span)
                     .await;
@@ -140,7 +138,6 @@ async fn run() -> Result<(), MainError> {
             let token = token.clone();
             let _repeater_handle = set.spawn(async move {
                 let span = span!(Level::INFO, REPEATER);
-                let _ = span.enter();
                 let _ = start_module(repeater_handler, listener, token)
                     .instrument(span)
                     .await;
@@ -157,7 +154,6 @@ async fn run() -> Result<(), MainError> {
             let token = token.clone();
             let _addon_handle = set.spawn(async move {
                 let span = span!(Level::INFO, ADDONS);
-                let _ = span.enter();
                 let _ = start_module(addon_handler, listener, token)
                     .instrument(span)
                     .await;
@@ -174,7 +170,6 @@ async fn run() -> Result<(), MainError> {
         .map_err(MainError::Builder)?;
     let _commander_handle = set.spawn(async move {
         let span = span!(Level::INFO, COMMANDER);
-        let _ = span.enter();
         run_commander(commander, ctoken)
             .instrument(span)
             .await;
@@ -185,7 +180,6 @@ async fn run() -> Result<(), MainError> {
     let proxy_token_clone = proxy_token.clone();
     let _proxy_handle = set.spawn(async move {
         let span = span!(Level::INFO, PROXY);
-        let _ = span.enter();
         proxy::start_proxy(
             soldier_tx,
             proxy_listener,

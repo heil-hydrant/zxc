@@ -30,7 +30,5 @@ fn span<T>(state: T) -> tracing::Span
 where
     T: Display,
 {
-    let span = span!(Level::TRACE, "", "{}", state.to_string());
-    let _ = span.enter();
-    span
+    span!(Level::TRACE, "", "{}", state.to_string())
 }
