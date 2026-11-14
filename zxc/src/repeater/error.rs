@@ -80,9 +80,9 @@ pub enum RepeaterError {
     // ws build
     #[error(transparent)]
     WsBuild(#[from] RWsBuildError),
-    #[error("scratch file error: {0}")]
+    #[error("scratch file: {0}")]
     ScratchFile(#[source] io::Error),
-    #[error("history file error: {0}")]
+    #[error("history file: {0}")]
     HistoryFile(#[source] io::Error),
     #[error("websocket id not found: {0}")]
     WsIdNotFound(usize),
