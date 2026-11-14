@@ -1,19 +1,11 @@
 use std::fs::read_dir;
 use std::io::Error;
+
 mod logging;
 pub use logging::*;
 
-/* Steps:
- *      1. Iterate through history directory
- *      2. Check if entry is a directory
- *      3. Get FileName
- *      4. convert to str
- *      5. parse to usize
- *      6. get largest
- */
-
 pub fn get_largest_file_index() -> Result<usize, Error> {
-    read_dir("history")?
+    Ok(read_dir("history")?
         .filter_map(|entry| {
             let path = entry.ok()?.path();
             if path.is_dir() {
@@ -26,7 +18,7 @@ pub fn get_largest_file_index() -> Result<usize, Error> {
             }
         })
         .max()
-        .ok_or_else(|| Error::other("Failed to get largest index"))
+        .unwrap_or(0))
 }
 
 #[cfg(test)]
