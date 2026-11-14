@@ -52,7 +52,7 @@ impl From<(&mut File, FileEvent, io::Error)> for FileErrorInfo {
             // Find the start of ', read' after 'path: '
             if let Some(end) = input[start..].find("\", read") {
                 // Extract the string between 'path: "' and '", read'
-                &input[(start + 7)..(start + end + 1)]
+                &input[(start + 7)..(start + end)]
             } else {
                 &input
             }
@@ -86,17 +86,15 @@ pub async fn create_and_write_file(
     Ok(file)
 }
 
-/* Description:
- *      Copy a file and preserve the request metadata xattrs.
- *
- *      Linux: copy user.host, user.http, user.sni, user.is_h2,
- *      user.authority and user.h2_scheme.
- *
- *      macOS: std::fs::copy already preserves xattrs via
- *      fclonefileat/fcopyfile, so no explicit copy is needed.
- *
- *      Timestamps and ownership are not copied.
- */
+// Copy a file and preserve the request metadata xattrs.
+//
+// Linux: copy user.host, user.http, user.sni, user.is_h2,
+// user.authority and user.h2_scheme.
+//
+// macOS: std::fs::copy already preserves xattrs via
+// fclonefileat/fcopyfile, so no explicit copy is needed.
+//
+// Timestamps and ownership are not copied.
 
 pub async fn copy_with_request_metadata(
     from: impl AsRef<Path>,
@@ -210,6 +208,30 @@ mod tests {
                 assert_eq!(xattr::get(&dst, name)?, Some(value.to_vec()));
             }
         }
+
+        std::fs::remove_dir_all(&dir)?;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_file_error_info_path_has_no_trailing_quote()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let dir = unique_temp_dir();
+        std::fs::create_dir_all(&dir)?;
+        let path = dir.join("error.req");
+        std::fs::write(&path, b"")?;
+        let mut file = File::open(&path).await?;
+
+        let info = FileErrorInfo::from((
+            &mut file,
+            FileEvent::Read,
+            std::io::Error::other("test"),
+        ));
+        let expected_path = path.canonicalize()?;
+        assert_eq!(
+            info.to_string(),
+            format!("file read: {}: test", expected_path.display())
+        );
 
         std::fs::remove_dir_all(&dir)?;
         Ok(())
