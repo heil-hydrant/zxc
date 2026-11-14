@@ -1,4 +1,4 @@
-use std::fs::{File, create_dir};
+use std::fs::{File, create_dir_all};
 use std::io::{self, Write};
 use std::sync::{LockResult, Mutex, MutexGuard};
 
@@ -105,7 +105,7 @@ pub fn setup_logging(debug: bool) -> Result<(), Box<dyn std::error::Error>> {
 
     if max_level == Level::TRACE {
         let _ =
-            create_dir("log").map_err(|e| eprintln!("create log dir| {}", e));
+            create_dir_all("log").map_err(|e| eprintln!("create log dir| {}", e));
         match File::create("./log/proxy.log") {
             Ok(file) => {
                 let writer = DebugLogger::new(basic_file, file);
