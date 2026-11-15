@@ -4,7 +4,7 @@ use bytes::BytesMut;
 use futures_util::{SinkExt, StreamExt};
 use tokio::fs::File;
 use tokio::io::{AsyncRead, AsyncWrite};
-use tokio_tungstenite::tungstenite::Message;
+use tokio_tungstenite::tungstenite::{Message, Utf8Bytes};
 use tracing::trace;
 
 use super::RWebSocket;
@@ -72,12 +72,14 @@ impl<T> RepeaterBytesToFrame for RWebSocket<T> {
         &mut self,
         buf: BytesMut,
     ) -> Result<Self::Frame, UpdateMsgError> {
-        let msg = Message::Text(
-            String::from_utf8_lossy(&buf)
-                .to_string()
-                .into(),
-        );
-        self.data = Some(buf);
+        let bytes = buf.freeze();
+        let utf8 = Utf8Bytes::try_from(bytes.clone()).unwrap_or_else(|_| {
+            String::from_utf8_lossy(&bytes)
+                .into_owned()
+                .into()
+        });
+        self.data = Some(bytes);
+        let msg = Message::Text(utf8);
         Ok(msg)
     }
 

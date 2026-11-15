@@ -2,7 +2,7 @@ mod pipeline;
 
 use std::path::PathBuf;
 
-use bytes::BytesMut;
+use bytes::{Bytes, BytesMut};
 use tokio::fs::File;
 use tokio::sync::mpsc::Receiver;
 use tokio_tungstenite::WebSocketStream;
@@ -25,7 +25,7 @@ pub struct RWebSocket<T> {
     frame: Option<Message>,
     log_id: usize,
     buf: BytesMut,
-    data: Option<BytesMut>,
+    data: Option<Bytes>,
 }
 
 impl<T> RWebSocket<T> {

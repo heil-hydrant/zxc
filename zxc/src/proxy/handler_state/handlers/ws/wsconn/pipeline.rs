@@ -40,12 +40,17 @@ impl<T, E> BytesToMsg for WsConn<T, E> {
     fn parse_bytes(&self, buf: BytesMut) -> Result<Self::Msg, UpdateMsgError> {
         // safe to unwrap
         let new_frame = match self.msg.as_ref().unwrap() {
-            Message::Text(_) => Message::Text(
-                String::from_utf8_lossy(&buf)
-                    .to_string()
-                    .into(),
-            ),
-            Message::Binary(_) => Message::Binary(buf.into()),
+            Message::Text(_) => {
+                let bytes = buf.freeze();
+                let utf8 = tungstenite::Utf8Bytes::try_from(bytes.clone())
+                    .unwrap_or_else(|_| {
+                        String::from_utf8_lossy(&bytes)
+                            .into_owned()
+                            .into()
+                    });
+                Message::Text(utf8)
+            }
+            Message::Binary(_) => Message::Binary(buf.freeze()),
             _ => return Err(UpdateMsgError::InvalidWsFrame),
         };
         Ok(new_frame)
