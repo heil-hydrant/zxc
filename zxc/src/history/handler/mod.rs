@@ -7,6 +7,7 @@ mod impl_handle_ui;
 use std::fmt::Debug;
 
 use bytes::BytesMut;
+use rustc_hash::FxHashMap;
 use tokio::fs::{File, OpenOptions};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tracing::trace;
@@ -14,12 +15,13 @@ use zxc_derive::{Buffer, NotifyCommander};
 
 use crate::CAPACITY_2MB;
 use crate::history::{
-    CommanderToHistory, HISTORY_WS_HIS, HistoryError, HistoryUIOps, HistoryWsError, WsHistory
+    CommanderToHistory, HISTORY_WS_HIS, HISTORY_WS_WSESS, HistoryError,
+    HistoryUIOps, HistoryWsError, HistoryWsRegisterInfo,
 };
-use crate::id::Id;
+use crate::id::SoldierId;
 use crate::io::write_and_flush;
 use crate::run::boundary::{
-    Buffer, HandleCommander, NotifyCommander, UiReply
+    Buffer, HandleCommander, NotifyCommander, UiReply,
 };
 
 const WS_HISTORY: &str = "ws_history";
@@ -34,7 +36,7 @@ pub struct HistoryHandler {
     to_commander: Sender<HistoryUIOps>,
     ui_storage: Vec<String>, // Stores the history in case the channel is disconnected
     ws_his: Option<File>,
-    ws_storage: Vec<WsHistory>, // Stores the Ws History
+    ws_storage: FxHashMap<SoldierId, File>, // Stores the Ws History
 }
 
 impl HistoryHandler {
@@ -51,7 +53,7 @@ impl HistoryHandler {
             msg_storage: Vec::with_capacity(100),
             ui_storage: storage,
             ws_his: None,
-            ws_storage: Vec::with_capacity(100),
+            ws_storage: FxHashMap::default(),
         }
     }
 
@@ -119,8 +121,8 @@ impl HistoryHandler {
              *          by calling log_data() method on WsRegisterInfo and
              *          write to ws.whis
              *
-             *      3. Create New WsHistory struct which maps id to .wsess file
-             *         and add to self.ws_storage
+             *      3. Open the .wsess file which maps id to the WebSocket
+             *         history and add it to self.ws_storage
              *
              * Error:
              *      HistoryWsError::FileCreate [1]
@@ -152,10 +154,11 @@ impl HistoryHandler {
                 .await
                 .map_err(HistoryWsError::Write)?;
 
-                let wshis = WsHistory::new(reginfo)
+                let id = reginfo.id;
+                let wsfile = open_ws_history(reginfo)
                     .await
                     .map_err(HistoryWsError::Register)?;
-                self.ws_storage.push(wshis);
+                self.ws_storage.insert(id, wsfile);
                 rply
             }
 
@@ -171,10 +174,9 @@ impl HistoryHandler {
                 trace!("ws write");
                 let wslog = self
                     .ws_storage
-                    .iter_mut()
-                    .find(|wshis| wshis.id() == id)
+                    .get_mut(&id)
                     .ok_or(HistoryError::NoId(id, WS_HISTORY))?;
-                write_and_flush(wslog.file_as_mut(), logdata.as_bytes())
+                write_and_flush(wslog, logdata.as_bytes())
                     .await
                     .map_err(HistoryWsError::Write)?;
                 None
@@ -187,12 +189,9 @@ impl HistoryHandler {
              *      HistoryError::NoId  [1]
              */
             CommanderToHistory::RemoveWs(id) => {
-                let index = self
-                    .ws_storage
-                    .iter()
-                    .position(|wshis| wshis.id() == id)
+                self.ws_storage
+                    .remove(&id)
                     .ok_or(HistoryError::NoId(id, WS_REMOVE))?;
-                self.ws_storage.swap_remove(index);
                 trace!("ws removed| {}", id);
                 None
             }
@@ -205,4 +204,15 @@ impl Debug for HistoryHandler {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "history")
     }
+}
+
+pub async fn open_ws_history(
+    mut info: HistoryWsRegisterInfo,
+) -> Result<File, std::io::Error> {
+    info.path.push(HISTORY_WS_WSESS);
+    OpenOptions::new()
+        .append(true)
+        .create(true)
+        .open(&info.path)
+        .await
 }

@@ -1,19 +1,20 @@
+use rustc_hash::FxHashMap;
 use tokio::sync::mpsc::Sender;
 use tracing::trace;
 
 use super::WsComm;
 use crate::commander::{CommanderResponse, CommunicateError};
-use crate::id::{Id, SoldierId};
+use crate::id::SoldierId;
 use crate::proxy::Role;
 
 const WS_SEND_LOG: &str = "Ws Send Log";
 const WS_SHOULD_INTERCEPT: &str = "Ws Should Intercept Response";
 const WS_SET_NEED_RESPONSE: &str = "Ws Set Need Response";
 
-// Stores Vector of WsComm
+// Stores map of WsComm by SoldierId
 #[derive(Default)]
 pub struct WsCommStorage {
-    store: Vec<WsComm>,
+    store: FxHashMap<SoldierId, WsComm>,
 }
 
 impl WsCommStorage {
@@ -24,7 +25,7 @@ impl WsCommStorage {
         server: Sender<CommanderResponse>,
     ) {
         self.store
-            .push(WsComm::new(id, client, server));
+            .insert(id, WsComm::new(id, client, server));
         trace!("ws comm registered");
     }
 
@@ -35,8 +36,7 @@ impl WsCommStorage {
     ) -> Result<(), CommunicateError> {
         let wscomm = self
             .store
-            .iter_mut()
-            .find(|x| x.id() == id)
+            .get_mut(&id)
             .ok_or(CommunicateError::NoId(id, WS_SEND_LOG))?;
         wscomm.inc_index();
         wscomm
@@ -51,8 +51,7 @@ impl WsCommStorage {
     ) -> Result<(), CommunicateError> {
         let wscomm = self
             .store
-            .iter_mut()
-            .find(|x| x.id() == id)
+            .get_mut(&id)
             .ok_or(CommunicateError::NoId(id, WS_SHOULD_INTERCEPT))?;
         let tosend = wscomm.need_response();
         if tosend {
@@ -70,29 +69,24 @@ impl WsCommStorage {
     ) -> Result<(), CommunicateError> {
         let wscomm = self
             .store
-            .iter_mut()
-            .find(|x| x.id() == id)
+            .get_mut(&id)
             .ok_or(CommunicateError::NoId(id, WS_SET_NEED_RESPONSE))?;
         wscomm.set_need_response();
         Ok(())
     }
 
-    pub fn store_as_mut(&mut self) -> &mut Vec<WsComm> {
-        &mut self.store
+    pub fn remove(&mut self, id: &SoldierId) -> bool {
+        self.store.remove(id).is_some()
     }
 
-    pub fn iter(
+    pub fn get_sender(
         &self,
+        id: &SoldierId,
         role: Role,
-    ) -> impl Iterator<Item = (SoldierId, &Sender<CommanderResponse>)> {
-        self.store.iter().map(move |x| {
-            (
-                x.id(),
-                match role {
-                    Role::Client => x.client_sender(),
-                    Role::Server => x.server_sender(),
-                },
-            )
+    ) -> Option<&Sender<CommanderResponse>> {
+        self.store.get(id).map(|x| match role {
+            Role::Client => x.client_sender(),
+            Role::Server => x.server_sender(),
         })
     }
 }

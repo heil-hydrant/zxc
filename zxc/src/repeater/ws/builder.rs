@@ -7,7 +7,7 @@ use tracing::trace;
 
 use crate::file_types::EXT_WREQ;
 use crate::forward_info::ForwardInfo;
-use crate::history::wshistory::HISTORY_WS_HIS;
+use crate::history::HISTORY_WS_HIS;
 use crate::io::*;
 use crate::proxy::prelude::*;
 use crate::proxy::server_info::json::ServerInfoJson;

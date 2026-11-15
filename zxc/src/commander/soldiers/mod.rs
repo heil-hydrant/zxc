@@ -10,7 +10,7 @@ use self::http2::Http2CommStorage;
 use self::ws::WsCommStorage;
 use super::{CommanderResponse, CommunicateError, WS_REGISTER};
 use crate::file_types::FileType;
-use crate::id::{Id, SoldierId};
+use crate::id::SoldierId;
 use crate::proxy::Role;
 
 #[derive(Default)]
@@ -102,14 +102,14 @@ impl Soldiers {
                     }
                 }
             },
-            FileType::Wreq => {
-                let iter = self.ws.iter(Role::Server);
-                send_response(id, iter, res).await
-            }
-            FileType::Wres => {
-                let iter = self.ws.iter(Role::Client);
-                send_response(id, iter, res).await
-            }
+            FileType::Wreq => match self.ws.get_sender(&id, Role::Server) {
+                Some(sender) => Ok(sender.send(res).await?),
+                None => Err(CommunicateError::ResponseNoId(id, res)),
+            },
+            FileType::Wres => match self.ws.get_sender(&id, Role::Client) {
+                Some(sender) => Ok(sender.send(res).await?),
+                None => Err(CommunicateError::ResponseNoId(id, res)),
+            },
         }
     }
 
@@ -133,7 +133,7 @@ impl Soldiers {
     }
 
     pub fn remove_from_ws_store(&mut self, id: SoldierId) -> bool {
-        remove_from_store(self.ws.store_as_mut(), id)
+        self.ws.remove(&id)
     }
 
     pub fn set_ws_need_response(
@@ -177,10 +177,9 @@ impl Soldiers {
         map: &mut FxHashMap<usize, SoldierId>,
     ) -> Result<(), CommunicateError> {
         for (&_log_id, &soldier_id) in map.iter() {
-            if let Some((_, sender)) = self
+            if let Some(sender) = self
                 .ws
-                .iter(Role::Server)
-                .find(|(id, _)| *id == soldier_id)
+                .get_sender(&soldier_id, Role::Server)
             {
                 sender
                     .send(CommanderResponse::Resume(None))
@@ -196,10 +195,9 @@ impl Soldiers {
         map: &mut FxHashMap<usize, SoldierId>,
     ) -> Result<(), CommunicateError> {
         for (&_log_id, &soldier_id) in map.iter() {
-            if let Some((_, sender)) = self
+            if let Some(sender) = self
                 .ws
-                .iter(Role::Client)
-                .find(|(id, _)| *id == soldier_id)
+                .get_sender(&soldier_id, Role::Client)
             {
                 sender
                     .send(CommanderResponse::Resume(None))
@@ -208,33 +206,5 @@ impl Soldiers {
         }
         map.clear();
         Ok(())
-    }
-}
-
-pub fn remove_from_store<T>(list: &mut Vec<T>, id: SoldierId) -> bool
-where
-    T: Id,
-{
-    if let Some(index) = list
-        .iter()
-        .position(|comm| comm.id() == id)
-    {
-        list.swap_remove(index);
-        return true;
-    }
-    false
-}
-
-pub async fn send_response<'a, T>(
-    to_send: SoldierId,
-    mut senders: T,
-    response: CommanderResponse,
-) -> Result<(), CommunicateError>
-where
-    T: Iterator<Item = (SoldierId, &'a Sender<CommanderResponse>)>,
-{
-    match senders.find(|(sid, _)| sid == &to_send) {
-        Some((_, sender)) => Ok(sender.send(response).await?),
-        None => Err(CommunicateError::ResponseNoId(to_send, response)),
     }
 }

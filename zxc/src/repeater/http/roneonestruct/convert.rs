@@ -8,7 +8,7 @@ use tokio_tungstenite::tungstenite::protocol;
 use super::Roneone;
 use crate::CAPACITY_2MB;
 use crate::file_types::EXT_WRES;
-use crate::history::wshistory::HISTORY_WS_WSESS;
+use crate::history::HISTORY_WS_WSESS;
 use crate::repeater::prelude::*;
 
 // Convert (RepeaterConn<T>, File) -> Roneone
