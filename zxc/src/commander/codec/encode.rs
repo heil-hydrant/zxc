@@ -26,10 +26,9 @@ fn base64_encode(input: &[u8]) -> Result<Vec<u8>, EncodeError> {
 }
 
 fn url_encode(input: &[u8]) -> Vec<u8> {
-    let val = byte_serialize(input)
-        .collect::<Vec<&str>>()
-        .join("");
-    val.into()
+    byte_serialize(input)
+        .collect::<String>()
+        .into_bytes()
 }
 
 fn url_encode_all_characters(input: &[u8]) -> Result<Vec<u8>, EncodeError> {
