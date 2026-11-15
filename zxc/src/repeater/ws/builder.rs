@@ -56,12 +56,16 @@ pub async fn build_repeater_dest_ws(
         .file
         .components()
         .nth(2)
-        .ok_or(RWsBuildError::NotEnoughComponents(
-            dst.to_string_lossy().to_string(),
-        ))?
+        .ok_or_else(|| {
+            RWsBuildError::NotEnoughComponents(
+                dst.to_string_lossy().to_string(),
+            )
+        })?
         .as_os_str()
         .to_str()
-        .ok_or(RWsBuildError::IdNotValid(dst.to_string_lossy().to_string()))?;
+        .ok_or_else(|| {
+            RWsBuildError::IdNotValid(dst.to_string_lossy().to_string())
+        })?;
     let server_info = read_server_info_from_whis(id).await?;
     let src_req_file = format!("./history/{0}/{0}.req", id);
     let mut dst_req_file = dst.clone();

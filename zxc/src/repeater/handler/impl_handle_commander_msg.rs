@@ -38,9 +38,9 @@ impl HandleCommander for RepeaterHandler {
         if let Module::Repeater = msg.to_module() {
             let ext = msg
                 .file_extension()
-                .ok_or(RepeaterError::NoExtension(msg.file.clone()))?
+                .ok_or_else(|| RepeaterError::NoExtension(msg.file.clone()))?
                 .to_str()
-                .ok_or(RepeaterError::NoExtension(msg.file.clone()))?;
+                .ok_or_else(|| RepeaterError::NoExtension(msg.file.clone()))?;
             msg.file = match ext {
                 EXT_REQ => build_repeater_dest(&msg.file, ext).await?,
                 EXT_WREQ => build_repeater_dest_ws(&mut msg).await?,
