@@ -61,6 +61,9 @@ where
             .1
             .peer_certificates()
             .ok_or(StateError::NoPeerCertificate)?;
+        let leaf_cert = cert_chain
+            .first()
+            .ok_or(StateError::NoPeerCertificate)?;
 
         let server_name = server_info.sni();
 
@@ -74,7 +77,7 @@ where
 
         let verify = verifier
             .verify_server_cert(
-                &cert_chain[0],
+                leaf_cert,
                 &cert_chain[1..],
                 server_name,
                 &[],
@@ -82,13 +85,11 @@ where
             )
             .is_ok();
 
-        let digest: CertDigest = ring::digest::digest(
-            &ring::digest::SHA256,
-            cert_chain[0].as_ref(),
-        )
-        .as_ref()
-        .try_into()
-        .expect("SHA-256 output is always 32 bytes");
+        let digest: CertDigest =
+            ring::digest::digest(&ring::digest::SHA256, leaf_cert.as_ref())
+                .as_ref()
+                .try_into()
+                .expect("SHA-256 output is always 32 bytes");
 
         let alpn = Alpn::from_bytes(self.writer.get_ref().1.alpn_protocol());
         let req = CommanderRequest::CheckServerConfigCache(
@@ -104,17 +105,9 @@ where
         let server_config = match recvd_config {
             Some(config) => config,
             None => {
-                let owned_cert_chain = cert_chain
-                    .iter()
-                    .cloned()
-                    .map(|x| x.into_owned())
-                    .collect();
+                let leaf_cert = leaf_cert.clone().into_owned();
                 let req = CommanderRequest::GetServerConfig(
-                    self.id,
-                    verify,
-                    digest,
-                    owned_cert_chain,
-                    alpn,
+                    self.id, verify, digest, leaf_cert, alpn,
                 );
                 self.commander.send(req).await?;
                 let res = recvr

@@ -88,10 +88,10 @@ impl CaptainCrypto {
 
     fn user_material() -> Result<CryptoMaterial, CryptoBuildError> {
         let pk_str = read_private()?;
-        let key_pair = KeyPair::from_pem(&pk_str)?;
-        let trusted_ca = CA::trusted(KeyPair::from_pem(&pk_str)?)?;
-        let untrusted_ca = CA::untrusted(KeyPair::from_pem(&pk_str)?)?;
         let private_key = str_to_private(&pk_str)?;
+        let key_pair = KeyPair::try_from(&private_key)?;
+        let trusted_ca = CA::trusted(KeyPair::try_from(&private_key)?)?;
+        let untrusted_ca = CA::untrusted(KeyPair::try_from(&private_key)?)?;
         Ok(CryptoMaterial {
             key_pair,
             private_key,
@@ -143,7 +143,7 @@ impl CaptainCrypto {
         &mut self,
         verified: bool,
         digest: CertDigest,
-        cert: Vec<CertificateDer<'static>>,
+        cert: CertificateDer<'static>,
         alpn: Alpn,
     ) -> Result<Arc<ServerConfig>, CertError> {
         let ca = if verified {
@@ -186,7 +186,7 @@ fn build_base()
 
 fn generate_domain_cert(
     keypair: &KeyPair,
-    cert: Vec<CertificateDer<'static>>,
+    cert: CertificateDer<'static>,
     signer: &Issuer<'_, KeyPair>,
 ) -> Result<CertificateDer<'static>, CertError> {
     use std::net::IpAddr;
@@ -194,11 +194,8 @@ fn generate_domain_cert(
     use rcgen::string::Ia5String;
     use x509_parser::extensions::GeneralName;
 
-    let leaf_der = cert
-        .first()
-        .ok_or(CertError::NoCertificate)?;
     let (_, real_cert) =
-        x509_parser::certificate::X509Certificate::from_der(leaf_der.as_ref())
+        x509_parser::certificate::X509Certificate::from_der(cert.as_ref())
             .map_err(|e| CertError::X509(e.to_string()))?;
     let subject_alt_names = real_cert
         .subject_alternative_name()
@@ -260,14 +257,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_generate_domain_cert_empty_chain() {
-        let keypair = KeyPair::generate().unwrap();
+    fn test_generate_domain_cert_from_leaf() {
+        let leaf_key = KeyPair::generate().unwrap();
+        let leaf_cert = CertificateParams::default()
+            .self_signed(&leaf_key)
+            .unwrap()
+            .der()
+            .clone();
         let signer = Issuer::new(
             CertificateParams::default(),
             KeyPair::generate().unwrap(),
         );
 
-        let result = generate_domain_cert(&keypair, Vec::new(), &signer);
-        assert!(matches!(result, Err(CertError::NoCertificate)));
+        let result = generate_domain_cert(&leaf_key, leaf_cert, &signer);
+        assert!(result.is_ok());
     }
 }

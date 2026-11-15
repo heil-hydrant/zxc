@@ -21,13 +21,7 @@ pub enum CommanderRequest {
     // Server
     GetVerifier(usize),
     CheckServerConfigCache(usize, bool, CertDigest, Alpn),
-    GetServerConfig(
-        usize,
-        bool,
-        CertDigest,
-        Vec<CertificateDer<'static>>,
-        Alpn,
-    ),
+    GetServerConfig(usize, bool, CertDigest, CertificateDer<'static>, Alpn),
 
     // ----- Should Log -----
     // http

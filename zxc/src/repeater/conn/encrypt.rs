@@ -12,7 +12,7 @@ use crate::repeater::prelude::*;
  *
  * Steps:
  *      1. Get SNI from ServerInfo
- *      2. Restrict ALPN to the protocol being replayed
+ *      2. Override ALPN for the protocol being replayed
  *      3. Encrypt connection with TlsConnector
  *      4. Verify the negotiated ALPN
  *
@@ -27,13 +27,11 @@ impl RepeaterConn<TcpStream> {
         connector: Arc<TlsConnector>,
     ) -> Result<RepeaterConn<TlsStream<TcpStream>>, RepeaterError> {
         let is_h2 = self.is_h2;
-        let mut config = connector.config().as_ref().clone();
-        config.alpn_protocols = if is_h2 {
+        let connector = connector.with_alpn(if is_h2 {
             vec![ALPN_H2.to_vec()]
         } else {
             vec![ALPN_H1.to_vec()]
-        };
-        let connector = TlsConnector::from(Arc::new(config));
+        });
 
         let sni = self.server_info.sni().to_owned();
         let stream = connector
