@@ -11,7 +11,7 @@ pub enum DomainFilter {
 }
 
 impl DomainFilter {
-    pub fn contains(&self, host: &String) -> bool {
+    pub fn contains(&self, host: &str) -> bool {
         match self {
             DomainFilter::Include(list) => list.contains(host),
             DomainFilter::Exclude(list) => !list.contains(host),

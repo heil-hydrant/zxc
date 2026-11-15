@@ -31,7 +31,7 @@ impl DomainList {
      *      2. If no result, check string list
      */
 
-    pub fn contains(&self, host: &String) -> bool {
+    pub fn contains(&self, host: &str) -> bool {
         // 1. Check wildcard list
         if let Some(wild_list) = &self.wildcard
             && wild_list
@@ -42,7 +42,9 @@ impl DomainList {
         }
         // 2. check string list
         if let Some(str_list) = &self.str
-            && str_list.binary_search(host).is_ok()
+            && str_list
+                .binary_search_by(|s| s.as_str().cmp(host))
+                .is_ok()
         {
             return true;
         }
@@ -117,11 +119,11 @@ mod test {
         //    Some(vec![Wildcard::from_owned("*.reddit.com").unwrap()])
         //);
 
-        assert!(domain_list.contains(&"www.reddit.com".to_string()));
-        assert!(domain_list.contains(&"chat.reddit.com".to_string()));
-        assert!(domain_list.contains(&"www.google.com".to_string()));
-        assert!(domain_list.contains(&"www.youtube.com".to_string()));
-        assert!(!domain_list.contains(&"www.bing.com".to_string()));
+        assert!(domain_list.contains("www.reddit.com"));
+        assert!(domain_list.contains("chat.reddit.com"));
+        assert!(domain_list.contains("www.google.com"));
+        assert!(domain_list.contains("www.youtube.com"));
+        assert!(!domain_list.contains("www.bing.com"));
 
         let wild = domain_list.wildcard.unwrap();
         assert!(wild[0].is_match(b"www.reddit.com"));

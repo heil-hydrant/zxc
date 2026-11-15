@@ -163,7 +163,7 @@ impl Config {
         }
     }
 
-    pub fn should_proxy(&self, host: &String) -> bool {
+    pub fn should_proxy(&self, host: &str) -> bool {
         self.filter_domains
             .as_ref()
             .is_none_or(|filter| filter.contains(host))
@@ -204,11 +204,14 @@ impl Config {
         false
     }
 
-    pub fn in_excluded_extensions(&self, extension: &String) -> bool {
+    pub fn in_excluded_extensions(&self, extension: &str) -> bool {
         if self
             .excluded_extensions
             .as_ref()
-            .is_some_and(|ext| ext.binary_search(extension).is_ok())
+            .is_some_and(|ext| {
+                ext.binary_search_by(|s| s.as_str().cmp(extension))
+                    .is_ok()
+            })
         {
             trace!("in excluded extensions| {}", extension);
             return true;
@@ -410,9 +413,9 @@ mod tests {
             Some(DomainFilter::Exclude(DomainList::from(elist)))
         );
         if let Some(filter) = filter {
-            assert!(filter.contains(&"www.reddit.com".to_string()));
-            assert!(!filter.contains(&"www.youtube.com".to_string()));
-            assert!(!filter.contains(&"www.google.com".to_string()));
+            assert!(filter.contains("www.reddit.com"));
+            assert!(!filter.contains("www.youtube.com"));
+            assert!(!filter.contains("www.google.com"));
         }
     }
 
