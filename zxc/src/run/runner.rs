@@ -83,7 +83,7 @@ where
                         {
                             Ok(UiReply::None) => (),
                             Ok(UiReply::Reply(id, data)) => {
-                                build_slice_and_write(id, data, &mut stream).await?;
+                                build_slice_and_write(id, &data, &mut stream).await?;
                             }
                             Ok(UiReply::Flush) => {
                                 trace!("needs flush");
@@ -116,7 +116,7 @@ where
                     match result {
                         Ok(UiReply::None) => (),
                         Ok(UiReply::Reply(id, data)) => {
-                            build_slice_and_write(id, data, &mut stream).await?;
+                            build_slice_and_write(id, &data, &mut stream).await?;
                         }
                         Ok(UiReply::Flush) => {
                             trace!("needs flush");

@@ -64,7 +64,7 @@ pub async fn unix_write_vec_and_flush(
 
 pub async fn build_slice_and_write(
     id: usize,
-    data: String,
+    data: &str,
     stream: &mut UnixStream,
 ) -> Result<(), UnixSockError> {
     let id_string;
@@ -74,15 +74,15 @@ pub async fn build_slice_and_write(
         id_string = format!("[{id},");
         &id_string
     };
-    let mut slice = build_slice(prefix, &data);
+    let mut slice = build_slice(prefix, data);
     unix_write_vec_and_flush(stream, &mut slice)
         .await
         .map_err(UnixSockError::Write)?;
     Ok(())
 }
 
-fn build_slice<'a>(id: &'a str, data: &'a str) -> Vec<IoSlice<'a>> {
-    vec![
+fn build_slice<'a>(id: &'a str, data: &'a str) -> [IoSlice<'a>; 3] {
+    [
         IoSlice::new(id.as_bytes()),
         IoSlice::new(data.as_bytes()),
         IoSlice::new(b"]"),
