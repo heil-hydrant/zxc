@@ -320,7 +320,7 @@ impl Commander {
         id: SoldierId,
     ) -> Option<(usize, PathBuf, Sender<CommanderToHistory>)> {
         let (index, path) = create_http_log_dir(
-            &self.comm_history.path(),
+            self.comm_history.path(),
             self.comm_history.http_log_index,
             MAX_HTTP_LOG_INDEX_ATTEMPTS,
         )
@@ -484,8 +484,8 @@ async fn create_http_log_dir(
     max_attempts: usize,
 ) -> Option<(usize, PathBuf)> {
     let mut index = start_index;
+    let mut path = base.to_path_buf();
     for _ in 0..max_attempts {
-        let mut path = base.to_path_buf();
         path.push(index.to_string());
         match create_dir(&path).await {
             Ok(()) => return Some((index, path)),
@@ -495,6 +495,7 @@ async fn create_http_log_dir(
                     index,
                     path.to_string_lossy()
                 );
+                path.pop();
                 index += 1;
             }
             Err(e) => {

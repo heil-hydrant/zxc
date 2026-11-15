@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use tokio::sync::mpsc::{Receiver, Sender};
 
@@ -26,7 +26,7 @@ impl HistoryComm {
         }
     }
 
-    pub fn path(&self) -> PathBuf {
-        self.history_path.clone()
+    pub fn path(&self) -> &Path {
+        &self.history_path
     }
 }
