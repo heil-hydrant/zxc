@@ -10,7 +10,7 @@ use bytes::BytesMut;
 use rustc_hash::FxHashMap;
 use tokio::fs::{File, OpenOptions};
 use tokio::sync::mpsc::{Receiver, Sender};
-use tracing::trace;
+use tracing::{error, trace};
 use zxc_derive::{Buffer, NotifyCommander};
 
 use crate::CAPACITY_2MB;
@@ -65,7 +65,10 @@ impl HistoryHandler {
      *      2. Else, reverse msg_storage to maintain order, pop elements and
      *         store response for each message in storage.
      *
-     *          a. If with_sock, return UiReply::Flush, to write_vectored()
+     *          a. If get_response errors, log it and continue so the batch
+     *             is fully drained without leaving reversed leftovers.
+     *
+     *          b. If with_sock, return UiReply::Flush, to write_vectored()
      */
     pub async fn handle_commander(
         &mut self,
@@ -86,8 +89,10 @@ impl HistoryHandler {
             trace!("recv| {}", size);
             self.msg_storage.reverse();
             while let Some(msg) = self.msg_storage.pop() {
-                if let Some(res) = self.get_response(msg).await? {
-                    self.ui_storage.push(res);
+                match self.get_response(msg).await {
+                    Ok(Some(res)) => self.ui_storage.push(res),
+                    Ok(None) => (),
+                    Err(e) => error!("history| {}", e),
                 }
             }
             if with_sock {
