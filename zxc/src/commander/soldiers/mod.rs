@@ -146,13 +146,13 @@ impl Soldiers {
     pub async fn broadcast_none_http(
         &mut self,
         map: &mut FxHashMap<usize, SoldierId>,
-    ) -> Result<(), CommunicateError> {
-        for (&_log_id, &soldier_id) in map.iter() {
+    ) {
+        for soldier_id in std::mem::take(map).into_values() {
             let res = CommanderResponse::Resume(None);
             match soldier_id {
                 SoldierId::Connection(conn_id) => {
                     if let Some(sender) = self.http1.get(conn_id) {
-                        sender.send(res).await?;
+                        let _ = sender.send(res).await;
                     }
                 }
                 SoldierId::H2Stream {
@@ -163,48 +163,62 @@ impl Soldiers {
                         .http2
                         .get_stream(conn_id, stream_id)
                     {
-                        sender.send(res).await?;
+                        let _ = sender.send(res).await;
                     }
                 }
             }
         }
-        map.clear();
-        Ok(())
     }
 
     pub async fn broadcast_none_wreq(
         &mut self,
         map: &mut FxHashMap<usize, SoldierId>,
-    ) -> Result<(), CommunicateError> {
-        for (&_log_id, &soldier_id) in map.iter() {
+    ) {
+        for soldier_id in std::mem::take(map).into_values() {
             if let Some(sender) = self
                 .ws
                 .get_sender(&soldier_id, Role::Server)
             {
-                sender
+                let _ = sender
                     .send(CommanderResponse::Resume(None))
-                    .await?;
+                    .await;
             }
         }
-        map.clear();
-        Ok(())
     }
 
     pub async fn broadcast_none_wres(
         &mut self,
         map: &mut FxHashMap<usize, SoldierId>,
-    ) -> Result<(), CommunicateError> {
-        for (&_log_id, &soldier_id) in map.iter() {
+    ) {
+        for soldier_id in std::mem::take(map).into_values() {
             if let Some(sender) = self
                 .ws
                 .get_sender(&soldier_id, Role::Client)
             {
-                sender
+                let _ = sender
                     .send(CommanderResponse::Resume(None))
-                    .await?;
+                    .await;
             }
         }
-        map.clear();
-        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn broadcast_none_drains_queue_when_receiver_is_gone() {
+        let mut soldiers = Soldiers::default();
+        drop(soldiers.add_http_handle(1));
+
+        let mut queue = FxHashMap::default();
+        queue.insert(7, SoldierId::Connection(1));
+
+        soldiers
+            .broadcast_none_http(&mut queue)
+            .await;
+
+        assert!(queue.is_empty());
     }
 }

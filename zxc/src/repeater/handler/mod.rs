@@ -22,7 +22,8 @@ use crate::io::*;
 use crate::proxy::*;
 use crate::repeater::prelude::*;
 use crate::run::boundary::{
-    Buffer, CloseAction, FlushStorage, HandleCommander, NotifyCommander, UiReply
+    Buffer, CloseAction, FlushStorage, HandleCommander, NotifyCommander,
+    UiReply,
 };
 
 // Handler for Repeater side of the PROXY
@@ -50,6 +51,27 @@ impl RepeaterHandler {
             ws_index: 1,
             from_commander,
             to_commander,
+        }
+    }
+
+    /* Description:
+     *      Drop handles whose websocket task has already exited.
+     *
+     * Steps:
+     *      1. Keep only handles where JoinHandle::is_finished() is false
+     *
+     *      The ws task returns when the server closes the stream or when
+     *      the task errors. Neither path tells the UI, so the handle would
+     *      otherwise stay in ws_handles for the process lifetime.
+     */
+
+    fn reap_finished_ws(&mut self) {
+        let before = self.ws_handles.len();
+        self.ws_handles
+            .retain(|ws| !ws.handle.is_finished());
+        let reaped = before - self.ws_handles.len();
+        if reaped > 0 {
+            trace!("ws reaped| {}", reaped);
         }
     }
 
@@ -101,6 +123,7 @@ impl RepeaterHandler {
         &mut self,
         msg: RepeaterMsg,
     ) -> Result<Option<String>, RepeaterError> {
+        self.reap_finished_ws();
         let output: Option<Value> = match msg.operation {
             /* Associated Values:
              *      info: ForwardInfo
@@ -254,22 +277,20 @@ impl RepeaterHandler {
             /* Associated Values:
              *      id  : usize
              *
-             * Error:
-             *      RepeaterError::WsIdNotFound
-             *      RepeaterWsMessage::Read
+             *      The ws task may already be gone (server close or task
+             *      error), so closing an unknown id is a no-op.
              */
             Operation::WsClose(id) => {
                 let index = self
                     .ws_handles
                     .iter()
-                    .position(|handler| handler.id == id)
-                    .ok_or(RepeaterError::WsIdNotFound(id))?;
-                let handler = self.ws_handles.swap_remove(index);
-                handler
-                    .send(RepeaterWsMsg::Close)
-                    .await?;
-                let _ = handler.handle.await;
-                trace!("ws closed| {}", id);
+                    .position(|handler| handler.id == id);
+                if let Some(index) = index {
+                    let handler = self.ws_handles.swap_remove(index);
+                    let _ = handler.send(RepeaterWsMsg::Close).await;
+                    let _ = handler.handle.await;
+                    trace!("ws closed| {}", id);
+                }
                 None
             }
             Operation::Close => {

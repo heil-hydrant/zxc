@@ -330,16 +330,14 @@ impl Commander {
         Some((index, path, self.comm_history.to_history.clone()))
     }
 
-    pub async fn empty_resume_queue(
-        &mut self,
-    ) -> Result<(), CommunicateError> {
+    pub async fn empty_resume_queue(&mut self) {
         // http
         self.soldiers
             .broadcast_none_http(
                 self.comm_interceptor
                     .http_queue_as_mut(),
             )
-            .await?;
+            .await;
         trace!("http queue emptied");
 
         // wreq
@@ -348,7 +346,7 @@ impl Commander {
                 self.comm_interceptor
                     .wreq_queue_as_mut(),
             )
-            .await?;
+            .await;
         trace!("wreq queue emptied");
 
         // wres
@@ -357,9 +355,8 @@ impl Commander {
                 self.comm_interceptor
                     .wres_queue_as_mut(),
             )
-            .await?;
+            .await;
         trace!("wres queue emptied");
-        Ok(())
     }
 
     /* Steps:
@@ -390,7 +387,7 @@ impl Commander {
                 trace!("toggle");
                 self.comm_interceptor.toggle();
                 if !self.comm_interceptor.status() {
-                    self.empty_resume_queue().await?;
+                    self.empty_resume_queue().await;
                 }
                 Ok(())
             }
