@@ -221,7 +221,7 @@ where
         true => {
             // set xttr
             let info = ServerInfoJson::from(&client_conn.server_info);
-            if let Err(e) = set_attr(client_conn.path(), info) {
+            if let Err(e) = set_attr(client_conn.path(), info).await {
                 error!("Set Attr| {}", e);
             }
 

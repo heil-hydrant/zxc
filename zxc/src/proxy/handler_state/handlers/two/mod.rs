@@ -195,10 +195,10 @@ async fn handle_stream(
 
     if let Some(path) = h2req.path.as_ref() {
         let info = ServerInfoJson::from(&h2req.server_info);
-        if let Err(e) = set_attr(path, info) {
+        if let Err(e) = set_attr(path, info).await {
             error!("h2 set attr| {e}");
         }
-        if let Err(e) = set_h2_attr(path, h2req.h2_pseudo.as_ref()) {
+        if let Err(e) = set_h2_attr(path, h2req.h2_pseudo.as_ref()).await {
             error!("h2 set pseudo attr| {e}");
         }
     }

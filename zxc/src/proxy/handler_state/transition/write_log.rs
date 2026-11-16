@@ -64,7 +64,18 @@ where
     Ok(ProxyState::ShouldIntercept(conn))
 }
 
-pub fn set_attr(path: &PathBuf, info: ServerInfoJson) -> Result<(), Error> {
+pub async fn set_attr(
+    path: &PathBuf,
+    info: ServerInfoJson,
+) -> Result<(), Error> {
+    // spawn_blocking needs 'static data, so the borrowed path is cloned.
+    let path = path.to_owned();
+    tokio::task::spawn_blocking(move || set_attr_sync(&path, info))
+        .await
+        .map_err(Error::other)?
+}
+
+fn set_attr_sync(path: &PathBuf, info: ServerInfoJson) -> Result<(), Error> {
     set(path, XATTR_HOST, info.host.as_bytes())?;
     if info.http.is_some() {
         set(path, XATTR_HTTP, b"1")?;
@@ -76,7 +87,18 @@ pub fn set_attr(path: &PathBuf, info: ServerInfoJson) -> Result<(), Error> {
     Ok(())
 }
 
-pub fn set_h2_attr(
+pub async fn set_h2_attr(
+    path: &PathBuf,
+    info: Option<&H2Info>,
+) -> Result<(), Error> {
+    let path = path.to_owned();
+    let info = info.cloned();
+    tokio::task::spawn_blocking(move || set_h2_attr_sync(&path, info.as_ref()))
+        .await
+        .map_err(Error::other)?
+}
+
+fn set_h2_attr_sync(
     path: &PathBuf,
     info: Option<&H2Info>,
 ) -> Result<(), Error> {
@@ -97,8 +119,8 @@ pub fn set_h2_attr(
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_set_attr() {
+    #[tokio::test]
+    async fn test_set_attr() {
         let path = std::env::temp_dir()
             .join(format!("zxc_set_attr_{}.req", std::process::id()));
         let _ = std::fs::remove_file(&path);
@@ -109,7 +131,7 @@ mod tests {
             http: None,
             sni: Some("example.com".to_string()),
         };
-        set_attr(&path, info).unwrap();
+        set_attr(&path, info).await.unwrap();
 
         assert_eq!(
             xattr::get(&path, XATTR_HOST).unwrap(),
@@ -124,8 +146,8 @@ mod tests {
         std::fs::remove_file(&path).unwrap();
     }
 
-    #[test]
-    fn test_set_h2_attr() {
+    #[tokio::test]
+    async fn test_set_h2_attr() {
         let path = std::env::temp_dir()
             .join(format!("zxc_set_h2_attr_{}.req", std::process::id()));
         let _ = std::fs::remove_file(&path);
@@ -135,7 +157,9 @@ mod tests {
             Some("example.com:443".to_string()),
             Some("https".to_string()),
         );
-        set_h2_attr(&path, Some(&info)).unwrap();
+        set_h2_attr(&path, Some(&info))
+            .await
+            .unwrap();
 
         assert_eq!(
             xattr::get(&path, XATTR_IS_H2).unwrap(),
@@ -154,14 +178,14 @@ mod tests {
         std::fs::remove_file(&path).unwrap();
     }
 
-    #[test]
-    fn test_set_h2_attr_without_pseudo_headers() {
+    #[tokio::test]
+    async fn test_set_h2_attr_without_pseudo_headers() {
         let path = std::env::temp_dir()
             .join(format!("zxc_set_h2_attr_empty_{}.req", std::process::id()));
         let _ = std::fs::remove_file(&path);
         std::fs::File::create(&path).unwrap();
 
-        set_h2_attr(&path, None).unwrap();
+        set_h2_attr(&path, None).await.unwrap();
 
         assert_eq!(
             xattr::get(&path, XATTR_IS_H2).unwrap(),
@@ -173,15 +197,17 @@ mod tests {
         std::fs::remove_file(&path).unwrap();
     }
 
-    #[test]
-    fn test_set_h2_attr_preserves_empty_fields() {
+    #[tokio::test]
+    async fn test_set_h2_attr_preserves_empty_fields() {
         let path = std::env::temp_dir()
             .join(format!("zxc_set_h2_attr_empty_{}.req", std::process::id()));
         let _ = std::fs::remove_file(&path);
         std::fs::File::create(&path).unwrap();
 
         let info = H2Info::new(Some(String::new()), Some(String::new()));
-        set_h2_attr(&path, Some(&info)).unwrap();
+        set_h2_attr(&path, Some(&info))
+            .await
+            .unwrap();
 
         assert_eq!(
             xattr::get(&path, XATTR_IS_H2).unwrap(),
