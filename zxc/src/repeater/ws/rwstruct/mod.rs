@@ -11,6 +11,7 @@ use tracing::trace;
 use zxc_derive::FileBuf;
 
 use crate::io::*;
+use crate::proxy::handler_state::transition::write_history::WsHistory;
 use crate::proxy::*;
 use crate::repeater::prelude::*;
 
@@ -26,6 +27,7 @@ pub struct RWebSocket<T> {
     log_id: usize,
     buf: BytesMut,
     data: Option<Bytes>,
+    is_bin: bool,
 }
 
 impl<T> RWebSocket<T> {
@@ -47,33 +49,38 @@ impl<T> RWebSocket<T> {
             buf,
             history,
             data: None,
+            is_bin: false,
         }
     }
 
     /* Description:
      *      Writes log to History file in format of:
-     *            id | role.as_ws_arrow() | size
+     *            id | role.as_arrow() | size
+     *            id | role.as_arrow() | size | b
      *
      * Steps:
-     *      1. Get size,
-     *          Server => data is stored as self.frame
-     *          Client => data is response_data
+     *      1. Get size and binary flag,
+     *          Server => data is stored as self.data
+     *          Client => data is stored as self.frame
      *
      *      2. Build data in format of:
-     *              id | as_arrow(role) | size
+     *              id | as_arrow(role) | size [| b]
      *
      * Error:
      *      FileErrorInfo
      */
 
     pub async fn log(&mut self, role: Role) -> Result<(), FileErrorInfo> {
-        let size = match role {
-            Role::Server => self.data_as_ref().len(),
-            Role::Client => self.response_data().len(),
+        let (size, is_bin) = match role {
+            Role::Server => (self.data_as_ref().len(), self.is_bin),
+            Role::Client => (
+                self.response_data().len(),
+                self.frame.as_ref().is_some_and(Message::is_binary),
+            ),
         };
 
         let data =
-            format!("{} | {} | {}\n", self.log_id, role.as_arrow(), size);
+            WsHistory::new(self.log_id, &role, is_bin, size).to_string();
         trace!("log| {}", data);
         // increment log_id for next write
         self.log_id += 1;
@@ -86,6 +93,10 @@ impl<T> RWebSocket<T> {
 
     pub fn add_frame(&mut self, frame: Message) {
         self.frame = Some(frame);
+    }
+
+    pub fn set_is_bin(&mut self, is_bin: bool) {
+        self.is_bin = is_bin;
     }
 
     pub fn file_as_mut(&mut self) -> &mut File {

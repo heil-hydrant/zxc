@@ -73,13 +73,16 @@ impl<T> RepeaterBytesToFrame for RWebSocket<T> {
         buf: BytesMut,
     ) -> Result<Self::Frame, UpdateMsgError> {
         let bytes = buf.freeze();
-        let utf8 = Utf8Bytes::try_from(bytes.clone()).unwrap_or_else(|_| {
-            String::from_utf8_lossy(&bytes)
-                .into_owned()
-                .into()
-        });
+        let msg = if self.is_bin {
+            Message::Binary(bytes.clone())
+        } else {
+            match Utf8Bytes::try_from(bytes.clone()) {
+                Ok(utf8) => Message::Text(utf8),
+                Err(_) => Message::Binary(bytes.clone()),
+            }
+        };
+        self.is_bin = msg.is_binary();
         self.data = Some(bytes);
-        let msg = Message::Text(utf8);
         Ok(msg)
     }
 

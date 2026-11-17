@@ -14,7 +14,7 @@ use crate::proxy::server_info::json::ServerInfoJson;
  *     [0,{"Send" : {"file": "1.req", "update": true, "server_info": {
  *      "scheme": "https", "host": "www.google.com", "update": true, "sni": "www.google.com"}]
  *     [0,{"WsEstablish": "1.req"}}]
- *     [0,{"WsSend": "1"}]
+ *     [0,{"WsSend": {"id": 1, "is_bin": true}}]
  */
 
 #[derive(Debug, Deserialize)]
@@ -46,7 +46,11 @@ pub enum Operation {
     Send(SendInfo),
     // ws
     WsEstablish(SendInfo),
-    WsSend(usize),
+    WsSend {
+        id: usize,
+        #[serde(default)]
+        is_bin: bool,
+    },
     WsClose(usize),
     Forward(ForwardInfo),
     Close,
@@ -106,5 +110,30 @@ mod tests {
 
         assert_eq!(info.is_h2, None);
         assert!(info.h2_info.is_none());
+    }
+
+    #[test]
+    fn test_ws_send_binary_flag() {
+        let value =
+            serde_json::json!([1, {"WsSend": {"id": 7, "is_bin": true}}]);
+        let msg: RepeaterMsg = serde_json::from_value(value).unwrap();
+        let Operation::WsSend { id, is_bin } = msg.operation else {
+            panic!("expected WsSend");
+        };
+
+        assert_eq!(id, 7);
+        assert!(is_bin);
+    }
+
+    #[test]
+    fn test_ws_send_defaults_to_text() {
+        let value = serde_json::json!([1, {"WsSend": {"id": 7}}]);
+        let msg: RepeaterMsg = serde_json::from_value(value).unwrap();
+        let Operation::WsSend { id, is_bin } = msg.operation else {
+            panic!("expected WsSend");
+        };
+
+        assert_eq!(id, 7);
+        assert!(!is_bin);
     }
 }

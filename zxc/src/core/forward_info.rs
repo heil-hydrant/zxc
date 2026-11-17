@@ -66,6 +66,8 @@ pub struct ForwardInfo {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub is_h2: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_bin: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub h2_info: Option<H2Info>,
 }
 
@@ -94,6 +96,7 @@ mod tests {
                 Some(String::new()),
                 Some("https".to_string()),
             )),
+            is_bin: None,
         };
 
         let value = serde_json::to_value(&info).unwrap();
@@ -122,5 +125,20 @@ mod tests {
         let h2_info = info.h2_info.unwrap();
         assert_eq!(h2_info.authority(), Some(""));
         assert_eq!(h2_info.scheme(), Some("https"));
+    }
+
+    #[test]
+    fn test_forward_info_is_bin() {
+        let value = serde_json::json!({
+            "to": "Repeater",
+            "file": "history/1/websocket/1.wreq",
+            "is_bin": true
+        });
+
+        let info: ForwardInfo = serde_json::from_value(value).unwrap();
+        assert_eq!(info.is_bin, Some(true));
+
+        let value = serde_json::to_value(&info).unwrap();
+        assert_eq!(value["is_bin"], true);
     }
 }

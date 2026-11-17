@@ -145,7 +145,7 @@ impl WsHistory {
 impl Display for WsHistory {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.is_bin {
-            writeln!(f, "{} | {} | b | {}", self.id, self.sign, self.size)
+            writeln!(f, "{} | {} | {} | b", self.id, self.sign, self.size)
         } else {
             writeln!(f, "{} | {} | {}", self.id, self.sign, self.size)
         }
@@ -202,7 +202,7 @@ mod tests {
     fn test_ws_history_binary() {
         let ws_history = WsHistory::new(0, &Role::Client, true, 100);
         let out = ws_history.to_string();
-        assert_eq!(out, "0 | <- | b | 100\n");
+        assert_eq!(out, "0 | <- | 100 | b\n");
     }
 
     #[test]

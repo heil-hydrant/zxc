@@ -298,6 +298,7 @@ Command             | Description                       | Availability
 :---------          | :---------                        | :---------
 RepeaterSend        | Send Request                      | `.req` and `scratch.wreq`
 WsEstablish         | Establish Websocket Connection    | `.req` in ws repeater
+WsBinary            | Toggle binary websocket frame     | `.wreq` and `scratch.wreq`
 
 To repeat a websocket request,
 1. In a websocket request (`wreq`) file, call `WsSendToRepeater`.
@@ -305,7 +306,7 @@ To repeat a websocket request,
    displayed in top-left.
 3. Call `WsEstablish` in the request(`req`) window to establish a websocket connection.
 4. Write the data in `scratch.wreq` in bottom left and call `RepeaterSend` to
-   send.
+   send. Call `WsBinary` to toggle between text and binary frames.
 
 ### Addons
 Addons window is used to run additional tools. The original request is copied
@@ -458,6 +459,7 @@ Binary Frames are indicated by 'b' in right corner of status line.
 Command             | Description
 :---------          | :---------
 WsSendToRepeater    | Send ws request to Repeater
+WsBinary            | Toggle binary frame
 
 ### popup [popup window]
 The popup window can be customised by setting `g:popup_options` with vim's

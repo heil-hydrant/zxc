@@ -257,19 +257,20 @@ impl RepeaterHandler {
             }
 
             /* Associated Values:
-             *      id  : usize
+             *      id      : usize
+             *      is_bin  : bool
              *
              * Error:
              *      RepeaterError::WsIdNotFound
              *      RepeaterWsMessage::Read
              */
-            Operation::WsSend(id) => {
+            Operation::WsSend { id, is_bin } => {
                 trace!("ws send| {}", id);
                 self.ws_handles
                     .iter_mut()
                     .find(|handle| handle.id == id)
                     .ok_or(RepeaterError::WsIdNotFound(id))?
-                    .send(RepeaterWsMsg::Read)
+                    .send(RepeaterWsMsg::Read { is_bin })
                     .await?;
                 None
             }

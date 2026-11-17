@@ -1,4 +1,4 @@
 pub enum RepeaterWsMsg {
-    Read,
+    Read { is_bin: bool },
     Close,
 }

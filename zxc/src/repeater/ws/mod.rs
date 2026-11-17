@@ -125,7 +125,8 @@ where
                     Some(msg) => {
                         trace!("from client");
                         match msg {
-                            RepeaterWsMsg::Read => {
+                            RepeaterWsMsg::Read { is_bin } => {
+                                rws.set_is_bin(is_bin);
                                 let mut state = RepeaterState::ReadFromFile(rws);
                                 rws = loop {
                                     state = state.next().await?;
