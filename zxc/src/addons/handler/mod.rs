@@ -12,6 +12,7 @@ use zxc_derive::{Buffer, CloseAction, FlushStorage, NotifyCommander};
 
 use super::AddonError;
 use super::builder::build_addon_dest;
+use super::h2::downgrade_file;
 use super::message::to_ui::AddonMsg;
 use crate::CAPACITY_2MB;
 use crate::config::Addon;
@@ -50,20 +51,24 @@ impl AddonHandler {
     /// 3. Build the incremental destination file with
     ///    [`build_addon_dest`].
     /// 4. Copy `info.file` to `dest_file`, preserving request metadata.
-    /// 5. Get the TLS flag from `server_info`, defaulting to `true` when
-    ///    absent.
-    /// 6. Read the HTTP/2 flag from `is_h2`, which is `true` only when the
+    /// 5. Read the HTTP/2 flag from `is_h2`, which is `true` only when the
     ///    UI forwarded an HTTP/2 request.
-    /// 7. Build the addon command string with `Addon::build_cmd` from the
+    /// 6. For HTTP/2, rewrite `dest_file` into an HTTP/1.1 request with a
+    ///    `Host` header.
+    /// 7. Get the TLS flag from `server_info`, defaulting to `true` when
+    ///    absent.
+    /// 8. Build the addon command string with `Addon::build_cmd` from the
     ///    addon name, `dest_file`, the TLS flag and the HTTP/2 flag.
-    /// 8. Build a new `AddonMsg` and return it serialized.
+    /// 9. Build a new `AddonMsg` and return it serialized.
     ///
     /// # Errors
     ///
     /// - `AddonError::WrongMsg` [1]
     /// - `AddonError::AddonNotFound` [2]
     /// - `AddonError::DirError` [3] [4]
-    /// - `AddonError::Serialize` [8]
+    /// - `AddonError::H2Request` [6]
+    /// - `AddonError::RequestFile` [6]
+    /// - `AddonError::Serialize` [9]
     pub async fn build_cmd_string(
         &self,
         info: ForwardInfo,
@@ -84,22 +89,19 @@ impl AddonHandler {
             .await
             .map_err(DirError::CopyFile)?;
 
+        let is_h2 = info.is_h2 == Some(true);
+        if is_h2 {
+            downgrade_file(&dest_file, &info).await?;
+        }
+
         let is_tls = info
             .server_info
             .as_ref()
             .map(|info| info.is_tls())
             .unwrap_or(true);
-        let is_h2 = info.is_h2 == Some(true);
 
-        // TODO(h2): rewrite `dest_file` to an HTTP/1.1 request with a
-        // `Host` header before emitting the command, so tools receive a
-        // request line and authority they can parse.
-        let cmd = addon.build_cmd(
-            name,
-            &dest_file.to_string_lossy(),
-            is_tls,
-            is_h2,
-        );
+        let cmd =
+            addon.build_cmd(name, &dest_file.to_string_lossy(), is_tls, is_h2);
 
         let addon_msg = AddonMsg::new(cmd, dest_file);
         Ok(serde_json::to_string(&addon_msg)?)

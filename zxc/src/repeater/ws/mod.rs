@@ -14,7 +14,7 @@ pub use message::*;
 pub use repeater_ws_handle::*;
 pub use rwstruct::*;
 use tokio::io::{
-    AsyncRead, AsyncReadExt, AsyncSeekExt, AsyncWrite, AsyncWriteExt
+    AsyncRead, AsyncReadExt, AsyncSeekExt, AsyncWrite, AsyncWriteExt,
 };
 use tokio::sync::mpsc::{self, Receiver};
 use tokio::{select, spawn};
