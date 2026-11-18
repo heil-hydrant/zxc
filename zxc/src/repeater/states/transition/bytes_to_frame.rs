@@ -2,13 +2,11 @@ use bytes::BytesMut;
 
 use crate::proxy::*;
 
-/* Description:
- *     Trait to convert Bytes to Frame (http/ws).
- *
- * Transition:
- *     UpdateFrame -> ReWrite
- */
-
+/// Converts buffered bytes into an HTTP or WebSocket frame.
+///
+/// # Transitions
+///
+/// `UpdateFrame` -> `ReWrite`.
 pub trait RepeaterBytesToFrame {
     type Frame;
 

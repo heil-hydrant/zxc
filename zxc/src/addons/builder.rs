@@ -8,28 +8,24 @@ use crate::ADDONS;
 use crate::file_types::EXT_REQ;
 use crate::io::{DirError, incremental};
 
-/* Steps:
- *      1. Check if the path has enough components, i.e. 3
- *              ./history/1/1.req
- *
- *      2. Pop (component_count - 3) times
- *              ./history/1
- *
- *      3. Push addons to the path and create_dir, if Error is AlreadyExists
- *      do nothing.
- *              ./history/1/addons
- *
- *      4. Get Incremental file for the addon prefix
- *
- *      5. Push prefix and incremental to the path
- *              ./history/1/addons/$prefix-$incremental.req
- *
- * Error:
- *      DirError::NoTop             [1]
- *      DirError::CreateDir         [3]
- *      DirError::GetIncrementalDir [4]
- */
-
+/// Builds the destination path for a copied addon request.
+///
+/// # Steps
+///
+/// 1. Check if the path has at least 3 components, i.e.
+///    `./history/1/1.req`.
+/// 2. Pop `component_count - 3` components to reach `./history/1`.
+/// 3. Push `addons` to the path and create the directory, ignoring an
+///    already existing one: `./history/1/addons`.
+/// 4. Get the incremental file number for the addon prefix.
+/// 5. Push the prefix and incremental number to build
+///    `./history/1/addons/$prefix-$incremental.req`.
+///
+/// # Errors
+///
+/// - `DirError::NoTop` [1]
+/// - `DirError::CreateDir` [3]
+/// - `DirError::GetIncrementalDir` [4]
 pub async fn build_addon_dest(
     prefix: &str,
     src_file: &Path,

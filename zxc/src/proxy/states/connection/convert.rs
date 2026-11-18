@@ -1,8 +1,7 @@
 use super::*;
 
-/* Type changing struct
- * https://github.com/rust-lang/rust/issues/86555
- */
+// Type-changing struct; see
+// https://github.com/rust-lang/rust/issues/86555.
 
 // Establish Server Connection = ZStream -> Tcp
 // Complete Handshake = Tls

@@ -28,12 +28,13 @@ impl ServerInfoJson {
     }
 }
 
-/* Steps:
- *      1. Get Host and Scheme
- *      2. If scheme is Https and should_add_sni() (i.e. host != sni) is true,
- *         get Sni
- *      3. Build ServerInfoJson.
- */
+// Builds the UI and history JSON view of `ServerInfo`.
+//
+// # Steps
+//
+// 1. Get the host and scheme.
+// 2. For HTTPS where the host differs from the SNI, include the SNI.
+// 3. Build `ServerInfoJson`.
 
 impl From<&ServerInfo> for ServerInfoJson {
     fn from(server_info: &ServerInfo) -> Self {

@@ -1,3 +1,10 @@
+//! History window backend.
+//!
+//! Owns HTTP and WebSocket history logging for the proxy and mirrors every
+//! `CommanderToHistory` message to the Vim UI. Entries buffered while the
+//! UI is disconnected stay in `ui_storage` and are saved to
+//! `.history.state`.
+
 mod error;
 pub mod handler;
 pub mod message;

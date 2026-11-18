@@ -8,13 +8,13 @@ use crate::core::HISTORY_STATE_FILE;
 use crate::history::HistoryHandler;
 use crate::run::boundary::CloseAction;
 
-/* Steps:
- *      1. If the storage is not empty, create and open file .history.state
- *         file
- *
- *      2. Convert storage to IoSlice and write to state file
- */
-
+// Persists buffered history entries before shutdown.
+//
+// # Steps
+//
+// 1. If the storage is not empty, create and open the `.history.state`
+//    file.
+// 2. Convert the storage to `IoSlice` and write it to the state file.
 impl CloseAction for HistoryHandler {
     async fn close_action(&mut self) -> Result<(), Error> {
         if !self.ui_storage.is_empty() {
@@ -25,14 +25,16 @@ impl CloseAction for HistoryHandler {
     }
 }
 
-/* Steps:
- *      1. Convert storage to IoSlice
- *
- *      2. Loop write_vectored until every slice is written
- *
- * Errors:
- *      ErrorKind::WriteZero
- */
+/// Writes the buffered history entries to the state file.
+///
+/// # Steps
+///
+/// 1. Convert the storage to `IoSlice`.
+/// 2. Loop `write_vectored` until every slice is written.
+///
+/// # Errors
+///
+/// `ErrorKind::WriteZero` [2]
 async fn write_history_state(
     file: &mut File,
     storage: &[String],

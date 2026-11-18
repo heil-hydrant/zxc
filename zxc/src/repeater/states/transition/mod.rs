@@ -1,9 +1,6 @@
-/* Traits required for repeater state transition
- *
- * Implementors:
- *      - Roneone
- *      - RWebsocket
- */
+// Traits used by the repeater state transitions.
+//
+// Implemented by `Roneone` and `RWebsocket`.
 
 pub mod bytes_to_frame;
 pub mod read_from_file;

@@ -2,17 +2,18 @@ use std::fs::{self, read_to_string};
 
 use crate::config::*;
 
-/* Steps:
- *      1. If !should_attach i.e. new_session, write new config
- *
- *      2. If should_attach i.e. attach to existing session,
- *          a. Try reading old config, if ok, combine with new config and
- *          sanitize
- *          b. If not ok or no old config, write new config
- *
- *      3. Convert new_config to toml and write to session_config
- */
-
+/// Writes the local config for the session.
+///
+/// # Steps
+///
+/// 1. If `should_attach` is false, i.e. a new session, write the new
+///    config.
+/// 2. If `should_attach` is true, i.e. attaching to an existing session:
+///    - Try reading the old config; on success combine it with the new
+///      config and sanitize the result.
+///    - If reading fails or there is no old config, write the new config.
+/// 3. Convert the resulting config to TOML and write it to the session
+///    config file.
 pub fn write_local_config(
     should_attach: bool,
     new_config: ProxyArgs,
@@ -56,11 +57,12 @@ pub fn write_local_config(
     args
 }
 
-/* Error:
- *      ConfigError::FileRead [2]
- *      ConfigError::ParseConfig [3]
- */
-
+/// Reads and parses the local config file.
+///
+/// # Errors
+///
+/// - `ConfigError::FileRead` [2]
+/// - `ConfigError::ParseConfig` [3]
 pub fn parse_local_config() -> Result<ProxyArgs, ConfigError> {
     let contents = read_to_string(CONFIG_FILE_NAME)?;
     Ok(toml::from_str::<ProxyArgs>(&contents)?)

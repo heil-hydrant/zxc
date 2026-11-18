@@ -5,18 +5,19 @@ use tracing::trace;
 
 use crate::io::*;
 
-/* Description:
- *      Trait to persist the payload to disk.
- *      Either rewrite the existing file or write a new one.
- *
- * Transition:
- *     ReWrite -> Send
- *
- * NOTE:
- *      HTTP implementations rewrite the existing file.
- *      WS implementations write a new file and update the path.
- */
-
+/// Persists the payload to disk.
+///
+/// Either rewrites the existing file or writes a new one depending on
+/// `should_rewrite`.
+///
+/// # Transitions
+///
+/// `ReWrite` -> `Send`.
+///
+/// # Note
+///
+/// HTTP implementations rewrite the existing file. WebSocket
+/// implementations write a new file and update the path.
 pub trait Persist {
     fn should_rewrite(&self) -> bool;
 
@@ -29,27 +30,26 @@ pub trait Persist {
     fn path_as_ref(&self) -> &PathBuf;
 }
 
-/* Description:
- *      Function to persist the payload to disk.
- *
- * Steps:
- *      1. Check if should rewrite,
- *          a. For http, if frame updated then rewrite, i.e. b:update set in UI
- *          b. For ws, always false
- *
- *      2. If rewrite, get data and file and rewrite_file
- *
- *      3. If newrite,
- *          a. update the path
- *          b. create_and_write_file
- *
- * Transition:
- *     ReWrite -> Send
- *
- * Error:
- *     FileErrorInfo [2] [3]
- */
-
+/// Persists the payload to disk.
+///
+/// # Steps
+///
+/// 1. Check `should_rewrite`.
+///    a. HTTP rewrites when the frame was updated, that is, when the
+///       user set `b:update` in the UI.
+///    b. WebSocket always returns `false`.
+/// 2. When rewriting, get the data and file and call `rewrite_file`.
+/// 3. When writing a new file:
+///    a. Update the path.
+///    b. Call `create_and_write_file`.
+///
+/// # Transitions
+///
+/// `ReWrite` -> `Send`.
+///
+/// # Errors
+///
+/// `FileErrorInfo` [2] [3].
 pub async fn rewrite<T>(mut conn: T) -> Result<T, FileErrorInfo>
 where
     T: Persist,

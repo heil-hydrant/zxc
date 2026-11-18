@@ -25,14 +25,10 @@ impl<T, E> AddRaw for WsConn<T, E> {
     }
 }
 
-// --- BytesToMsg ---
-/* Steps:
- *      Only text and binary frame is supported. build new frame of the same
- *      type. For other frame, return an error.
- *
- * Errors:
- *      ProxyUpdateFrameError::InvalidWsFrame
- */
+// Converts buffered bytes into a WebSocket message.
+//
+// Only text and binary frames are supported; other frame types return
+// `ProxyUpdateFrameError::InvalidWsFrame`.
 
 impl<T, E> BytesToMsg for WsConn<T, E> {
     type Msg = Message;
@@ -234,9 +230,8 @@ impl<T, E> ShouldLog for WsConn<T, E> {
 }
 
 // --- ShouldRewrite ---
-/* Steps:
- *      Always return false as no additional data is added.
- */
+// WebSocket frames never rewrite existing files, so this always returns
+// `false`.
 
 impl<T, E> ShouldRewrite for WsConn<T, E> {
     #[inline(always)]

@@ -25,11 +25,12 @@ pub struct CliArgs {
 }
 
 impl CliArgs {
-    /* Since, session_args.new_name and session_args.attach_name are mutually
-     * exclusive and are checked for empty values using serde, no need to
-     * sanitize them.
-     */
-
+    /// Sanitizes the proxy arguments and drops the args when nothing is
+    /// set.
+    ///
+    /// `session_args` needs no sanitizing: `session_args.new_name` and
+    /// `session_args.attach_name` are mutually exclusive and are checked
+    /// for empty values by serde.
     pub fn sanitize(mut self) -> Option<Self> {
         self.proxy_args = self
             .proxy_args

@@ -36,13 +36,14 @@ pub struct ProxyArgs {
 }
 
 impl ProxyArgs {
-    /* Steps:
-     *      1. If port is 8080, remove it
-     *      2. Remove empty and duplicate values from included_domains and
-     *         excluded_domains
-     *      3. If all fields are empty and no_ws is false, return None
-     */
-
+    /// Cleans up the parsed proxy arguments.
+    ///
+    /// # Steps
+    ///
+    /// 1. If the port is `8080`, remove it.
+    /// 2. Remove empty and duplicate values from `included_domains` and
+    ///    `excluded_domains`.
+    /// 3. If all fields are empty, return `None`.
     pub fn sanitize(mut self) -> Option<ProxyArgs> {
         // if port is 8080 , remove it
         if self.port == Some(8080) {

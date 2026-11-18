@@ -71,7 +71,8 @@ impl TryFrom<HistoryEnum<'_>> for CommanderToHistory {
     }
 }
 
-// {"Request":{"id":1,"method":"GET","http":bool,"host":"www.google.com"," uri":"/robots.txt"}}
+/// Serialized as `{"Request":{"id":1,"method":"GET","http":bool,
+/// "host":"www.google.com","uri":"/robots.txt"}}`.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RequestHistory<'a> {
     id: usize,

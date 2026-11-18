@@ -1,3 +1,7 @@
+//! Central actor routing messages between the proxy, the UI, and TLS state.
+//!
+//! It owns the soldier registry, window channels, and global config; every
+//! intercepted message receives exactly one response.
 pub mod captain_crypto;
 pub mod codec;
 pub mod communicate;
@@ -136,21 +140,22 @@ impl Commander {
                 Ok(())
             }
 
-            /* Steps:
-             *      1. Pop the Server sender from the http_storage
-             *
-             *      2. Create mpsc::channel<CommanderResponse> for client.
-             *         Server already has a receiver and commander has the
-             *         sender.
-             *
-             *      3. Build new rply with the Receivers and send it through
-             *         popped sender
-             *
-             *      4. Add the Senders to ws_storage by calling add_ws_handle()
-             *
-             * Error:
-             *      CommunicateError::NoId
-             */
+            // Registers a WebSocket connection.
+            //
+            // # Steps
+            //
+            // 1. Pop the server sender from the HTTP storage.
+            // 2. Create an `mpsc::channel<CommanderResponse>` for the
+            //    client. The server already has a receiver and the
+            //    commander holds the sender.
+            // 3. Build a new reply with the receivers and send it through
+            //    the popped sender.
+            // 4. Add the senders to the WebSocket storage by calling
+            //    `add_ws_handle()`.
+            //
+            // # Errors
+            //
+            // `CommunicateError::NoId`.
             CommanderRequest::WsRegister(id) => {
                 let conn_id = id.conn_id();
                 let server_sender = self.soldiers.pop_http_sender(conn_id)?;
@@ -168,12 +173,14 @@ impl Commander {
                 Ok(())
             }
 
-            /* Steps:
-             *      1. Try to remove from http_storage
-             *      2. else remove from ws_storage
-             *      3. If removed tom ws_storage, send
-             *         CommanderToHistory::RemoveWs to history
-             */
+            // Closes an HTTP or WebSocket connection.
+            //
+            // # Steps
+            //
+            // 1. Try to remove from the HTTP storage.
+            // 2. Otherwise remove from the WebSocket storage.
+            // 3. If removed from the WebSocket storage, send
+            //    `CommanderToHistory::RemoveWs` to history.
             CommanderRequest::Close(id) => {
                 self.comm_interceptor.purge_soldier(id);
                 if self.soldiers.remove_from_http_store(id) {
@@ -242,15 +249,17 @@ impl Commander {
                         (SoldierId::Connection(id), response)
                     }
 
-                    /* Associated Values:
-                     *      ext : String
-                     *
-                     * Steps:
-                     *      1. if config is_some call config.should_log() with
-                     *         extension, else true
-                     *      2. if true, call self.get_http_log_path() with id
-                     *         to get new path and Sender<CommanderToHistory>
-                     */
+                    // Decides whether to log an HTTP request by extension.
+                    //
+                    // `ext` is the request extension.
+                    //
+                    // # Steps
+                    //
+                    // 1. If config is `Some`, call `config.should_log()`
+                    //    with the extension; otherwise `true`.
+                    // 2. If true, call `self.get_http_log_path()` with the
+                    //    ID to get the new path and
+                    //    `Sender<CommanderToHistory>`.
                     CommanderRequest::ShouldLogHttp(id, ext) => {
                         let result = self
                             .config
@@ -267,17 +276,18 @@ impl Commander {
                         (id, response)
                     }
 
-                    /* Associated Values:
-                     *      ct  : ContentType
-                     *
-                     * Steps:
-                     *      1. if config is_some call
-                     *         !config.in_excluded_content_types() with
-                     *         ContentType
-                     *
-                     *      2. if true, call self.get_http_log_path() with id
-                     *         to get new path and Sender<CommanderToHistory>
-                     */
+                    // Decides whether to log an HTTP request by content type.
+                    //
+                    // `ct` is the content type.
+                    //
+                    // # Steps
+                    //
+                    // 1. If config is `Some`, call
+                    //    `!config.in_excluded_content_types()` with the
+                    //    content type.
+                    // 2. If true, call `self.get_http_log_path()` with the
+                    //    ID to get the new path and
+                    //    `Sender<CommanderToHistory>`.
                     CommanderRequest::ShouldLogHttpCt(id, ct) => {
                         let result =
                             self.config
@@ -359,25 +369,20 @@ impl Commander {
         trace!("wres queue emptied");
     }
 
-    /* Steps:
-     *      Match request
-     *      1. If toggle, call interceptor_handle.toggle().
-     *
-     *      2. If intercept status is false, empty the interceptor queue
-     *      (msgs which have been intercepted).
-     *
-     *      3. If Forward, call interceptor_handle.forward()
-     *
-     *      4. if resume,
-     *          a. if wreq, and need_response, set_ws_need_response(id)
-     *
-     *      5. For resume and drop msgs, get log_id, file_type, response
-     *
-     *      6. Get connection id from log_id, by calling conn_id_from_log_id
-     *
-     *      7. Send response to the respective soldier
-     */
-
+    /// Handles messages sent from the interceptor window.
+    ///
+    /// # Steps
+    ///
+    /// 1. On `Toggle`, call `interceptor_handle.toggle()`.
+    /// 2. If the intercept status is false, empty the interceptor queue.
+    /// 3. On `Forward`, call `interceptor_handle.forward()`.
+    /// 4. On resume of a `wreq` that needs a response, call
+    ///    `set_ws_need_response(id)`.
+    /// 5. For resume and drop messages, get the log id, file type, and
+    ///    response.
+    /// 6. Get the connection id from the log id by calling
+    ///    `conn_id_from_log_id`.
+    /// 7. Send the response to the respective soldier.
     pub async fn handle_interceptor(
         &mut self,
         msg: InterUIOps,
@@ -467,14 +472,16 @@ impl Commander {
 
 const MAX_HTTP_LOG_INDEX_ATTEMPTS: usize = 1024;
 
-/* Steps:
- *      1. Build <base>/<index>.
- *      2. Try create_dir.
- *          a. Ok, return the index and path.
- *          b. AlreadyExists, increment index and retry.
- *          c. Other error, log and return None.
- *      3. Return None after max_attempts is exhausted.
- */
+/// Creates an incrementing HTTP log directory under `base`.
+///
+/// # Steps
+///
+/// 1. Build `<base>/<index>`.
+/// 2. Try `create_dir`.
+///    - `Ok`: return the index and path.
+///    - `AlreadyExists`: increment the index and retry.
+///    - Other errors are logged and return `None`.
+/// 3. Return `None` after `max_attempts` is exhausted.
 async fn create_http_log_dir(
     base: &Path,
     start_index: usize,

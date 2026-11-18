@@ -34,15 +34,10 @@ pub trait HandleCommander: FromCommander {
     ) -> Result<UiReply, Self::Error>;
 }
 
-/* Description:
- *      Flush the storage to unix socket.
- *
- * Actual implementation:
- *      HistoryHandler
- *
- * All other handlers blanket implementation using derive macro.
- *      zxc-derive/src/flush_storage.rs
- */
+/// Flushes queued UI output to the Unix socket.
+///
+/// Implemented by `HistoryHandler`; the other handlers derive a no-op
+/// implementation from `zxc-derive`.
 pub trait FlushStorage {
     async fn flush_storage(
         &mut self,
@@ -50,16 +45,10 @@ pub trait FlushStorage {
     ) -> Result<(), UnixSockError>;
 }
 
-/* Description:
- *      When the binary is closed and there is remaining data that needs to be
- *      written, write it to a .state file.
- *
- * Actual implementation:
- *      HistoryHandler
- *
- * All other handlers blanket implementation using derive macro.
- *      zxc-derive/src/close_action.rs
- */
+/// Persists remaining handler state before the UI shuts down.
+///
+/// `HistoryHandler` writes `.history.state`; the other handlers derive a
+/// no-op implementation from `zxc-derive`.
 pub trait CloseAction {
     async fn close_action(&mut self) -> Result<(), io::Error>;
 }
@@ -75,17 +64,10 @@ pub trait HandleUI: HandleCommander {
     ) -> Result<UiReply, <Self as HandleCommander>::Error>;
 }
 
-/* Description:
- *      When the ui is closed/error, notify the commander so that no messages
- *      are received.
- *
- * Actual implementation:
- *      HistoryHandler
- *
- * All other handlers blanket implementation using derive macro.
- *      zxc-derive/src/notify.rs
- */
-
+/// Notifies the commander when the UI connects or disconnects.
+///
+/// Implemented by `InterceptorHandler`; the other handlers derive a no-op
+/// implementation from `zxc-derive`.
 pub trait NotifyCommander: HandleCommander {
     async fn notify_commander(
         &mut self,
@@ -98,13 +80,10 @@ pub trait IsUIError {
     }
 }
 
-/* Description:
- *      Reply returned by UI handlers.
- *
- *      None  : nothing to send.
- *      Reply : send data to UI. id 0 is a push, any other id is an RPC reply.
- *      Flush : flush queued storage to the UI.
- */
+/// Result of a UI handler call.
+///
+/// `None` sends nothing, `Reply` sends data (ID `0` is a push, any other ID
+/// is an RPC reply), and `Flush` drains queued storage to the UI.
 pub enum UiReply {
     None,
     Reply(usize, String),
@@ -117,12 +96,10 @@ impl UiReply {
     }
 }
 
-/* Description:
- *      Errors shared by all UI handlers.
- *
- *      Only Socket errors terminate the UI runner. NoUI, Closed and Message
- *      errors are logged and the runner continues.
- */
+/// Errors shared by all UI handlers.
+///
+/// Only `Socket` terminates the UI runner. `NoUI`, `Closed`, and `Message`
+/// are logged and the runner continues.
 #[derive(Debug, Error)]
 pub enum UiError {
     #[error("no UI connected")]
@@ -141,11 +118,9 @@ impl IsUIError for UiError {
     }
 }
 
-/* Description:
- *      Generates the shared UI error conversions for a handler error enum.
- *
- *      The enum must have a `Ui(UiError)` variant.
- */
+/// Generates the shared UI error conversions for a handler error enum.
+///
+/// The enum must have a `Ui(UiError)` variant.
 #[macro_export]
 macro_rules! impl_ui_error {
     ($err:ty) => {

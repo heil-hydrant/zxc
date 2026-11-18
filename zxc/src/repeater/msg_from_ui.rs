@@ -6,17 +6,19 @@ use crate::commander::codec::Codec;
 use crate::forward_info::{ForwardInfo, H2Info, Module};
 use crate::proxy::server_info::json::ServerInfoJson;
 
-/* Message received from Repeater UI
- *
- * Supported Messages:
- *     [0,{"Encode" : {"Codec": Base64, "data": "aGVsbG8gd29ybGQ="}}]
- *     [0,{"Decode" : {"Codec": Base64, "data": "aGVsbG8gd29ybGQ="}}]
- *     [0,{"Send" : {"file": "1.req", "update": true, "server_info": {
- *      "scheme": "https", "host": "www.google.com", "update": true, "sni": "www.google.com"}]
- *     [0,{"WsEstablish": "1.req"}}]
- *     [0,{"WsSend": {"id": 1, "is_bin": true}}]
- */
-
+/// Represents a message received from the Repeater UI.
+///
+/// Supported messages:
+///
+/// ```text
+/// [0,{"Encode" : {"Codec": Base64, "data": "aGVsbG8gd29ybGQ="}}]
+/// [0,{"Decode" : {"Codec": Base64, "data": "aGVsbG8gd29ybGQ="}}]
+/// [0,{"Send" : {"file": "1.req", "update": true, "server_info": {
+///  "scheme": "https", "host": "www.google.com", "update": true,
+///  "sni": "www.google.com"}]`]
+/// [0,{"WsEstablish": "1.req"}}]
+/// [0,{"WsSend": {"id": 1, "is_bin": true}}]
+/// ```
 #[derive(Debug, Deserialize)]
 pub struct RepeaterMsg {
     pub id: usize,

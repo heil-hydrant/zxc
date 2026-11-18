@@ -25,53 +25,31 @@ pub trait ToWs<T, E> {
     async fn convert(self) -> Result<TupleWs<T, E>, WsCreationError>;
 }
 
-/* Description:
- *      ToWs trait implementation for OneOneHandler
- *
- * Steps:
- *      1. Create websocket path and build
- *              old path = id/id.res
- *              new path = id/websocket
- *
- *      2. Register ws in Commander
- *          a. Build CommanderRequest::WsRegister with id
- *          b. Send it to Commander
- *          c. Receive WsRegisterReply and convert to
- *          (Receiver<CommanderResponse> , Sender<CommanderToHistory>)
- *          [ TryFrom trait in response/convert.rs ]
- *
- *      3. Register ws in History
- *          a. Build HistoryWsRegisterInfo with id, log_id, path and
- *          server_info
- *          b. Wrap in CommanderToHistory::RegisterWs
- *          c. Send it to History
- *
- *      4. Create WebSocketStream for
- *          a. client   => response.writer
- *          b. server   => response.reader
- *
- *      5. Split the WebSocketStream into read and write halves
- *
- *      6. Push "0" to path, so that when logging set_file_name() can be used
- *
- *      7. Build WsStruct for
- *          a. server => server_read_half , client_write_half
- *                      old_request_sender.clone(), old_response_recvr
- *                      old_buf
- *
- *          b. client => client_read_half , server_write_half
- *                      old_response_sender, WsRegisterReply.receiver
- *                      new_buf
- *
- *      8. Clone history_sender, path from commander response for server and client
- *
- * Error:
- *      WsCreationError
- *          CreateDir   [1]
- *          Send        [2.b]
- *          NoReply     [2.c]
- *          HistorySend [3]
- */
+// Converts a logged HTTP/1.1 request into the WebSocket relay.
+//
+// # Steps
+//
+// 1. Build `id/websocket` from `id/id.res`.
+// 2. Register the WebSocket with the commander.
+//    a. Build `CommanderRequest::WsRegister` with the ID.
+//    b. Send it and convert the reply into the response receiver and
+//       history sender.
+// 3. Register it with the history handler.
+//    a. Build `HistoryWsRegisterInfo` with the ID, log ID, path, and
+//       server info.
+//    b. Wrap it in `CommanderToHistory::RegisterWs` and send it.
+// 4. Create the client and server `WebSocketStream`s.
+// 5. Split each stream into read and write halves.
+// 6. Push `"0"` to the path so logging can use `set_file_name()`.
+// 7. Build the server and client `WsConn`s.
+// 8. Clone the history sender and path for both halves.
+//
+// # Errors
+//
+// - `WsCreationError::CreateDir` [1]
+// - `WsCreationError::Send` [2.b]
+// - `WsCreationError::NoReply` [2.c]
+// - `WsCreationError::HistorySend` [3]
 
 impl<T, E> ToWs<T, E> for OneOneConn<T, E, OneResponseLine>
 where

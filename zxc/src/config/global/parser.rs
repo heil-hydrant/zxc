@@ -12,12 +12,12 @@ pub fn global_config_path() -> Result<PathBuf, VarError> {
     Ok(path)
 }
 
-/* Error:
- *      ConfigError::Env [1]
- *      ConfigError::FileRead [2]
- *      ConfigError::ParseConfig [4]
- */
-
+/// Parses the global config and sanitizes it.
+///
+/// # Errors
+///
+/// Returns [`ConfigError`] when `HOME` is unset, the file cannot be read, or
+/// the TOML is invalid.
 pub fn parse_global_config() -> Result<Option<GlobalConfig>, ConfigError> {
     let mut path = global_config_path()?;
     path.push(CONFIG_FILE_NAME);

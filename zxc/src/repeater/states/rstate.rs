@@ -35,77 +35,103 @@ where
 
     async fn next(self) -> Result<Self, Self::Error> {
         match self {
-            /* Transition:
-             *      ReadFromFile -> UpdateFrame | Send
-             *
-             * Trait Bound:
-             *      FileBuf + ShouldUpdate + AddRaw
-             *
-             * Errors:
-             *      ProtocolError::File
-             *      ProtocolError::UpdateFrame
-             */
+            // Reads the payload and applies the update policy.
+            //
+            // # Transitions
+            //
+            // `ReadFromFile` -> `UpdateFrame` | `Send`.
+            //
+            // # Note
+            //
+            // Requires `FileBuf + ShouldUpdate + AddRaw`.
+            //
+            // # Errors
+            //
+            // - `ProtocolError::File`
+            // - `ProtocolError::UpdateFrame`
             Self::ReadFromFile(conn) => read_from_file(conn).await,
 
-            /* Transition:
-             *      UpdateFrame -> ReWrite
-             *
-             * Trait Bound:
-             *      RepeaterBytesToFrame
-             *
-             * Errors:
-             *      ProtocolError::UpdateFrame
-             */
+            // Converts the buffered bytes into a frame.
+            //
+            // # Transitions
+            //
+            // `UpdateFrame` -> `ReWrite`.
+            //
+            // # Note
+            //
+            // Requires `RepeaterBytesToFrame`.
+            //
+            // # Errors
+            //
+            // `ProtocolError::UpdateFrame`.
             Self::UpdateFrame(mut conn, buf) => {
                 let frame = conn.parse_frame(buf)?;
                 conn.frame_to_payload(frame);
                 Ok(RepeaterState::ReWrite(conn))
             }
-            /* Transition:
-             *      ReWrite -> Send
-             *
-             * Trait Bound:
-             *      Persist,
-             *
-             * Errors:
-             *      ProtocolError::File
-             */
+            // Persists the payload to disk.
+            //
+            // # Transitions
+            //
+            // `ReWrite` -> `Send`.
+            //
+            // # Note
+            //
+            // Requires `Persist`.
+            //
+            // # Errors
+            //
+            // `ProtocolError::File`.
             Self::ReWrite(mut conn) => {
                 conn = rewrite(conn).await?;
                 Ok(Self::Send(conn))
             }
 
-            /* Transition:
-             *      Send -> Receive
-             *
-             * Trait Bound:
-             *      ReadWrite
-             *
-             * Errors:
-             *      RepeaterError::ReadHttp | RepeaterError::WsIo
-             */
+            // Sends the request and waits for the response.
+            //
+            // # Transitions
+            //
+            // `Send` -> `Receive`.
+            //
+            // # Note
+            //
+            // Requires `ReadWrite`.
+            //
+            // # Errors
+            //
+            // - `RepeaterError::ReadHttp`
+            // - `RepeaterError::WsIo`
             Self::Send(conn) => conn.write().await.map_err(Into::into),
 
-            /* Transition:
-             *      Receive -> WriteResponse
-             *
-             * Trait Bound:
-             *      ReadWrite
-             *
-             * Errors:
-             *      RepeaterError::ReadHttp | RepeaterError::WsIo
-             */
+            // Reads the response or frame from the server.
+            //
+            // # Transitions
+            //
+            // `Receive` -> `WriteResponse`.
+            //
+            // # Note
+            //
+            // Requires `ReadWrite`.
+            //
+            // # Errors
+            //
+            // - `RepeaterError::ReadHttp`
+            // - `RepeaterError::WsIo`
             Self::Receive(conn) => conn.read().await.map_err(Into::into),
 
-            /* Transition:
-             *      WriteResponse -> End
-             *
-             * Trait Bound:
-             *      WriteResponse
-             *
-             * Errors:
-             *      ProtocolError::File
-             */
+            // Logs the response to disk.
+            //
+            // # Transitions
+            //
+            // `WriteResponse` -> `End`.
+            //
+            // # Note
+            //
+            // Requires `WriteResponse`.
+            //
+            // # Errors
+            //
+            // `ProtocolError::File`.
             Self::WriteResponse(mut conn) => {
                 conn = log_response(conn).await?;
                 Ok(Self::End(conn))

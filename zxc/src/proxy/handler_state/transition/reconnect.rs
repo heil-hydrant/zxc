@@ -1,26 +1,20 @@
 use crate::proxy::prelude::*;
 
-/* Description:
- *      Trait to reconnect to server.
- *      http only
- *
- *
- * Methods:
- *      can_reconnect   :   can be reconnected to server,
- *                          If user defines different scheme to connect to
- *                          original or different server after intercepting,
- *                          return false.
- *
- *      reconnect       :   reconnect to server
- *
- *
- *
- * Implemented in:
- *      oneonestruct/impl_reconnect
- */
-
+/// Reconnects a server stream after interception.
+///
+/// HTTP/1.1 only. Implemented by `OneOneConn`.
 pub trait Reconnect {
+    /// Returns whether the stream can target `server_info`.
+    ///
+    /// `false` when the user changed the scheme, host, or SNI during
+    /// interception.
     fn can_reconnect(&self, server_info: &ServerInfo) -> bool;
 
+    /// Drops the old transport and dials `server_info`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ProxyStateError`] when the TCP connect or TLS handshake
+    /// fails.
     async fn reconnect(&mut self) -> Result<(), ProxyStateError>;
 }

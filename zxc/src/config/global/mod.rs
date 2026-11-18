@@ -21,19 +21,21 @@ pub struct GlobalConfig {
 }
 
 impl GlobalConfig {
-    /* Steps:
-     *      1. Remove empty values from excluded_domains, excluded_extensions
-     *      and excluded_content_types.
-     *
-     *      2. Remove ContentType::Unknown from excluded_content_types.
-     *
-     *      FIX:
-     *          https://github.com/rust-lang/rust/issues/35428
-     *          remove_empty_and_dedup() can be generalised
-     *
-     *      3. If all fields are empty, return None
-     */
-
+    /// Sanitizes the global config and returns `None` when it is empty.
+    ///
+    /// # Steps
+    ///
+    /// 1. Remove empty values from `excluded_domains`,
+    ///    `excluded_extensions` and `excluded_content_types`.
+    /// 2. Sort and deduplicate `excluded_content_types`, then remove
+    ///    `ContentType::Unknown`.
+    /// 3. Return `None` if all fields are empty.
+    ///
+    /// # FIXME
+    ///
+    /// <https://github.com/rust-lang/rust/issues/35428>
+    ///
+    /// `remove_empty_and_dedup()` can be generalised.
     pub fn sanitize(mut self) -> Option<GlobalConfig> {
         // 1. Remove empty values
         sanitize_option_vec_string(&mut self.excluded_domains);

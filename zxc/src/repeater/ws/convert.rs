@@ -3,20 +3,13 @@ use tokio::sync::mpsc::Receiver;
 
 use crate::repeater::prelude::*;
 
-/* Description:
- *      Trait Implementation types to RepeaterWs.
- *      Trait, not method for future-proofing (H2).
- *
- * Implementation:
- *      repeater/http/roneonestruct/impl_to_rws
- *
- * Returns:
- *      Ok(RWebSocket)
- *
- * Error:
- *      WsCreationError
- */
-
+/// Converts connection types into `RepeaterWs` implementations.
+///
+/// A trait instead of a method to leave room for HTTP/2.
+///
+/// # Errors
+///
+/// `WsCreationError`.
 pub trait ToRepeaterWs<T>
 where
     T: AsyncRead + AsyncWrite + Unpin,

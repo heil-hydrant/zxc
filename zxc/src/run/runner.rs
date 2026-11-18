@@ -14,44 +14,24 @@ use crate::io::{
 
 const CLOSE_MSG: &[u8] = br#"[0,{"Action": "Close"}]"#;
 
-/* Steps:
- * ----- loop -----
- *      ----- select -----
- *          a. Receive msg from commander, call handle_commander_ui and match
- *          result
- *              1. UiReply::None            => continue
- *
- *              2. UiReply::Reply(id, data) => build_slice_and_write(id, data)
- *
- *              3. UiReply::Flush           => call flush_storage()
- *
- *              4. Err(..)                  => print error
- *
- *          b. Read from stream
- *              1. If Err is Block, continue for other types return
- *              2. While a complete frame is buffered:
- *                  a. Call handle_ui() to get result.
- *                  b. Replace buffer with the unconsumed tail.
- *                  c. match result:
- *                      UiReply::None             => continue
- *
- *                      UiReply::Reply(id, data)  => build_slice_and_write
- *
- *                      UiReply::Flush            => call flush_storage()
- *
- *                      Err(..)                   => If is_ui_error() return,
- *                                                   else continue
- *
- *          c. Check token cancelled,
- *              1. write CLOSE_MSG to stream
- *              2. read one byte to detect peer close, bounded by timeout
- *              3. return Ok
- *
- *  Errors:
- *      UnixSocketError::Read       [b]
- *      UnixSocketError::Write      [a, b]
- */
-
+/// Runs the event loop for one UI module over its Unix socket.
+///
+/// # Steps
+///
+/// 1. Select on commander messages, socket readability, and cancellation.
+/// 2. Commander message: call `handle_commander_ui` and handle the reply.
+///    `None` continues, `Reply` writes a framed reply, `Flush` drains queued
+///    storage, and errors are logged.
+/// 3. Socket read: decode every complete buffered frame, call `handle_ui`,
+///    keep the unconsumed tail, and write or flush the reply. Return on a UI
+///    error, otherwise continue.
+/// 4. Cancellation: write `CLOSE_MSG`, wait briefly for the peer to close,
+///    and return.
+///
+/// # Errors
+///
+/// - `UnixSocketError::Read` from the socket read.
+/// - `UnixSocketError::Write` from commander replies and the close message.
 pub async fn run_module<T>(
     handler: &mut T,
     mut stream: UnixStream,

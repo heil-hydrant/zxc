@@ -5,21 +5,24 @@ use crate::io::*;
 use crate::proxy::*;
 use crate::repeater::prelude::*;
 
-/* Steps:
- *     1. Read from the file
- *     2. If should_update is true, transition to UpdateFrame [ Always true for
- *     ws and by default true for http ]
- *     3. else, add as raw data and transition to Send [ http only, when user
- *        sets b:update to false in UI ]
- *
- * Transition:
- *     ReadFromFile -> UpdateFrame | Send
- *
- * Error:
- *      ProtocolError::File         [1]
- *      ProtocolError::UpdateFrame  [3]
- */
-
+/// Reads the payload from disk and applies the update policy.
+///
+/// # Steps
+///
+/// 1. Read from the file.
+/// 2. Transition to `UpdateFrame` when `should_update` is `true`. This
+///    is always true for WebSocket and the default for HTTP.
+/// 3. Otherwise add the raw data and transition to `Send`. HTTP only,
+///    when the user sets `b:update` to `false` in the UI.
+///
+/// # Transitions
+///
+/// `ReadFromFile` -> `UpdateFrame` | `Send`.
+///
+/// # Errors
+///
+/// - `ProtocolError::File` [1]
+/// - `ProtocolError::UpdateFrame` [3]
 pub async fn read_from_file<T>(
     mut conn: T,
 ) -> Result<RepeaterState<T>, ProtocolError>

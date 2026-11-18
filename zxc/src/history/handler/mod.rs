@@ -57,19 +57,18 @@ impl HistoryHandler {
         }
     }
 
-    /* Steps:
-     *      1. If size is 1, pop message, get response
-     *          a. If with_sock, return Some(response)
-     *          b. Else, push to storage
-     *
-     *      2. Else, reverse msg_storage to maintain order, pop elements and
-     *         store response for each message in storage.
-     *
-     *          a. If get_response errors, log it and continue so the batch
-     *             is fully drained without leaving reversed leftovers.
-     *
-     *          b. If with_sock, return UiReply::Flush, to write_vectored()
-     */
+    /// Drains the commander storage and builds the UI responses.
+    ///
+    /// # Steps
+    ///
+    /// 1. If the size is 1, pop the message and get its response:
+    ///    - With a socket, return `Some(response)`.
+    ///    - Without a socket, push the response to the storage.
+    /// 2. Else, reverse `msg_storage` to maintain order, pop the elements
+    ///    and store the response of each message in the storage:
+    ///    - If `get_response` errors, log it and continue so the batch is
+    ///      fully drained without leaving reversed leftovers.
+    ///    - With a socket, return `UiReply::Flush` for `write_vectored()`.
     pub async fn handle_commander(
         &mut self,
         size: usize,
@@ -107,33 +106,30 @@ impl HistoryHandler {
         msg: CommanderToHistory,
     ) -> Result<Option<String>, HistoryError> {
         let response = match msg {
-            /* Associcated Values:
-             *      data: String
-             */
+            // Returns the raw HTTP history entry.
             CommanderToHistory::Http(data) => Some(data),
 
-            /* Associcated Values:
-             *      reginfo: HistoryWsRegisterInfo
-             *
-             * Steps:
-             *      1. First time a ws conn is received,
-             *          a. Open ./ws.whis file and store in self.ws_his
-             *
-             *          b. Send {"Action":"wsview"} to history_ui stream.
-             *
-             *      2. Get ws history data in format
-             *              id | proto | host
-             *          by calling log_data() method on WsRegisterInfo and
-             *          write to ws.whis
-             *
-             *      3. Open the .wsess file which maps id to the WebSocket
-             *         history and add it to self.ws_storage
-             *
-             * Error:
-             *      HistoryWsError::FileCreate [1]
-             *      HistoryWsError::Write      [2]
-             *      HistoryWsError::Register   [3]
-             */
+            // Registers a WebSocket connection with history.
+            //
+            // `reginfo` carries the connection ID, log ID, path, and
+            // server info.
+            //
+            // # Steps
+            //
+            // 1. On the first WebSocket connection:
+            //    a. Open `./ws.whis` and store it in `self.ws_his`.
+            //    b. Send `{"Action":"wsview"}` to the history UI stream.
+            // 2. Get the WebSocket history data in the format
+            //    `id | proto | host` by calling `log_data()` on
+            //    `reginfo` and write it to `ws.whis`.
+            // 3. Open the `.wsess` file that maps the ID to the
+            //    WebSocket history and add it to `self.ws_storage`.
+            //
+            // # Errors
+            //
+            // - `HistoryWsError::FileCreate` [1]
+            // - `HistoryWsError::Write` [2]
+            // - `HistoryWsError::Register` [3]
             CommanderToHistory::RegisterWs(reginfo) => {
                 trace!("ws register");
                 let rply = if self.ws_his.is_none() {
@@ -167,14 +163,14 @@ impl HistoryHandler {
                 rply
             }
 
-            /* Associcated Values:
-             *      id      : usize
-             *      logdata : String
-             *
-             * Error:
-             *      HistoryError::NoId      [1]
-             *      HistoryWsError::Write   [2]
-             */
+            // Writes a WebSocket frame to its history file.
+            //
+            // `id` is the connection ID and `logdata` is the frame entry.
+            //
+            // # Errors
+            //
+            // - `HistoryError::NoId` [1]
+            // - `HistoryWsError::Write` [2]
             CommanderToHistory::WebSocket(id, logdata) => {
                 trace!("ws write");
                 let wslog = self
@@ -187,12 +183,13 @@ impl HistoryHandler {
                 None
             }
 
-            /* Associcated Values:
-             *      id : usize
-             *
-             * Error:
-             *      HistoryError::NoId  [1]
-             */
+            // Removes the WebSocket log handle.
+            //
+            // `id` is the connection ID.
+            //
+            // # Errors
+            //
+            // `HistoryError::NoId` [1].
             CommanderToHistory::RemoveWs(id) => {
                 self.ws_storage
                     .remove(&id)

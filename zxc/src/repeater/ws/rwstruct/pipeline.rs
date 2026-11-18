@@ -27,13 +27,16 @@ where
     type Error = WsError;
     type State = RepeaterState<Self>;
 
-    /*  Transition:
-     *      Receive -> WriteResponse
-     *
-     *  Error:
-     *      WsError::Read
-     *      WsError::Close
-     */
+    // Reads the next frame and transitions to `WriteResponse`.
+    //
+    // # Transitions
+    //
+    // `Receive` -> `WriteResponse`.
+    //
+    // # Errors
+    //
+    // - `WsError::Read`
+    // - `WsError::Close`.
 
     async fn read(mut self) -> Result<RepeaterState<Self>, WsError> {
         let Some(msg) = self.stream.next().await else {
@@ -44,7 +47,7 @@ where
         Ok(RepeaterState::WriteResponse(self))
     }
 
-    // Transition: WriteResponse -> Receive | End
+    // Transitions `WriteResponse` to `Receive` or `End`.
     async fn write(mut self) -> Result<RepeaterState<Self>, WsError> {
         let frame = self
             .frame
@@ -102,10 +105,7 @@ impl<T> Persist for RWebSocket<T> {
         panic!("No rewrite for ws");
     }
 
-    /* Steps:
-     *        1. update path to id.wreq
-     *        2. increment id
-     */
+    // Updates the path to `id.wreq` and increments the ID.
     fn update_path(&mut self) {
         self.path
             .set_file_name(self.log_id.to_string());
@@ -121,9 +121,7 @@ impl<T> Persist for RWebSocket<T> {
     }
 }
 
-/* New ws frame should always be constructed.
- * So, always return true
- */
+// WebSocket frames are always new, so this always returns `true`.
 
 impl<T> ShouldUpdate for RWebSocket<T> {
     #[inline(always)]

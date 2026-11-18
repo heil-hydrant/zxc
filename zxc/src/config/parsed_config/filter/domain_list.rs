@@ -26,11 +26,12 @@ impl PartialEq for DomainList {
 }
 
 impl DomainList {
-    /* Steps:
-     *      1. Check wildcard list
-     *      2. If no result, check string list
-     */
-
+    /// Checks whether the host matches any entry in the list.
+    ///
+    /// # Steps
+    ///
+    /// 1. Check the wildcard list.
+    /// 2. If there is no match, check the string list.
     pub fn contains(&self, host: &str) -> bool {
         // 1. Check wildcard list
         if let Some(wild_list) = &self.wildcard
@@ -52,11 +53,12 @@ impl DomainList {
     }
 }
 
-/* Steps:
- *      1. Separate wildcard list and string list
- *      2. Convert wildcard list to Wildcard
- */
-
+// Builds a domain list from raw patterns.
+//
+// # Steps
+//
+// 1. Separate the wildcard list from the string list.
+// 2. Convert the wildcard entries to `Wildcard`.
 impl From<Vec<String>> for DomainList {
     fn from(v: Vec<String>) -> Self {
         // 1. Separate string list and wildcard list

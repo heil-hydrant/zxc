@@ -13,21 +13,20 @@ use crate::forward_info::H2Info;
 use crate::proxy::*;
 use crate::repeater::prelude::*;
 
-/* Description:
- *      Build an H2 request from the raw rep.req bytes.
- *
- * Steps:
- *      1. Parse the logged HTTP/1.1 style bytes into OneRequest
- *      2. If normalize is true, fix the body headers
- *      3. Convert OneRequest to the H2 Request
- *      4. Apply only the pseudo headers supplied by the UI
- *
- * Note:
- *      Normalization is only requested from parse_frame, which is reached
- *      when b:update is true. The write fallback reparses the payload without
- *      normalizing so b:update == false sends the user bytes unchanged.
- */
-
+/// Builds an H2 request from the raw `rep.req` bytes.
+///
+/// # Steps
+///
+/// 1. Parse the logged HTTP/1.1 style bytes into a `OneRequest`.
+/// 2. If `normalize` is true, fix the body headers.
+/// 3. Convert the `OneRequest` into an H2 `Request`.
+/// 4. Apply only the pseudo headers supplied by the UI.
+///
+/// # Note
+///
+/// Normalization is only requested from `parse_frame`, which is reached when
+/// `b:update` is true. The write fallback reparses the payload without
+/// normalizing, so `b:update == false` sends the user bytes unchanged.
 fn build_h2_request(
     buf: BytesMut,
     h2_info: Option<&H2Info>,

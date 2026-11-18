@@ -9,26 +9,21 @@ use crate::run::boundary::FromCommander;
 
 const LIMIT: usize = 100;
 
-/* Description:
- *      Time based buffer writer.
- *      Writes every 2 seconds.
- *
- * Associcated type:
- *      Number of messages received
- *
- * Steps:
- *      1. Set Interval for 2 seconds.
- *      ----- loop -----
- *          ----- select -----
- *          1. recv_many messages from commander
- *              a. If current Interval is not 2 seconds, set Interval to 2
- *              seconds and reset immediately.
- *              b. Else, wait for timer to tick.
- *          2. If Interval ticked,
- *              a. If there are no messages, increment Interval by 2 seconds
- *              b. If there are messages, return number of messages
- */
-
+// Buffers commander messages and releases them on a timer.
+//
+// Yields the number of messages received.
+//
+// # Steps
+//
+// 1. Set the interval to 2 seconds.
+// 2. Loop over a `select!`:
+//    a. Receive messages from the commander with `recv_many`. If the
+//       current interval is not 2 seconds, set it to 2 seconds and
+//       reset it immediately, otherwise wait for the timer to tick.
+//    b. If the interval ticked and the storage is empty, increase the
+//       interval by 2 seconds.
+//    c. If the interval ticked and there are messages, return the
+//       number of messages.
 impl FromCommander for HistoryHandler {
     type Message = usize;
 

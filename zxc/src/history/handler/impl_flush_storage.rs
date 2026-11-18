@@ -8,19 +8,17 @@ use crate::io::{
 };
 use crate::run::boundary::FlushStorage;
 
-/* Steps:
- *      1. Build Vec<IoSlice> with capacity of storage length * 3
- *
- *      2. For each entry in storage push
- *          - DEFAULT_ID
- *          - entry
- *          - ']'
- *
- *      3. write to socket
- *
- * Errors:
- *      UnixSockError::Write
- */
+// Flushes buffered history entries to the UI socket.
+//
+// # Steps
+//
+// 1. Build a `Vec<IoSlice>` with capacity of storage length * 3.
+// 2. For each entry in the storage, push `DEFAULT_ID`, the entry and `]`.
+// 3. Write the slices to the socket.
+//
+// # Errors
+//
+// `UnixSockError::Write` [3].
 impl FlushStorage for HistoryHandler {
     async fn flush_storage(
         &mut self,

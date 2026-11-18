@@ -158,13 +158,14 @@ impl ResumeInfo {
         }
     }
 
-    // When HandleOneOneError::ReadFromServer occurs, reconnect to server and
-    // resume from ProxyState::ReadModFile state which requires a ResumeInfo
-    //
-    // As the frame is already updated and rewritten according to the user.
-    //
-    // By setting update to some, resume_info.update() returns false, so the
-    // state can transition to Send directly
+    /// Builds a resume request for a server reconnect.
+    ///
+    /// When `HandleOneOneError::ReadFromServer` occurs, the proxy
+    /// reconnects and resumes from `ProxyState::ReadModFile`, which
+    /// requires a `ResumeInfo`. The frame is already updated and rewritten
+    /// according to the user, so `update` is set to `Some`; then
+    /// `resume_info.update()` returns `false` and the state transitions to
+    /// `Send` directly.
     pub fn request() -> Self {
         Self {
             id: 0,

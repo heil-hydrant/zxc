@@ -1,3 +1,8 @@
+//! Configuration loading for the global config and per-session files.
+//!
+//! Parses `~/.config/zxc/config.toml`, the session `local_config.toml`, and
+//! the CLI overrides into the runtime `Config`, including the domain and
+//! content filters used by logging and interception.
 pub mod error;
 pub mod global;
 pub mod local;

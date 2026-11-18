@@ -4,21 +4,21 @@ use tracing::error;
 use crate::repeater::prelude::*;
 use crate::run::boundary::{HandleUI, UiReply};
 
-/* Steps:
- *      1. Parse the buf into RepeaterMsg.
- *
- *      2. If msg is to_repeater set id to 0 or set to msg.id to reuse in
- *         response.
- *
- *      3. To get response, call get_response() with msg as args.
- *          a. If response is Some, convert to string
- *          b. If response is Err, construct a json with error string.
- *
- *      4. If Some(data) is returned, return (id, data)
- *
- * Error:
- *      RepeaterError::MsgSerializing   [1]
- */
+// Handles one decoded UI message for the repeater.
+//
+// # Steps
+//
+// 1. Parse the buffer into `RepeaterMsg`.
+// 2. Set the reply ID to `0` for repeater messages, otherwise reuse
+//    `msg.id`.
+// 3. Call `get_response()` with the message.
+//    a. A `Some` response is converted to a string.
+//    b. An `Err` response becomes a JSON object with the error string.
+// 4. Return `(id, data)` when a response is produced.
+//
+// # Errors
+//
+// `RepeaterError::MsgSerializing` [1].
 
 impl HandleUI for RepeaterHandler {
     async fn handle_ui(&mut self) -> Result<UiReply, RepeaterError> {

@@ -28,16 +28,16 @@ impl AsyncStep for RepeaterConnState {
 
     async fn next(self) -> Result<Self, Self::Error> {
         match self {
-            /* Description:
-             *      Establish connection with server
-             *
-             * Transition:
-             *      if Tls -> NeedConnector
-             *      if Tcp -> HandleTcp
-             *
-             * Error:
-             *      RepeaterError::Connection
-             */
+            // Establishes the connection with the server.
+            //
+            // # Transitions
+            //
+            // - TLS: `NeedConnector`.
+            // - TCP: `HandleTcp`.
+            //
+            // # Errors
+            //
+            // `RepeaterError::Connection`.
             Self::EstablishServerConn(rconn) => {
                 let stream = establish_connection(rconn.address()).await?;
                 let rconn = RepeaterConn::<TcpStream>::from((rconn, stream));
@@ -48,15 +48,15 @@ impl AsyncStep for RepeaterConnState {
                 Ok(Self::HandleTcp(rconn))
             }
 
-            /* Description:
-             *      Encrypt connection
-             *
-             * Transitions:
-             *      HandleTls
-             *
-             * Error:
-             *      RepeaterError::Encrypt
-             */
+            // Encrypts the connection.
+            //
+            // # Transitions
+            //
+            // `HandleTls`, or `HandleH2` when the connection is HTTP/2.
+            //
+            // # Errors
+            //
+            // `RepeaterError::Encrypt`.
             Self::EncryptConnection(rconn, connector) => {
                 let rconn = rconn.encrypt(connector).await?;
                 if rconn.is_h2 {

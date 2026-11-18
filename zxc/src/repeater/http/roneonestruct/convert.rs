@@ -26,26 +26,21 @@ impl<T> From<(RepeaterConn<T>, File)> for Roneone<T> {
     }
 }
 
-/* Description:
- *      Async conversion from Roneone -> RWebSocket
- *
- * Args:
- *      mut self
- *      receiver: Receiver<RepeaterWsMessage>
- *
- * Steps:
- *      1. Build Scratch file, changedir/rep.res to dir/scratch.wreq, open file
- *      2. Build History file, dir/ws.wsess and Open History file
- *      3. Set path to dir/0.wres, return to original directory
- *      4. Build new ws stream, WebSocketStream::from_raw_socket()
- *      5. Clear previous Buffer
- *
- * Returns:
- *      Ok(RWebSocket)
- *
- * Error:
- *      - WsCreationError::NoPath [2] [4]
- */
+// Converts `Roneone` into `RWebSocket`.
+//
+// # Steps
+//
+// 1. Rename the scratch file from `dir/rep.res` to `dir/scratch.wreq`
+//    and open it.
+// 2. Build the history file `dir/ws.wsess` and open it.
+// 3. Set the path to `dir/0.wres` and return to the original directory.
+// 4. Build the WebSocket stream with
+//    `WebSocketStream::from_raw_socket()`.
+// 5. Clear the previous buffer.
+//
+// # Errors
+//
+// `WsCreationError::NoPath` [2] [4].
 
 impl<T> ToRepeaterWs<T> for Roneone<T>
 where

@@ -4,22 +4,20 @@ use std::str::FromStr;
 use super::AddressError;
 use crate::proxy::prelude::*;
 
-/* Description:
- *      Method to split host and port from an &str.
- *      input can be:
- *          - host:port
- *          - host without port, in which case return 0.
- *
- * Steps:
- *      1. rplit_once(':') to get host and port
- *      2. If host is empty, return error
- *      3. Parse port to u16, if no port is found, set port to 0
- *
- * Error:
- *      AddressError::NoHost    [2]
- *      AddressError::PortParse [3]
- */
-
+/// Splits `host[:port]` into a host and a port.
+///
+/// A missing port becomes `0`; an empty host is an error.
+///
+/// # Steps
+///
+/// 1. `rsplit_once(':')` to get the host and port.
+/// 2. If the host is empty, return an error.
+/// 3. Parse the port as `u16`; if absent, use `0`.
+///
+/// # Errors
+///
+/// - `AddressError::NoHost` [2]
+/// - `AddressError::PortParse` [3]
 pub fn split_host_and_port(addr: &str) -> Result<(&str, u16), AddressError> {
     let (host, port_str) = addr
         .rsplit_once(':')

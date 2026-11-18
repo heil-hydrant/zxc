@@ -19,15 +19,9 @@ pub enum WsCreationError {
     HistorySend(#[from] SendError<CommanderToHistory>),
 }
 
-/* Description:
- *      Error common to ws handlers.
- *
- * Used In:
- *      ReadWrite trait implementation by
- *          - wstruct/impl_read_write.rs (proxy ws handler)
- *          - rwstruct/impl_read_write.rs (repeater ws handler)
- *
- */
+/// Errors common to the proxy and repeater WebSocket handlers.
+///
+/// Shared by `WsConn` and `RWebSocket`.
 #[derive(Debug, Error)]
 pub enum WsError {
     #[error(transparent)]

@@ -13,24 +13,25 @@ impl HandleCommander for RepeaterHandler {
         Err(RepeaterError::from(UiError::NoUI))
     }
 
-    /* Steps:
-     *      1. If msg is to repeater,
-     *          a. get extension
-     *          b. build dest file based on extension
-     *                  req  => build_repeater_dest_req
-     *                  wreq => build_repeater_dest_ws
-     *
-     *      2. set the msg file to dest file
-     *      3. serialize to string and return
-     *      4. if msg is not for repeater, send to commander
-     *
-     *  Errors:
-     *      RepeaterError
-     *          NoExtension         [1.a]
-     *          UnknownExtension    [1.b]
-     *          MsgSerializing      [3]
-     *          CommanderSend       [4]
-     */
+    // Forwards a `ForwardInfo` to the repeater or back to the commander.
+    //
+    // # Steps
+    //
+    // 1. If the message targets the repeater:
+    //    a. Get the extension.
+    //    b. Build the destination file from the extension:
+    //       `req` uses `build_repeater_dest_req`;
+    //       `wreq` uses `build_repeater_dest_ws`.
+    // 2. Set the message file to the destination file.
+    // 3. Serialize the message and return the string.
+    // 4. Otherwise send the message to the commander.
+    //
+    // # Errors
+    //
+    // - `RepeaterError::NoExtension` [1.a]
+    // - `RepeaterError::UnknownExtension` [1.b]
+    // - `RepeaterError::MsgSerializing` [3]
+    // - `RepeaterError::CommanderSend` [4]
     async fn handle_commander_ui(
         &mut self,
         mut msg: ForwardInfo,

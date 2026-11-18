@@ -50,8 +50,9 @@ impl Address {
         }
     }
 
-    /* https://docs.rs/rustls-pki-types/latest/rustls_pki_types/enum.IpAddr.html
-    ServerName uses no-std IpAddr, so we need to convert it to String */
+    // `rustls-pki-types` `ServerName` uses the no-std `IpAddr`, so
+    // convert it to `String` for comparison.
+    // https://docs.rs/rustls-pki-types/latest/rustls_pki_types/enum.IpAddr.html
     pub fn is_host_sni_equal(&self, sni: &ServerName) -> bool {
         match self {
             Address::Socket(addr) => addr.ip().to_string() == sni.to_str(),
@@ -138,6 +139,9 @@ mod tests {
         assert_eq!(result, BytesMut::from(verify));
         let final_ptr = result.as_ptr_range();
         let url = "http://127.0.0.1:8080";
+        // SAFETY: `url` is the prefix removed from `buf`, so `url.len()`
+        // stays within the original allocation, and the buffer is not
+        // reallocated between the two pointer snapshots.
         let expected_start_ptr =
             unsafe { initial_ptr_range.start.add(url.len()) };
 
@@ -165,6 +169,9 @@ mod tests {
         assert_eq!(result, BytesMut::from(verify));
         let final_ptr = result.as_ptr_range();
         let url = "http://127.0.0.1:8080";
+        // SAFETY: `url` is the prefix removed from `buf`, so `url.len()`
+        // stays within the original allocation, and the buffer is not
+        // reallocated between the two pointer snapshots.
         let expected_start_ptr =
             unsafe { initial_ptr_range.start.add(url.len()) };
         let expected_ptr_range = Range {

@@ -27,27 +27,19 @@ pub enum RWsBuildError {
     CopyFile(#[from] std::io::Error),
 }
 
-/* Description:
- *      Build websocket repeater session
- *
- * Steps:
- *      1. Build destination repeater file,
- *              ./history/1/websocket/r-ws-1/scratch.wreq
- *
- *      2. Get $id from path, ./history/$id
- *
- *      3. Get ServerInfoJson corresponding to the id from ws.whis
- *
- *      4. Build source http request file, ./history/$id/$id.req
- *
- *      5. Build destination http request file,
- *              ./history/1/websocket/r-ws-1/rep.req
- *
- *      6. Copy source file to destination
- *
- *      7. Set info.server_info to ServerInfoJson
- */
-
+/// Builds a WebSocket repeater session.
+///
+/// # Steps
+///
+/// 1. Build the destination repeater file
+///    `./history/1/websocket/r-ws-1/scratch.wreq`.
+/// 2. Get `$id` from the path, `./history/$id`.
+/// 3. Get the `ServerInfoJson` for the ID from `ws.whis`.
+/// 4. Build the source HTTP request file `./history/$id/$id.req`.
+/// 5. Build the destination HTTP request file
+///    `./history/1/websocket/r-ws-1/rep.req`.
+/// 6. Copy the source file to the destination.
+/// 7. Set `info.server_info` to the `ServerInfoJson`.
 pub async fn build_repeater_dest_ws(
     info: &mut ForwardInfo,
 ) -> Result<PathBuf, RWsBuildError> {
@@ -86,19 +78,16 @@ pub enum ServerInfoReadError {
     NotValidScheme(String),
 }
 
-/* Description:
- *      Function to read server info from ws.whis
- *
- * File Format:
- *      id | Scheme | Host
- *
- * Steps:
- *      1. Read ws.whis file
- *      2. Find the line with given id
- *      3. Get Scheme and Host from line
- *      4. Build ServerInfoInfoJson from Scheme and Host
- */
-
+/// Reads the server info for `id` from `ws.whis`.
+///
+/// Lines use `id | Scheme | Host`.
+///
+/// # Steps
+///
+/// 1. Read `ws.whis`.
+/// 2. Find the line with the given ID.
+/// 3. Get the scheme and host from the line.
+/// 4. Build `ServerInfoJson` from the scheme and host.
 pub async fn read_server_info_from_whis(
     id: &str,
 ) -> Result<ServerInfoJson, ServerInfoReadError> {
@@ -118,9 +107,9 @@ pub async fn read_server_info_from_whis(
     Err(ServerInfoReadError::NoHost(id.to_string()))
 }
 
-/* File Format:
- *      id | Scheme | Host
- */
+/// Parses `Scheme` and `Host` for `id` from `ws.whis` lines.
+///
+/// Lines use `id | Scheme | Host`.
 fn parse_scheme_host<'a>(
     lines: &'a str,
     id: &str,

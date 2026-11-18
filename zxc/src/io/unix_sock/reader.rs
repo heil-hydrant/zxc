@@ -30,17 +30,16 @@ pub fn read_from_unix(
     }
 }
 
-/* Description:
- *      Splits the next newline-delimited JSON frame from buf.
- *
- *      Vim terminates every JSON channel message with a newline. A read can
- *      contain several frames or only part of one, so the caller must keep
- *      the returned tail until the next read.
- *
- * Returns:
- *      The unconsumed tail; buf keeps the complete frame. None if no
- *      newline-terminated frame is buffered yet.
- */
+/// Splits the next newline-delimited JSON frame from `buf`.
+///
+/// Vim terminates every JSON channel message with a newline. A read can
+/// contain several frames or only part of one, so the caller must keep the
+/// returned tail until the next read.
+///
+/// # Returns
+///
+/// The unconsumed tail; `buf` keeps the complete frame. `None` if no
+/// newline-terminated frame is buffered yet.
 pub fn split_json_frame(buf: &mut BytesMut) -> Option<BytesMut> {
     let newline = buf.iter().position(|b| *b == b'\n')?;
     Some(buf.split_off(newline + 1))

@@ -249,9 +249,9 @@ impl<T> From<OneOneConn<T, ClientTlsStream<Tcp>, OneRequestLine>>
     }
 }
 
-// ProxyState<OneOneConn<T, E, OneRequestLine>> => OneOneConn<T,E,OneRequestLine>.
-//
-//      i.e. client_state to client_handler
+// `ProxyState<OneOneConn<T, E, OneRequestLine>>` ->
+// `OneOneConn<T, E, OneRequestLine>`, that is, `client_state` to
+// `client_handler`.
 
 impl<T, E> TryFrom<ProxyState<OneOneConn<T, E, OneRequestLine>>>
     for OneOneConn<T, E, OneRequestLine>

@@ -181,13 +181,12 @@ fn read_history_state(id: usize) -> Result<Vec<String>, Error> {
     Ok(result)
 }
 
-// Description:
-//      Remove unlogged entries from .history.state
-//
-// Steps:
-//      1. For each line in file, serialize line to HistoryEnum
-//      2. If HistoryEnum.id < max, add line to result
-
+/// Removes unlogged entries from `.history.state`.
+///
+/// # Steps
+///
+/// 1. Serialize each line in the file to `HistoryEnum`.
+/// 2. Keep the line when the ID is absent or less than `max`.
 #[inline(always)]
 fn remove_unlogged<T>(file: T, max: usize) -> Vec<String>
 where

@@ -54,17 +54,15 @@ impl RepeaterHandler {
         }
     }
 
-    /* Description:
-     *      Drop handles whose websocket task has already exited.
-     *
-     * Steps:
-     *      1. Keep only handles where JoinHandle::is_finished() is false
-     *
-     *      The ws task returns when the server closes the stream or when
-     *      the task errors. Neither path tells the UI, so the handle would
-     *      otherwise stay in ws_handles for the process lifetime.
-     */
-
+    /// Drops handles whose WebSocket task has already exited.
+    ///
+    /// # Steps
+    ///
+    /// 1. Keep only handles where `JoinHandle::is_finished()` is `false`.
+    ///
+    /// The task returns when the server closes the stream or when the task
+    /// errors. Neither path tells the UI, so the handle would otherwise stay
+    /// in `ws_handles` for the process lifetime.
     fn reap_finished_ws(&mut self) {
         let before = self.ws_handles.len();
         self.ws_handles
@@ -75,20 +73,19 @@ impl RepeaterHandler {
         }
     }
 
-    /* Description:
-     *      Runs the Initial repeater state machine (RepeaterConnState).
-     *
-     * Steps:
-     *      1. Convert SendInfo to RepeaterConn
-     *      2. Create RepeaterConnState::EstablishServerConn
-     *      3. Run RepeaterConnState
-     *      4. If need connector then jump to encryption state
-     *      5. If state is_ended() then return
-     *
-     * Error:
-     *      RepeaterError::InvalidAddress   [1]
-     */
-
+    /// Runs the initial repeater state machine (`RepeaterConnState`).
+    ///
+    /// # Steps
+    ///
+    /// 1. Convert `SendInfo` to `RepeaterConn`.
+    /// 2. Create `RepeaterConnState::EstablishServerConn`.
+    /// 3. Run `RepeaterConnState`.
+    /// 4. Jump to the encryption state when a connector is needed.
+    /// 5. Return when the state `is_ended()`.
+    ///
+    /// # Errors
+    ///
+    /// `RepeaterError::InvalidAddress` [1].
     pub async fn establish_conn(
         &self,
         info: SendInfo,
@@ -125,13 +122,10 @@ impl RepeaterHandler {
     ) -> Result<Option<String>, RepeaterError> {
         self.reap_finished_ws();
         let output: Option<Value> = match msg.operation {
-            /* Associated Values:
-             *      info: ForwardInfo
-             *
-             * Steps:
-             *      Since, result from handle_commander_ui() is UiReply,
-             *      return it directly.
-             */
+            // Forwards `info` and returns the resulting reply.
+            //
+            // `handle_commander_ui()` already returns a `UiReply`, so the
+            // result is returned directly.
             Operation::Forward(info) => {
                 if let UiReply::Reply(_, result) =
                     self.handle_commander_ui(info).await?
@@ -140,13 +134,11 @@ impl RepeaterHandler {
                 }
                 None
             }
-            /* Associated Values:
-             *      codec   : Codec
-             *      data    : String
-             *
-             * Error:
-             *      RepeaterError::Codec
-             */
+            // Encodes `data` with `codec`.
+            //
+            // # Errors
+            //
+            // `RepeaterError::Codec`.
             Operation::Encode {
                 codec,
                 data,
@@ -155,13 +147,11 @@ impl RepeaterHandler {
                 Some(result)
             }
 
-            /* Associated Values:
-             *      codec   : Codec
-             *      data    : String
-             *
-             * Error:
-             *      RepeaterError::Codec
-             */
+            // Decodes `data` with `codec`.
+            //
+            // # Errors
+            //
+            // `RepeaterError::Codec`.
             Operation::Decode {
                 codec,
                 data,
@@ -170,21 +160,21 @@ impl RepeaterHandler {
                 Some(result)
             }
 
-            /* Associated Values:
-             *      info    : SendInfo
-             *
-             * Steps:
-             *      1. start timer
-             *      2. start initial RepeaterState machine
-             *      3. If RepeaterState is HandleTcp/HandleTls call
-             *         handle_http(), and get the response.
-             *      4. calculate the response length
-             *      5. end timer and calculate the response time
-             *      6. build output json in format {"size": size, "time": time}
-             *
-             * Error:
-             *      RepeaterError
-             */
+            // Sends a request and measures the response.
+            //
+            // # Steps
+            //
+            // 1. Start the timer.
+            // 2. Start the initial `RepeaterState` machine.
+            // 3. Call `handle_http()` for `HandleTcp` or `HandleTls`, and
+            //    `handle_h2()` for `HandleH2`, then get the payload.
+            // 4. Calculate the response length.
+            // 5. Stop the timer and calculate the response time.
+            // 6. Build `{"size": size, "time": time}`.
+            //
+            // # Errors
+            //
+            // `RepeaterError`.
             Operation::Send(info) => {
                 let start_time = Instant::now();
 
@@ -222,20 +212,21 @@ impl RepeaterHandler {
                 Some(json!({"size" : size, "time": time}))
             }
 
-            /* Associated Values:
-             *      info    : SendInfo
-             *
-             * Steps:
-             *      1. Call establish_conn()
-             *
-             *      2. If RepeaterConnState is HandleTcp/HandleTls, call
-             *          spawn_repeater_ws() to get RepeaterWsHandle
-             *
-             *      3. Build output json in format {"id": self.ws_index}
-             *
-             *      4. Push handle to self.ws_handles and increment
-             *         self.ws_index
-             */
+            // Establishes a WebSocket repeater session.
+            //
+            // # Steps
+            //
+            // 1. Call `establish_conn()`.
+            // 2. Call `spawn_repeater_ws()` for `HandleTcp` or `HandleTls`
+            //    and get a `RepeaterWsHandle`.
+            // 3. `HandleH2` returns `RepeaterError::H2WsUnsupported`.
+            // 4. Build `{"id": self.ws_index}`.
+            // 5. Push the handle to `self.ws_handles` and increment
+            //    `self.ws_index`.
+            //
+            // # Errors
+            //
+            // `RepeaterError::H2WsUnsupported`.
             Operation::WsEstablish(info) => {
                 let handle = match self.establish_conn(info).await? {
                     RepeaterConnState::HandleTcp(conn) => {
@@ -256,14 +247,14 @@ impl RepeaterHandler {
                 output
             }
 
-            /* Associated Values:
-             *      id      : usize
-             *      is_bin  : bool
-             *
-             * Error:
-             *      RepeaterError::WsIdNotFound
-             *      RepeaterWsMessage::Read
-             */
+            // Sends a WebSocket frame to session `id`.
+            //
+            // `is_bin` selects the binary opcode.
+            //
+            // # Errors
+            //
+            // - `RepeaterError::WsIdNotFound`
+            // - `RepeaterWsMessage::Read`.
             Operation::WsSend { id, is_bin } => {
                 trace!("ws send| {}", id);
                 self.ws_handles
@@ -275,12 +266,10 @@ impl RepeaterHandler {
                 None
             }
 
-            /* Associated Values:
-             *      id  : usize
-             *
-             *      The ws task may already be gone (server close or task
-             *      error), so closing an unknown id is a no-op.
-             */
+            // Closes WebSocket session `id`.
+            //
+            // The task may already be gone after a server close or task
+            // error, so closing an unknown ID is a no-op.
             Operation::WsClose(id) => {
                 let index = self
                     .ws_handles

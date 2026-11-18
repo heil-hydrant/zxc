@@ -31,16 +31,10 @@ impl Scheme {
         }
     }
 
-    /* Description:
-     *      Function to get http as Option<bool>.
-     *      Used when sending data to ui.
-     *      If None, serializing can be skipped.
-     *
-     * Used by:
-     *      ServerInfoJson
-     *      RequestHistory
-     */
-
+    /// Returns the HTTP flag for UI serialization.
+    ///
+    /// `Some(true)` for HTTP and `None` for HTTPS, so the field can be skipped
+    /// when serializing. Used by `ServerInfoJson` and `RequestHistory`.
     pub fn http_as_opt(&self) -> Option<bool> {
         match self {
             Scheme::Http => Some(true),

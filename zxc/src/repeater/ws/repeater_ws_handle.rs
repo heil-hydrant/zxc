@@ -4,16 +4,11 @@ use tokio::task::JoinHandle;
 
 use crate::repeater::prelude::*;
 
-/* Description:
- *       Handle for RepeaterWs.
- *       Sender is used for sending messages from repeater to ws task.
- *
- * Flow:
- *     ┌───────────┐     ┌───────────────────┐    ┌───────┐
- *     │repeater_ui├────►│repeater_main_task ├───►│ws-task│
- *     └───────────┘     └───────────────────┘    └───────┘
- */
-
+/// Handle for a `RepeaterWs` task.
+///
+/// The sender carries messages from the repeater to the WebSocket task.
+///
+/// The flow is `repeater_ui` -> `repeater_main_task` -> `ws-task`.
 pub struct RepeaterWsHandle {
     pub id: usize,
     sender: Sender<RepeaterWsMsg>,

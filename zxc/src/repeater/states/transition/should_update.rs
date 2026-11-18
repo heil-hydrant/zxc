@@ -1,11 +1,8 @@
-/* Description:
- *      Trait to check if frame should be updated.
- *      Decided by b:update set by user in interceptor and repeater windows.
- *      http only.
- *      ws should always be updated.
- *      So for ws, its blanket implementation, always returns true.
- */
-
+/// Returns whether a frame should be updated.
+///
+/// The user sets `b:update` in the interceptor and repeater windows.
+/// HTTP only. WebSocket frames are always updated, so the blanket
+/// implementation for WebSocket always returns `true`.
 pub trait ShouldUpdate {
     fn should_update(&self) -> bool;
 }

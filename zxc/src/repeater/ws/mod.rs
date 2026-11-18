@@ -26,22 +26,23 @@ use crate::io::*;
 use crate::proxy::*;
 use crate::repeater::prelude::*;
 
-/* Description:
- *      Function to spawn a ws task
- *
- * Steps:
- *      1. call handle_http() with conn and get response.
- *      2. take the response and check status code.
- *      3. If status code is 101, build mpsc<RepeaterWsMessage>
- *      4. Spawn task to handle ws, repeater_handle_ws() with
- *        mpsc_receiver<RepeaterWsMessage> and conn
- *      5. Build new RepeaterWsHandle with index, tx , task and return
- *      6. If status code is not 101, return RepeaterError::WsWrongScode
- *
- * Error:
- *      RepeaterError::WsWrongScode     [6]
- */
-
+/// Spawns a WebSocket task for an upgraded repeater connection.
+///
+/// # Steps
+///
+/// 1. Call `handle_http()` with the connection and get the response.
+/// 2. Take the response and check the status code.
+/// 3. If the status code is `101`, build an `mpsc` channel of
+///    `RepeaterWsMessage`.
+/// 4. Spawn `repeater_handle_ws()` with the receiver and connection.
+/// 5. Build a `RepeaterWsHandle` with the index, sender, and task,
+///    then return it.
+/// 6. If the status code is not `101`, return
+///    `RepeaterError::WsWrongScode`.
+///
+/// # Errors
+///
+/// `RepeaterError::WsWrongScode` [6].
 pub async fn spawn_repeater_ws<T>(
     conn: RepeaterConn<T>,
     index: usize,
@@ -73,22 +74,16 @@ where
     }
 }
 
-/* Description:
- *      Handler Function for Repeater ws
- *
- * Steps:
- *     1. Convert type T to RWebSocket
- *     2. ----- loop -----
- *          ----- select -----
- *          a. Server Side
- *             1. Read from server
- *             2. Write response
- *             3. Log
- *          b. Client Side
- *             1. Msg from repeater ui
- *             2. Write to server
- *             3. Log
- */
+/// Handles the WebSocket repeater task.
+///
+/// # Steps
+///
+/// 1. Convert `T` into `RWebSocket`.
+/// 2. Loop on `select`:
+///    a. Server side: read from the server, write the response, and
+///       log.
+///    b. Client side: receive a message from the repeater UI, write it
+///       to the server, and log.
 pub async fn repeater_handle_ws<T, E>(
     conn: T,
     receiver: Receiver<RepeaterWsMsg>,

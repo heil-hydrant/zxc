@@ -8,13 +8,10 @@ use crate::commander::*;
 use crate::history::*;
 use crate::proxy::prelude::*;
 
-/* When a new connection is required, OneOneStruct<Request> is split into
- * Connection and AdditionalHandlerInfo structs.
- *
- * AdditionalHandlerInfo contains the required info to rebuild the
- * OneOneStruct<Request>
- */
-
+/// State split from `OneOneConn` when a new server connection is required.
+///
+/// Holds the information needed to rebuild the request half of the
+/// connection.
 pub struct AdditionalHandlerInfo {
     pub log_id: usize,
     pub payload: BytesMut,

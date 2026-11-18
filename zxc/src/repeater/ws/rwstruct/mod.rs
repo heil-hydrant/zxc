@@ -53,23 +53,20 @@ impl<T> RWebSocket<T> {
         }
     }
 
-    /* Description:
-     *      Writes log to History file in format of:
-     *            id | role.as_arrow() | size
-     *            id | role.as_arrow() | size | b
-     *
-     * Steps:
-     *      1. Get size and binary flag,
-     *          Server => data is stored as self.data
-     *          Client => data is stored as self.frame
-     *
-     *      2. Build data in format of:
-     *              id | as_arrow(role) | size [| b]
-     *
-     * Error:
-     *      FileErrorInfo
-     */
-
+    /// Writes a frame entry to the history file.
+    ///
+    /// Entries use `id | role.as_arrow() | size`, with a trailing `| b`
+    /// for binary frames.
+    ///
+    /// # Steps
+    ///
+    /// 1. Get the size and binary flag. `Server` data comes from
+    ///    `self.data`; `Client` data comes from `self.frame`.
+    /// 2. Build `id | as_arrow(role) | size [| b]`.
+    ///
+    /// # Errors
+    ///
+    /// `FileErrorInfo`.
     pub async fn log(&mut self, role: Role) -> Result<(), FileErrorInfo> {
         let (size, is_bin) = match role {
             Role::Server => (self.data_as_ref().len(), self.is_bin),

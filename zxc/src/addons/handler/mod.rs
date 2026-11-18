@@ -42,23 +42,27 @@ impl AddonHandler {
         }
     }
 
-    /* Steps:
-     *      1. Check if the module is an addon
-     *      2. Get the addon from the map
-     *      3. Build incremental destination file, by calling build_addon_dest
-     *      4. Copy info.file to dest_file
-     *      5. Get tls from server_info, if None, set it to true
-     *      6. Build addon command string by calling build_addon_cmd
-     *      with addon_name, dest_file and is_tls
-     *      7. Build new AddonMsg and serialize to string and return
-     *
-     * Error:
-     *      AddonError::WrongMsg        [1]
-     *      AddonError::AddonNotFound   [2]
-     *      AddonError::DirError        [3] [4]
-     *      AddonError::Serialize       [7]
-     */
-
+    /// Builds the serialized addon command for a forwarded request.
+    ///
+    /// # Steps
+    ///
+    /// 1. Check if the module is an addon.
+    /// 2. Get the addon from the map.
+    /// 3. Build the incremental destination file with
+    ///    [`build_addon_dest`].
+    /// 4. Copy `info.file` to `dest_file`.
+    /// 5. Get the TLS flag from `server_info`, defaulting to `true` when
+    ///    absent.
+    /// 6. Build the addon command string with `Addon::build_cmd` from the
+    ///    addon name, `dest_file` and the TLS flag.
+    /// 7. Build a new `AddonMsg` and return it serialized.
+    ///
+    /// # Errors
+    ///
+    /// - `AddonError::WrongMsg` [1]
+    /// - `AddonError::AddonNotFound` [2]
+    /// - `AddonError::DirError` [3] [4]
+    /// - `AddonError::Serialize` [7]
     pub async fn build_cmd_string(
         &self,
         info: ForwardInfo,

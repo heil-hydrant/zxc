@@ -1,3 +1,7 @@
+//! I/O helpers shared by the proxy and the UI runners.
+//!
+//! Provides file writes, incremental session directories, TCP connection
+//! helpers, and the newline-framed Unix socket transport used for IPC.
 pub mod file;
 pub mod inc_dir;
 pub mod socket;

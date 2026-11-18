@@ -16,44 +16,35 @@ pub const REPEATER_HTTP_BUILD_INFO: (usize, &str, &str) =
 pub const REPEATER_WS_BUILD_INFO: (usize, &str, &str) =
     (4, "r-ws-", REPEATER_WS_SCRATCH_FILENAME);
 
-/* Steps:
- *      1. Based on the given extension, select build info
- *              a. threshold
- *              b. prefix
- *              c. dest_filename
- *
- *      2. Check if path has enough components, i.e. < threshold
- *
- *              ./history/1/1.req
- *              ./history/1/websocket/1.wreq
- *
- *      3. Pop path components until (components - threshold) to get top dir
- *              ./history/1
- *
- *      4. Get next incremental index, for selected prefix by calling
- *         incremental()
- *
- *      5. Build destination dir, by pushing prefix and incremental index
- *              ./history/1/r-1
- *              ./history/1/websocket/r-ws-1
- *
- *      6. Create dir
- *
- *      7. Build destination file, by pushing selected dest_filename
- *              ./history/1/r-1/rep.req
- *              ./history/1/websocket/r-ws-1/scratch.wreq
- *
- *      8. Copy src_file to destination
- *
- * Error:
- *      DirError
- *          UnknownExt          [1]
- *          NoTop               [2]
- *          IncrementalDir      [4]
- *          CreateDir           [6]
- *          CopyFile            [8]
- *
- */
+/// Builds the repeater destination path and copies the source file into it.
+///
+/// # Steps
+///
+/// 1. Select the build info for the extension: threshold, prefix, and
+///    destination filename.
+/// 2. Check that the path has at least `threshold` components, for
+///    example `./history/1/1.req` or `./history/1/websocket/1.wreq`.
+/// 3. Pop components until `components - threshold` remain to get the
+///    top directory, for example `./history/1`.
+/// 4. Get the next incremental index for the prefix by calling
+///    `incremental()`.
+/// 5. Build the destination directory by pushing the prefix and index,
+///    for example `./history/1/r-1` or `./history/1/websocket/r-ws-1`.
+/// 6. Create the directory.
+/// 7. Build the destination file by pushing the destination filename,
+///    for example `./history/1/r-1/rep.req` or
+///    `./history/1/websocket/r-ws-1/scratch.wreq`.
+/// 8. Copy `src_file` to the destination.
+///
+/// # Errors
+///
+/// Returns [`DirError`] for the following conditions:
+///
+/// - `UnknownExt`: the extension has no build info. [1]
+/// - `NoTop`: the path has fewer components than the threshold. [2]
+/// - `IncrementalDir`: the incremental index cannot be resolved. [4]
+/// - `CreateDir`: the destination directory cannot be created. [6]
+/// - `CopyFile`: the source file cannot be copied. [8]
 pub async fn build_repeater_dest(
     src_file: &PathBuf,
     extension: &str,

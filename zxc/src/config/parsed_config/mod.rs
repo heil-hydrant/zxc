@@ -19,26 +19,29 @@ pub struct Config {
 }
 
 impl Config {
-    /* Steps:
-     *      1. Get Excluded Content Types and Extensions from global config
-     *
-     *      2. Get with_ws from global config and no_ws from local config and
-     *         (global || !local) to get with_ws
-     *
-     *            g l f
-     *            -----
-     *            0 0 0
-     *            1 0 1
-     *            0 1 0
-     *            1 1 0
-     *
-     *      3. Get filter_domains from local config and global config
-     *      by calling combine_filter
-     *
-     *      4. Sanitize, if any field is Some and with_ws is false
-     *      return Some(Config) else return None
-     */
-
+    /// Builds the parsed proxy configuration from the local and global
+    /// config.
+    ///
+    /// # Steps
+    ///
+    /// 1. Take `excluded_content_types` and `excluded_extensions` from the
+    ///    global config.
+    /// 2. Combine the global `with_ws` and the local `no_ws` flag with
+    ///    `global && !local`:
+    ///
+    ///    ```text
+    ///    g l f
+    ///    -----
+    ///    0 0 0
+    ///    1 0 1
+    ///    0 1 0
+    ///    1 1 0
+    ///    ```
+    ///
+    /// 3. Build `filter_domains` from the local and global config through
+    ///    `combine_filter()`.
+    /// 4. Return `Some(Config)` when `with_ws` is false or any field is
+    ///    set, otherwise return `None`.
     pub fn build(
         local_config: Option<ProxyArgs>,
         mut global_config: Option<GlobalConfig>,
@@ -82,38 +85,26 @@ impl Config {
         }
     }
 
-    /* Description:
-     *      Combine Local and Global config to get DomainFilter
-     *
-     * Steps:
-     *      1. If no config, return None
-     *
-     *      2. If only global config, return DomainList::Exclude from
-     *         global_config.excluded_domains since, global_config only
-     *         contains excluded_domains
-     *
-     *      3. If only local config, either include or exclude is present
-     *
-     *          a. if local_config.included_domains is Some, return
-     *          DomainList::Include from local_config.included_domains
-     *
-     *          b. else return DomainList::Exclude from
-     *          local_config.excluded_domains
-     *
-     *      4. If both config present,
-     *          a. if local_config.included_domains is Some, return
-     *          DomainList::Include from local_config.included_domains
-     *
-     *          b. else
-     *              1. combine local_config.excluded_domains and
-     *                 global.excluded_domains by calling add_option_vec::add()
-     *
-     *              2. Sanitize the result by calling
-     *                 sanitize_option_vec_string()
-     *
-     *              3. If list is some return DomainList::Exclude
-     */
-
+    /// Combines the local and global config into a `DomainFilter`.
+    ///
+    /// # Steps
+    ///
+    /// 1. If no config is given, return `None`.
+    /// 2. With only a global config, return `DomainList::Exclude` from
+    ///    `global_config.excluded_domains`, since the global config only
+    ///    carries excluded domains.
+    /// 3. With only a local config, either include or exclude is present:
+    ///    - If `local_config.included_domains` is `Some`, return
+    ///      `DomainList::Include` from it.
+    ///    - Otherwise return `DomainList::Exclude` from
+    ///      `local_config.excluded_domains`.
+    /// 4. With both configs present:
+    ///    - If `local_config.included_domains` is `Some`, return
+    ///      `DomainList::Include` from it.
+    ///    - Otherwise combine `local_config.excluded_domains` and
+    ///      `global_config.excluded_domains` with `add_option_vec()`,
+    ///      sanitize the result with `sanitize_option_vec_string()`, and
+    ///      return `DomainList::Exclude` when the list is `Some`.
     fn combine_filter(
         local_config: Option<ProxyArgs>,
         global_config: Option<GlobalConfig>,
@@ -169,17 +160,15 @@ impl Config {
             .is_none_or(|filter| filter.contains(host))
     }
 
-    /* Description:
-     *      Checks if given extension should be logged.
-     *
-     * Steps:
-     *      1. If extension is not empty, make it lowercase
-     *      2. Check if extension is not in excluded_extensions,
-     *      3. If false, then get ContentType from extension by calling
-     *         content_type_from_extension() and check if ContentType is in
-     *         excluded_content_types
-     */
-
+    /// Checks whether traffic with the given extension should be logged.
+    ///
+    /// # Steps
+    ///
+    /// 1. If the extension is not empty, make it lowercase.
+    /// 2. Return `false` when the extension is in `excluded_extensions`.
+    /// 3. Otherwise look up the `ContentType` for the extension in
+    ///    `EXTENSION_MAP` and return `false` when that content type is in
+    ///    `excluded_content_types`.
     pub fn should_log(&self, mut ext: String) -> bool {
         if !ext.is_empty() {
             ext.make_ascii_lowercase();
