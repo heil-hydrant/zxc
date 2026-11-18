@@ -83,12 +83,14 @@ mod tests {
             prefix = "z-"
             request_flag = "-request"
             http_flag = "-request-proto http"
+            http2_flag = "-http2"
             add_flag = "-w"
 
             [addons.sqlmap]
             prefix = "q-"
             request_flag = "-r"
             https_flag = "--force-ssl"
+            http2_flag = "--http2"
             add_flag = "--batch --dbs"
             "#;
 

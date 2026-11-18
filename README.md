@@ -328,10 +328,13 @@ prefix          | Prefix for resulting file used by the addon
 request_flag    | Flag used by the addon to identify the request file<br>For example, `-r` for sqlmap and `-request` for ffuf</br>
 http_flag       | Flag used by the addon to identify http scheme<br>For example, `-request-proto http` for ffuf</br>
 https_flag      | Flag used by the addon to identify https scheme<br>For example, `--force-tls` for sqlmap</br>
+http2_flag      | Flag used by the addon to enable HTTP/2<br>For example, `--http2` for sqlmap and `-http2` for ffuf</br>
 add_flag        | Additional flags that will be added to the end of the command
 
 ### Note
 If the binary by default uses https, skip http_flag and vice versa.
+`http2_flag` is appended only when the forwarded request is HTTP/2. If the
+field is missing, the tool runs without an HTTP/2 flag.
 
 ##### 2. Calling Addon
 The addon can be called from request `.req` file by calling `RequestToAddon`

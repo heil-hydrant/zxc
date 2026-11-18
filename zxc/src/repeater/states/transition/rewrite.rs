@@ -34,14 +34,14 @@ pub trait Persist {
 ///
 /// # Steps
 ///
-/// 1. Check `should_rewrite`.
-///    a. HTTP rewrites when the frame was updated, that is, when the
-///       user set `b:update` in the UI.
-///    b. WebSocket always returns `false`.
+/// 1. Check `should_rewrite`:
+///   - HTTP rewrites when the frame was updated, that is, when the user
+///     set `b:update` in the UI.
+///   - WebSocket always returns `false`.
 /// 2. When rewriting, get the data and file and call `rewrite_file`.
 /// 3. When writing a new file:
-///    a. Update the path.
-///    b. Call `create_and_write_file`.
+///   - Update the path.
+///   - Call `create_and_write_file`.
 ///
 /// # Transitions
 ///

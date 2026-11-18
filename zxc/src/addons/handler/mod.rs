@@ -6,7 +6,6 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 
 use bytes::BytesMut;
-use tokio::fs::copy;
 use tokio::net::UnixStream;
 use tokio::sync::mpsc::Receiver;
 use zxc_derive::{Buffer, CloseAction, FlushStorage, NotifyCommander};
@@ -17,9 +16,9 @@ use super::message::to_ui::AddonMsg;
 use crate::CAPACITY_2MB;
 use crate::config::Addon;
 use crate::forward_info::{ForwardInfo, Module};
-use crate::io::{DirError, UnixSockError};
+use crate::io::{DirError, UnixSockError, copy_with_request_metadata};
 use crate::run::boundary::{
-    Buffer, CloseAction, FlushStorage, HandleCommander, NotifyCommander
+    Buffer, CloseAction, FlushStorage, HandleCommander, NotifyCommander,
 };
 
 #[derive(Buffer, FlushStorage, CloseAction, NotifyCommander)]
@@ -50,19 +49,21 @@ impl AddonHandler {
     /// 2. Get the addon from the map.
     /// 3. Build the incremental destination file with
     ///    [`build_addon_dest`].
-    /// 4. Copy `info.file` to `dest_file`.
+    /// 4. Copy `info.file` to `dest_file`, preserving request metadata.
     /// 5. Get the TLS flag from `server_info`, defaulting to `true` when
     ///    absent.
-    /// 6. Build the addon command string with `Addon::build_cmd` from the
-    ///    addon name, `dest_file` and the TLS flag.
-    /// 7. Build a new `AddonMsg` and return it serialized.
+    /// 6. Read the HTTP/2 flag from `is_h2`, which is `true` only when the
+    ///    UI forwarded an HTTP/2 request.
+    /// 7. Build the addon command string with `Addon::build_cmd` from the
+    ///    addon name, `dest_file`, the TLS flag and the HTTP/2 flag.
+    /// 8. Build a new `AddonMsg` and return it serialized.
     ///
     /// # Errors
     ///
     /// - `AddonError::WrongMsg` [1]
     /// - `AddonError::AddonNotFound` [2]
     /// - `AddonError::DirError` [3] [4]
-    /// - `AddonError::Serialize` [7]
+    /// - `AddonError::Serialize` [8]
     pub async fn build_cmd_string(
         &self,
         info: ForwardInfo,
@@ -79,7 +80,7 @@ impl AddonHandler {
 
         let dest_file = build_addon_dest(&addon.prefix, &info.file).await?;
 
-        copy(&info.file, &dest_file)
+        copy_with_request_metadata(&info.file, &dest_file)
             .await
             .map_err(DirError::CopyFile)?;
 
@@ -88,8 +89,17 @@ impl AddonHandler {
             .as_ref()
             .map(|info| info.is_tls())
             .unwrap_or(true);
+        let is_h2 = info.is_h2 == Some(true);
 
-        let cmd = addon.build_cmd(name, &dest_file.to_string_lossy(), is_tls);
+        // TODO(h2): rewrite `dest_file` to an HTTP/1.1 request with a
+        // `Host` header before emitting the command, so tools receive a
+        // request line and authority they can parse.
+        let cmd = addon.build_cmd(
+            name,
+            &dest_file.to_string_lossy(),
+            is_tls,
+            is_h2,
+        );
 
         let addon_msg = AddonMsg::new(cmd, dest_file);
         Ok(serde_json::to_string(&addon_msg)?)

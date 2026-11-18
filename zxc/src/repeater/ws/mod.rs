@@ -80,10 +80,9 @@ where
 ///
 /// 1. Convert `T` into `RWebSocket`.
 /// 2. Loop on `select`:
-///    a. Server side: read from the server, write the response, and
-///       log.
-///    b. Client side: receive a message from the repeater UI, write it
-///       to the server, and log.
+///   - Server side: read from the server, write the response, and log.
+///   - Client side: receive a message from the repeater UI, write it to
+///     the server, and log.
 pub async fn repeater_handle_ws<T, E>(
     conn: T,
     receiver: Receiver<RepeaterWsMsg>,
