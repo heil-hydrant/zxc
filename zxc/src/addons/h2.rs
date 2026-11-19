@@ -1,4 +1,4 @@
-//! HTTP/2 to HTTP/1.1 rewrite for addon request copies.
+//! Host header injection for HTTP/2 addon request copies.
 
 use std::path::Path;
 
@@ -12,15 +12,15 @@ use crate::proxy::server_info::json::ServerInfoJson;
 
 use super::AddonError;
 
-/// Rewrites a copied HTTP/2 request file into HTTP/1.1.
+/// Ensures a `Host` header on a copied HTTP/2 request file.
 ///
 /// # Steps
 ///
 /// 1. Read the copied request file.
 /// 2. Parse it into a [`OneRequest`].
 /// 3. Pick the authority for the `Host` header.
-/// 4. Rewrite the request-line version and ensure `Host`.
-/// 5. Write the rewritten bytes back to the same file.
+/// 4. Insert `Host` when it is missing.
+/// 5. Write the updated bytes back to the same file.
 ///
 /// # Errors
 ///
@@ -28,7 +28,7 @@ use super::AddonError;
 /// - `AddonError::H2Request` [3] when no authority is available.
 /// - `AddonError::RequestFile` [1] [5] when the file cannot be read or
 ///   written.
-pub async fn downgrade_file(
+pub async fn ensure_host_file(
     path: &Path,
     info: &ForwardInfo,
 ) -> Result<(), AddonError> {
@@ -38,12 +38,11 @@ pub async fn downgrade_file(
     })?;
 
     let mut request = OneRequest::try_from(BytesMut::from(&bytes[..]))
-        .map_err(|error| AddonError::H2Request(error.to_string()))?;
+        .map_err(|e| AddonError::H2Request(e.to_string()))?;
 
     let host = request_host(info.h2_info.as_ref(), info.server_info.as_ref())
         .ok_or_else(|| AddonError::H2Request("missing host".to_string()))?;
 
-    request.downgrade_to_http1();
     request.ensure_host(host);
 
     fs::write(path, request.into_bytes())
@@ -58,6 +57,7 @@ pub async fn downgrade_file(
 ///
 /// The HTTP/2 `:authority` wins when present and non-empty because it keeps
 /// non-default ports. Otherwise `server_info.host` is used.
+#[inline(always)]
 fn request_host<'a>(
     h2_info: Option<&'a H2Info>,
     server_info: Option<&'a ServerInfoJson>,

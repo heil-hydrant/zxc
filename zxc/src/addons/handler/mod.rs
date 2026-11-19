@@ -12,7 +12,7 @@ use zxc_derive::{Buffer, CloseAction, FlushStorage, NotifyCommander};
 
 use super::AddonError;
 use super::builder::build_addon_dest;
-use super::h2::downgrade_file;
+use super::h2::ensure_host_file;
 use super::message::to_ui::AddonMsg;
 use crate::CAPACITY_2MB;
 use crate::config::Addon;
@@ -53,12 +53,11 @@ impl AddonHandler {
     /// 4. Copy `info.file` to `dest_file`, preserving request metadata.
     /// 5. Read the HTTP/2 flag from `is_h2`, which is `true` only when the
     ///    UI forwarded an HTTP/2 request.
-    /// 6. For HTTP/2, rewrite `dest_file` into an HTTP/1.1 request with a
-    ///    `Host` header.
+    /// 6. For HTTP/2, ensure `dest_file` has a `Host` header.
     /// 7. Get the TLS flag from `server_info`, defaulting to `true` when
     ///    absent.
     /// 8. Build the addon command string with `Addon::build_cmd` from the
-    ///    addon name, `dest_file`, the TLS flag and the HTTP/2 flag.
+    ///    addon name, `dest_file`, the TLS flag and `is_h2`.
     /// 9. Build a new `AddonMsg` and return it serialized.
     ///
     /// # Errors
@@ -91,7 +90,7 @@ impl AddonHandler {
 
         let is_h2 = info.is_h2 == Some(true);
         if is_h2 {
-            downgrade_file(&dest_file, &info).await?;
+            ensure_host_file(&dest_file, &info).await?;
         }
 
         let is_tls = info

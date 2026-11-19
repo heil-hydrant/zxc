@@ -96,10 +96,7 @@ pub mod tests {
         assert_eq!(cmd, "ffuf -request file -w");
 
         let cmd = addon.build_cmd("ffuf", "file", false, true);
-        assert_eq!(
-            cmd,
-            "ffuf -request file -request-proto http -http2 -w"
-        );
+        assert_eq!(cmd, "ffuf -request file -request-proto http -http2 -w");
 
         let cmd = addon.build_cmd("ffuf", "file", true, true);
         assert_eq!(cmd, "ffuf -request file -http2 -w");
@@ -115,10 +112,7 @@ pub mod tests {
         assert_eq!(cmd, "sqlmap -r file --batch --dbs");
 
         let cmd = addon.build_cmd("sqlmap", "file", true, true);
-        assert_eq!(
-            cmd,
-            "sqlmap -r file --force-ssl --http2 --batch --dbs"
-        );
+        assert_eq!(cmd, "sqlmap -r file --force-ssl --http2 --batch --dbs");
 
         let cmd = addon.build_cmd("sqlmap", "file", false, true);
         assert_eq!(cmd, "sqlmap -r file --http2 --batch --dbs");
@@ -126,14 +120,7 @@ pub mod tests {
 
     #[test]
     fn test_addon_build_cmd_h2_without_flag() {
-        let addon = build_addon(
-            "x-",
-            "-r",
-            None,
-            None,
-            None,
-            Some("--batch"),
-        );
+        let addon = build_addon("x-", "-r", None, None, None, Some("--batch"));
         let cmd = addon.build_cmd("tool", "file", false, true);
         assert_eq!(cmd, "tool -r file --batch");
     }

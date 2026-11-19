@@ -334,7 +334,9 @@ add_flag        | Additional flags that will be added to the end of the command
 ### Note
 If the binary by default uses https, skip http_flag and vice versa.
 `http2_flag` is appended only when the forwarded request is HTTP/2. If the
-field is missing, the tool runs without an HTTP/2 flag.
+field is missing, the tool runs without an HTTP/2 flag. The copied request
+keeps its original request line; edit the copy manually if the tool requires
+`HTTP/1.1`.
 
 ##### 2. Calling Addon
 The addon can be called from request `.req` file by calling `RequestToAddon`
