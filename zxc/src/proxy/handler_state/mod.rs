@@ -136,7 +136,10 @@ where
             Self::ReWrite(conn, _) => (conn, "rewrite"),
             Self::Send(conn) => (conn, "send"),
             Self::SwitchProtocol(conn, _) => (conn, "switch_protocol"),
-            _ => return Err(std::fmt::Error),
+            Self::Drop(conn) => (conn, "drop"),
+            Self::End(conn) => (conn, "end"),
+            Self::NewConnection(conn, _) => (conn, "new_connection"),
+            Self::ServerClose(conn, _) => (conn, "server_close"),
         };
         write!(f, "[{}::{}]", conn.role(), val)
     }
