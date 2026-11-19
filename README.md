@@ -6,13 +6,13 @@ interface.
   <summary><b>Table of Contents</b></summary>
   <ol>
     <li><a href="#about-the-project">About The Project</a></li>
-    <li><a href="#Features">Features</a></li>
+    <li><a href="#features">Features</a></li>
     <li><a href="#prerequisites">Prerequisites</a></li>
     <li><a href="#installation">Installation</a></li>
     <ul>
         <li><a href="#make">Make</a></li>
         <li><a href="#manual-installation">Manual Installation</a></li>
-        <li><a href="#Add-CA">Add CA</a></li>
+        <li><a href="#add-ca">Add CA</a></li>
     </ul>
     <li><a href="#usage">Usage</a></li>
     <ul>
@@ -151,7 +151,7 @@ using their respective aliases.
 * tmux and vim as user interface.
 * Disk based storage.
 * Custom http/1.1 parser to send malformed requests.
-* http/1.1 and websocket support.
+* http/1.1, http/2 and websocket support.
 
 ## Prerequisites
 * getfattr
@@ -242,7 +242,7 @@ zxc
   -h, --help                        Print help
 ```
 
-`-i` and `-e` are mutually exclusive . The values should be in format
+`-i` and `-e` are mutually exclusive. The values should be in format
 `domain:port`.
 
 For example, to intercept all domains except https://<i></i>example.com,
@@ -283,7 +283,7 @@ Displays the following history files,
 
 Performs history recording. Closing it halts recording. In case of closing the
 window accidentally reopen it by calling `vhistory` to resume recording. If zxc
-is existed without history window, a state file `.history.state` is created to
+exits without the history window, a state file `.history.state` is created to
 resume logging the next time zxc is attached to this session. 
 
 #### Note
@@ -310,24 +310,23 @@ To repeat a websocket request,
 
 ### Addons
 Addons window is used to run additional tools. The original request is copied
-to a folder named `addons/$addon_prefix-$id.req` within the specific history
-folder with prefix specific to the addon being called. The request is displayed
-in the top window and a terminal with addon cmd and arguments is displayed in
-bottom split. Currently, `ffuf` and `sqlmap` are available.
+to `addons/$addon_prefix-$id.req` within the specific history folder, with the
+prefix specific to the addon being called. . The request is displayed in the
+top window and a terminal with addon cmd and arguments is displayed in bottom
+split. Currently, `ffuf` and `sqlmap` are available.
 
 #### Add New Addons
 Refer to ![global config][config.toml] for example addon integration.
 ##### 1. Defining addon
 Define a new table in `$HOME/.config/zxc/config.toml` file.<br>
-The following values(strings) are required:
+`prefix` and `request_flag` are required; the other keys are optional.
 
 Key             | Description
 :---------      | :---------
-name            | Name of the binary to be called
 prefix          | Prefix for resulting file used by the addon
 request_flag    | Flag used by the addon to identify the request file<br>For example, `-r` for sqlmap and `-request` for ffuf</br>
 http_flag       | Flag used by the addon to identify http scheme<br>For example, `-request-proto http` for ffuf</br>
-https_flag      | Flag used by the addon to identify https scheme<br>For example, `--force-tls` for sqlmap</br>
+https_flag      | Flag used by the addon to identify https scheme<br>For example, `--force-ssl` for sqlmap</br>
 http2_flag      | Flag used by the addon to enable HTTP/2<br>For example, `--http2` for sqlmap and `-http2` for ffuf</br>
 add_flag        | Additional flags that will be added to the end of the command
 
@@ -336,7 +335,8 @@ If the binary by default uses https, skip http_flag and vice versa.
 `http2_flag` is appended only when the forwarded request is HTTP/2. If the
 field is missing, the tool runs without an HTTP/2 flag. The copied request
 keeps its original request line; edit the copy manually if the tool requires
-`HTTP/1.1`.
+`HTTP/1.1`. For HTTP/2 copies, a canonical `Host` header is inserted when it
+is missing.
 
 ##### 2. Calling Addon
 The addon can be called from request `.req` file by calling `RequestToAddon`
@@ -430,22 +430,36 @@ available in `interceptor` and `repeater` windows.
 
 Variable    | Type          | Description
 :---------  | :--------     | :---------
-b:host      | string        | Host to send request to (ignore port for scheme specific default)
+b:host      | string        | Host to send request to, including optional port
 b:scheme    | string        | http/https
 b:sni       | string        | SNI to use in TLS handshake (only when b:scheme is https)
 b:update    | bool          | Whether request should be updated according to RFC.
+b:authority | string        | HTTP/2 `:authority` pseudo-header (HTTP/2 only)
+b:h2_scheme | string        | HTTP/2 `:scheme` pseudo-header (HTTP/2 only)
+b:is_h2     | number        | 1 for HTTP/2 requests, 0 otherwise (set by the backend)
+
+For HTTP/2, `EditBufVar` shows `b:authority`, `b:h2_scheme`; `b:host`,
+`b:scheme`, and `b:sni` are not shown (sending request to new host not
+supported yet).
 
 #### Extended Attributes
 The following extended attributes are set to the `.req` filetype for users to
 identify the destination for a request outside of zxc.
 
-Value       | Description
-:---------  | :----------
-user.host   | Host to which request was sent (ignore port for scheme specific default)
-user.http   | Set to "1" when scheme is http.<br>for https, ignored.
-user.sni    | Set when scheme is https and host != sni
+Value           | Description
+:---------      | :----------
+user.host       | Host to which request was sent, including optional port
+user.http       | Set to "1" when scheme is http.<br>for https, ignored.
+user.sni        | Set when scheme is https and host != sni
+user.is_h2      | Set to "1" for HTTP/2 requests
+user.authority  | HTTP/2 `:authority` pseudo-header
+user.h2_scheme  | HTTP/2 `:scheme` pseudo-header
 
 ### res [http response]
+Command             | Description
+:---------          | :---------
+OpenReq             | Open the corresponding request in a vertical split
+
 Only variable `b:update` available.
 
 ### whis [All websocket history]
@@ -527,7 +541,8 @@ Keys                    | Description                               | Possible V
 excluded_domains        | List of domains to be relayed             | string list
 excluded_content_types  | List of content types to be relayed       | list of:<br> app, audio, font, img, msg,<br>model, multipart, txt, video
 excluded_extensions     | List of extensions to be relayed          | string list
-with_ws                 | Whether to proxy websocket requests       | bool (default true)
+with_ws                 | Whether to proxy websocket requests       | bool (default true in shipped config)
+addons                  | Addon definitions                         | table
 
 #### Local
 Per session config is created in `$session/config.toml` based on user flags.
@@ -575,7 +590,7 @@ highlight groups can be found [here][zxcolor].
 
 FileType            | Highlight Group Help
 :---------          | :---------
-history             | zxc-hl-his
+his                 | zxc-hl-his
 req                 | zxc-hl-req
 res                 | zxc-hl-res
 
@@ -604,28 +619,7 @@ WriteDebug      | Writes debug info to a file named $window_debug.log in $sessio
 * Follow redirects in repeater.
 * Nvim support.
 * Socks support.
-* http/2 and http/3 support.
+* http/3 support.
 
 ## Contributing
 Feel free to report issues and PR's. Feature requests are most welcome.
-
-## Social
-[![Bluesky](https://img.shields.io/badge/Bluesky-0285FF?logo=bluesky&logoColor=fff&style=for-the-badge)][bluesky]
-[![Reddit](https://img.shields.io/badge/Reddit-FF4500?style=for-the-badge&logo=reddit&logoColor=black)][reddit]
-[![X](https://img.shields.io/badge/X-000000?style=for-the-badge&logo=x&logoColor=white)][x]
-
-
-[BUILD_VIM]: https://github.com/vim/vim/blob/master/src/INSTALL
-[alias]: https://github.com/hail-hydrant/zxc/blob/main/config/alias
-[config.toml]: https://github.com/hail-hydrant/zxc/blob/main/config/config.toml
-[example-his]: https://github.com/hail-hydrant/zxc/blob/main/config/example/ftplugin/his.vim
-[example-req]: https://github.com/hail-hydrant/zxc/blob/main/config/example/ftplugin/req.vim
-[example-wreq]: https://github.com/hail-hydrant/zxc/blob/main/config/example/ftplugin/wreq.vim
-[example-zxc]: https://github.com/hail-hydrant/zxc/blob/main/config/example/zxc.vim
-[local_config.toml]: https://github.com/hail-hydrant/zxc/blob/main/config/example/local_config.toml
-[tmux.conf]: https://github.com/hail-hydrant/zxc/blob/main/config/tmux.conf
-[zxc.vim]: https://github.com/hail-hydrant/zxc.vim
-[zxcolor]: https://github.com/hail-hydrant/zxc/blob/main/config/example/zxcolor.vim
-[bluesky]: https://bsky.app/profile/zxc-proxy.bsky.social
-[reddit]: https://www.reddit.com/r/zxc_proxy/
-[x]: https://x.com/zxc_proxy
