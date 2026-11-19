@@ -14,6 +14,8 @@ pub use oneoneconn::*;
 use tokio::io::{
     AsyncReadExt, AsyncWriteExt, BufReader, copy_bidirectional_with_sizes,
 };
+use std::time::Duration;
+use tokio::time::timeout;
 use tracing::{error, trace};
 
 use super::handle_websocket;
@@ -222,7 +224,7 @@ where
         false => {
             trace!("relay");
             let mut reader = BufReader::new(&mut client_conn.writer);
-            let _ = tokio::io::copy_buf(&mut reader, &mut client_conn.reader)
+            let _ = timeout(Duration::from_secs(5), tokio::io::copy_buf(&mut reader, &mut client_conn.reader))
                 .await;
             Ok(ProxyState::End(client_conn.into()))
         }
