@@ -34,7 +34,7 @@ impl RepeaterConn<TcpStream> {
             vec![ALPN_H1.to_vec()]
         });
 
-        let sni = self.server_info.sni().to_owned();
+        let sni = self.server_info.sni_or_host()?;
         let stream = connector
             .connect(sni, self.stream)
             .await

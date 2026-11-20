@@ -270,7 +270,7 @@ where
 
             Self::EstablishTcpTls(mut conn, mut addinfo) => {
                 let tcp = establish_connection(addinfo.address()).await?;
-                let sni = addinfo.sni().to_owned();
+                let sni = addinfo.sni_or_host()?;
                 let tls = server_encrypt(
                     conn.id,
                     &mut conn.commander,

@@ -18,7 +18,9 @@ use crate::proxy::prelude::*;
 ///
 /// - `AddressError::NoHost` [2]
 /// - `AddressError::PortParse` [3]
-pub fn split_host_and_port(addr: &str) -> Result<(&str, u16), AddressError> {
+pub fn split_dns_host_and_port(
+    addr: &str,
+) -> Result<(&str, u16), AddressError> {
     let (host, port_str) = addr
         .rsplit_once(':')
         .unwrap_or((addr, ""));
@@ -60,7 +62,7 @@ impl TryFrom<&str> for Address {
         }
 
         // Else, treat it as DNS (host, port)
-        let (host, port) = split_host_and_port(val)?;
+        let (host, port) = split_dns_host_and_port(val)?;
         Ok(Address::Dns((host.to_string(), port)))
     }
 }
@@ -87,27 +89,28 @@ mod tests {
 
     #[test]
     fn test_split_with_port() {
-        let (host, port) = split_host_and_port("www.google.com:8080").unwrap();
+        let (host, port) =
+            split_dns_host_and_port("www.google.com:8080").unwrap();
         assert_eq!(host, "www.google.com");
         assert_eq!(port, 8080);
     }
 
     #[test]
     fn test_split_without_port() {
-        let (host, port) = split_host_and_port("www.google.com").unwrap();
+        let (host, port) = split_dns_host_and_port("www.google.com").unwrap();
         assert_eq!(host, "www.google.com");
         assert_eq!(port, 0);
     }
 
     #[test]
     fn test_split_with_empty_host() {
-        let result = split_host_and_port(":8080");
+        let result = split_dns_host_and_port(":8080");
         assert!(matches!(result, Err(AddressError::NoHost(_))));
     }
 
     #[test]
     fn test_split_large_port() {
-        let result = split_host_and_port("www.google.com:65536");
+        let result = split_dns_host_and_port("www.google.com:65536");
         assert!(matches!(result, Err(AddressError::PortParse(_))));
     }
 

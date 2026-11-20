@@ -193,7 +193,7 @@ where
     async fn reconnect(&mut self) -> Result<(), ProxyStateError> {
         let tcp = establish_connection(self.address()).await?;
         trace!("Reconnected");
-        let server_name = self.server_info.sni().clone();
+        let server_name = self.server_info.sni_or_host()?;
         let tls = server_encrypt(
             self.id.conn_id(),
             &mut self.commander_sendr,

@@ -51,15 +51,23 @@ impl ServerInfo {
         self.sni = Some(server_name);
     }
 
-    pub fn sni(&self) -> &ServerName<'static> {
-        self.sni.as_ref().unwrap()
+    /// Returns the SNI , if one has been set.
+    pub fn sni(&self) -> Option<&ServerName<'static>> {
+        self.sni.as_ref()
+    }
+
+    /// Returns the SNI, falling back to the destination host.
+    pub fn sni_or_host(&self) -> Result<ServerName<'static>, AddressError> {
+        match self.sni() {
+            Some(sni) => Ok(sni.to_owned()),
+            None => Ok(self.address.parse_sni(None)?.to_owned()),
+        }
     }
 
     // Returns true if host and sni are not equal
     pub fn should_add_sni(&self) -> bool {
-        !self
-            .address
-            .is_host_sni_equal(self.sni())
+        self.sni()
+            .is_some_and(|sni| !self.address.is_host_sni_equal(sni))
     }
 
     pub fn address_to_string(&self) -> String {
@@ -119,7 +127,7 @@ mod tests {
         assert_eq!(*server_info.address(), addr);
         assert_eq!(server_info.scheme(), Scheme::Http);
         assert!(!server_info.is_tls());
-        assert!(server_info.sni.is_none());
+        assert!(server_info.sni().is_none());
     }
 
     #[test]
@@ -135,7 +143,7 @@ mod tests {
         assert_eq!(server_info.scheme(), Scheme::Https);
         assert!(server_info.is_tls());
         let server_name = ServerName::try_from("www.google.com").unwrap();
-        assert_eq!(server_info.sni(), &server_name);
+        assert_eq!(server_info.sni(), Some(&server_name));
     }
 
     #[test]
@@ -150,7 +158,7 @@ mod tests {
         assert_eq!(*server_info.address(), addr);
         assert_eq!(server_info.scheme(), Scheme::Http);
         assert!(!server_info.is_tls());
-        assert!(server_info.sni.is_none());
+        assert!(server_info.sni().is_none());
     }
 
     #[test]
@@ -166,7 +174,7 @@ mod tests {
         assert_eq!(server_info.scheme(), Scheme::Https);
         assert!(server_info.is_tls());
         let server_name = ServerName::try_from("www.google.com").unwrap();
-        assert_eq!(server_info.sni(), &server_name);
+        assert_eq!(server_info.sni(), Some(&server_name));
     }
 
     #[test]
@@ -178,7 +186,7 @@ mod tests {
         assert_eq!(*server_info.address(), addr);
         assert_eq!(server_info.scheme(), Scheme::Http);
         assert!(!server_info.is_tls());
-        assert!(server_info.sni.is_none());
+        assert!(server_info.sni().is_none());
     }
 
     #[test]
@@ -193,7 +201,7 @@ mod tests {
         assert_eq!(*server_info.address(), addr);
         assert_eq!(server_info.scheme(), Scheme::Http);
         assert!(!server_info.is_tls());
-        assert!(server_info.sni.is_none());
+        assert!(server_info.sni().is_none());
     }
 
     #[test]
@@ -206,7 +214,7 @@ mod tests {
         assert_eq!(server_info.scheme(), Scheme::Https);
         assert!(server_info.is_tls());
         let server_name = ServerName::try_from("127.0.0.1").unwrap();
-        assert_eq!(server_info.sni(), &server_name);
+        assert_eq!(server_info.sni(), Some(&server_name));
     }
 
     #[test]
@@ -222,6 +230,29 @@ mod tests {
         assert_eq!(server_info.scheme(), Scheme::Https);
         assert!(server_info.is_tls());
         let server_name = ServerName::try_from("127.0.0.1").unwrap();
-        assert_eq!(server_info.sni(), &server_name);
+        assert_eq!(server_info.sni(), Some(&server_name));
+    }
+
+    #[test]
+    fn test_should_add_sni_without_sni() {
+        let server_info = ServerInfo::new(
+            Address::Dns(("www.google.com".to_string(), 443)),
+            true,
+            None,
+        );
+        assert!(!server_info.should_add_sni());
+        let json = ServerInfoJson::from(&server_info);
+        assert!(json.sni.is_none());
+    }
+
+    #[test]
+    fn test_sni_or_host_without_sni() {
+        let server_info = ServerInfo::new(
+            Address::Dns(("www.google.com".to_string(), 443)),
+            true,
+            None,
+        );
+        let sni = server_info.sni_or_host().unwrap();
+        assert_eq!(sni.to_str(), "www.google.com");
     }
 }

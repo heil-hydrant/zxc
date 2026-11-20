@@ -47,7 +47,7 @@ impl AdditionalHandlerInfo {
         self.server_info.address()
     }
 
-    pub fn sni(&self) -> &ServerName<'_> {
-        self.server_info.sni()
+    pub fn sni_or_host(&self) -> Result<ServerName<'static>, AddressError> {
+        self.server_info.sni_or_host()
     }
 }

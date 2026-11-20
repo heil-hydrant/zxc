@@ -60,6 +60,9 @@ pub enum ProxyStateError {
     Reconnect(#[from] ConnectError),
 
     #[error(transparent)]
+    Address(#[from] AddressError),
+
+    #[error(transparent)]
     ServerEncrypt(#[from] ServerEncryptError),
     #[error("message dropped by user")]
     Drop,

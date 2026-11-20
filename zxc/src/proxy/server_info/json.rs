@@ -41,7 +41,9 @@ impl From<&ServerInfo> for ServerInfoJson {
         let host = server_info.address_to_string();
         let scheme = server_info.scheme();
         let sni = if scheme == Scheme::Https && server_info.should_add_sni() {
-            Some(server_info.sni().to_str().to_string())
+            server_info
+                .sni()
+                .map(|sni| sni.to_str().to_string())
         } else {
             None
         };

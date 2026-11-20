@@ -65,7 +65,7 @@ where
             .first()
             .ok_or(StateError::NoPeerCertificate)?;
 
-        let server_name = server_info.sni();
+        let server_name = server_info.sni_or_host()?;
 
         let req = CommanderRequest::GetVerifier(self.id);
         self.commander.send(req).await?;
@@ -79,7 +79,7 @@ where
             .verify_server_cert(
                 leaf_cert,
                 &cert_chain[1..],
-                server_name,
+                &server_name,
                 &[],
                 UnixTime::now(),
             )
