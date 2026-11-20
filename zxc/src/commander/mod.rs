@@ -76,17 +76,16 @@ impl Commander {
     ) -> Result<(), CommunicateError> {
         match request {
             CommanderRequest::ShouldProxy(id, host, tx) => {
-                let tosend = if let Some(config) = self.config.as_ref() {
-                    if config.should_proxy(&host) {
-                        trace!("proxying| {}", &host);
-                        Some(self.soldiers.add_http_handle(id))
-                    } else {
-                        trace!("relay| {}", &host);
-                        None
-                    }
-                } else {
-                    trace!("default proxying| {}", &host);
+                let should_proxy = self
+                    .config
+                    .as_ref()
+                    .is_none_or(|config| config.should_proxy(&host));
+                let tosend = if should_proxy {
+                    trace!("proxying| {host}");
                     Some(self.soldiers.add_http_handle(id))
+                } else {
+                    trace!("relay| {host}");
+                    None
                 };
                 tx.send(tosend)
                     .map_err(|_| CommunicateError::ShouldProxy)
