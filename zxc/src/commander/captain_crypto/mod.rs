@@ -192,6 +192,7 @@ fn generate_domain_cert(
     use std::net::IpAddr;
 
     use rcgen::string::Ia5String;
+    use rcgen::DnType;
     use x509_parser::extensions::GeneralName;
 
     let (_, real_cert) =
@@ -228,8 +229,25 @@ fn generate_domain_cert(
         .transpose()?;
 
     let mut cert_params = CertificateParams::default();
-    if let Some(alt_names) = subject_alt_names {
+
+    let common_name = if let Some(cn_attr) = real_cert.subject().iter_common_name().next() {
+        let cn = cn_attr
+            .as_str()
+            .map_err(|e| CertError::X509(e.to_string()))?;
+        cert_params.distinguished_name.push(DnType::CommonName, cn);
+        Some(cn)
+    } else {
+        None
+    };
+
+    if let Some(alt_names) = subject_alt_names.filter(|sans| !sans.is_empty()) {
         cert_params.subject_alt_names = alt_names;
+    } else if let Some(cn) = common_name {
+        let san = match cn.parse::<IpAddr>() {
+            Ok(ip) => SanType::IpAddress(ip),
+            Err(_) => SanType::DnsName(Ia5String::try_from(cn)?),
+        };
+        cert_params.subject_alt_names = vec![san];
     }
     let certificate: CertificateDer<'static> = cert_params
         .signed_by(keypair, signer)?
@@ -258,6 +276,8 @@ mod tests {
 
     #[test]
     fn test_generate_domain_cert_from_leaf() {
+        use x509_parser::extensions::GeneralName;
+
         let leaf_key = KeyPair::generate().unwrap();
         let leaf_cert = CertificateParams::default()
             .self_signed(&leaf_key)
@@ -271,5 +291,19 @@ mod tests {
 
         let result = generate_domain_cert(&leaf_key, leaf_cert, &signer);
         assert!(result.is_ok());
+        let cert_der = result.unwrap();
+        let (_, cert) =
+            x509_parser::certificate::X509Certificate::from_der(cert_der.as_ref()).unwrap();
+        let san = cert.subject_alternative_name().unwrap().unwrap();
+        let dns_names: Vec<_> = san
+            .value
+            .general_names
+            .iter()
+            .filter_map(|name| match name {
+                GeneralName::DNSName(dns) => Some(*dns),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(dns_names, vec!["rcgen self signed cert"]);
     }
 }
