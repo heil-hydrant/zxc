@@ -1,6 +1,6 @@
 use std::fs::{File, create_dir_all};
 use std::io::{self, Write};
-use std::sync::{LockResult, Mutex, MutexGuard};
+use std::sync::{Mutex, MutexGuard};
 
 use time::UtcOffset;
 use time::macros::format_description;
@@ -11,19 +11,19 @@ use tracing_subscriber::field::MakeExt;
 use tracing_subscriber::fmt::time::OffsetTime;
 use tracing_subscriber::fmt::{MakeWriter, format};
 
-pub struct FileWriter<'a>(LockResult<MutexGuard<'a, File>>);
+pub struct FileWriter<'a>(MutexGuard<'a, File>);
 
 impl Write for FileWriter<'_> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.0.as_mut().unwrap().write(buf)
+        self.0.write(buf)
     }
 
     fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
-        self.0.as_mut().unwrap().write_all(buf)
+        self.0.write_all(buf)
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        self.0.as_mut().unwrap().flush()
+        self.0.flush()
     }
 }
 
@@ -47,15 +47,15 @@ impl<'a> MakeWriter<'a> for DebugLogger {
     type Writer = FileWriter<'a>;
 
     fn make_writer(&'a self) -> Self::Writer {
-        FileWriter(self.debug.lock())
+        FileWriter(self.debug.lock().unwrap_or_else(|e| e.into_inner()))
     }
 
     fn make_writer_for(&'a self, meta: &Metadata<'_>) -> Self::Writer {
         if meta.level() <= &Level::DEBUG {
-            return FileWriter(self.basic.lock());
+            return FileWriter(self.basic.lock().unwrap_or_else(|e| e.into_inner()));
         }
 
-        FileWriter(self.debug.lock())
+        FileWriter(self.debug.lock().unwrap_or_else(|e| e.into_inner()))
     }
 }
 
@@ -65,11 +65,11 @@ impl<'a> MakeWriter<'a> for BasicLogger {
     type Writer = FileWriter<'a>;
 
     fn make_writer(&'a self) -> Self::Writer {
-        FileWriter(self.0.lock())
+        FileWriter(self.0.lock().unwrap_or_else(|e| e.into_inner()))
     }
 
     fn make_writer_for(&'a self, _: &Metadata<'_>) -> Self::Writer {
-        FileWriter(self.0.lock())
+        FileWriter(self.0.lock().unwrap_or_else(|e| e.into_inner()))
     }
 }
 
@@ -127,4 +127,30 @@ pub fn setup_logging(debug: bool) -> Result<(), Box<dyn std::error::Error>> {
         .finish();
     set_global_default(subscriber)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_file_writer_recovers_from_poisoned_mutex() {
+        let temp_path = std::env::temp_dir().join("test_logging_poison.txt");
+        let temp_file = File::create(&temp_path).unwrap();
+        let logger = BasicLogger(Mutex::new(temp_file));
+
+        // Poison the mutex intentionally
+        let _ = std::panic::catch_unwind(|| {
+            let _guard = logger.0.lock().unwrap();
+            panic!("poisoning mutex");
+        });
+
+        assert!(logger.0.is_poisoned());
+
+        let mut writer = logger.make_writer();
+        assert!(writer.write_all(b"test log entry\n").is_ok());
+        assert!(writer.flush().is_ok());
+
+        let _ = std::fs::remove_file(temp_path);
+    }
 }
