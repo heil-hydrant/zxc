@@ -2,29 +2,34 @@ mod impl_boundary;
 
 use std::collections::HashMap;
 use std::fmt::Debug;
+use std::io::ErrorKind;
+use std::path::{Path, PathBuf};
 
 use bytes::BytesMut;
+use tokio::fs::create_dir;
+use tracing::trace;
+
 use tokio::net::UnixStream;
 use tokio::sync::mpsc::Receiver;
 use zxc_derive::{Buffer, CloseAction, FlushStorage, NotifyCommander};
 
-use super::builder::build_addon_dest;
+use super::AddonError;
 use super::h2::ensure_host_file;
 use super::message::to_ui::AddonMsg;
-use super::AddonError;
-use crate::config::Addon;
-use crate::forward_info::{ForwardInfo, Module};
-use crate::io::{copy_with_request_metadata, DirError, UnixSockError};
-use crate::run::boundary::{
-    Buffer, CloseAction, FlushStorage, HandleCommander, NotifyCommander,
-};
+use crate::ADDONS;
 use crate::CAPACITY_2MB;
+use crate::config::Addon;
+use crate::file_types::EXT_REQ;
+use crate::forward_info::{ForwardInfo, Module};
+use crate::io::*;
+use crate::io::{DirError, incremental};
+use crate::run::boundary::*;
 
 #[derive(Buffer, FlushStorage, CloseAction, NotifyCommander)]
 pub struct AddonHandler {
-    from_commander: Receiver<ForwardInfo>,
     addons_map: HashMap<String, Addon>,
     buf: BytesMut,
+    from_commander: Receiver<ForwardInfo>,
 }
 
 impl AddonHandler {
@@ -41,31 +46,6 @@ impl AddonHandler {
     }
 
     /// Builds the serialized addon command for a forwarded request.
-    ///
-    /// # Steps
-    ///
-    /// 1. Check if the module is an addon.
-    /// 2. Get the addon from the map.
-    /// 3. Build the incremental destination file with
-    ///    [`build_addon_dest`].
-    /// 4. Copy `info.file` to `dest_file`, preserving request metadata.
-    /// 5. Read the HTTP/2 flag from `is_h2`, which is `true` only when the
-    ///    UI forwarded an HTTP/2 request.
-    /// 6. For HTTP/2, ensure `dest_file` has a `Host` header.
-    /// 7. Get the TLS flag from `server_info`, defaulting to `true` when
-    ///    absent.
-    /// 8. Build the addon command string with `Addon::build_cmd` from the
-    ///    addon name, `dest_file`, the TLS flag and `is_h2`.
-    /// 9. Build a new `AddonMsg` and return it serialized.
-    ///
-    /// # Errors
-    ///
-    /// - `AddonError::WrongMsg` [1]
-    /// - `AddonError::AddonNotFound` [2]
-    /// - `AddonError::DirError` [3] [4]
-    /// - `AddonError::H2Request` [6]
-    /// - `AddonError::RequestFile` [6]
-    /// - `AddonError::Serialize` [9]
     pub async fn build_cmd_string(
         &self,
         info: ForwardInfo,
@@ -108,5 +88,77 @@ impl AddonHandler {
 impl Debug for AddonHandler {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Addon")
+    }
+}
+
+/// Builds the destination path for a copied addon request.
+pub async fn build_addon_dest(
+    prefix: &str,
+    src_file: &Path,
+) -> Result<PathBuf, DirError> {
+    let mut path = src_file.to_path_buf();
+
+    if path.components().count() < 3 {
+        return Err(DirError::NoTop(src_file.to_string_lossy().to_string()));
+    }
+
+    // Pop `component_count - 3` components to reach `./history/1`.
+    for _ in 0..(path.components().count() - 3) {
+        path.pop();
+    }
+    trace!("top| {}", &path.to_string_lossy());
+    path.push(ADDONS);
+    if let Err(e) = create_dir(&path).await
+        && !matches!(e.kind(), ErrorKind::AlreadyExists)
+    {
+        return Err(DirError::CreateDir(e));
+    }
+    let incremental = incremental(&path, prefix, false)
+        .await
+        .map_err(DirError::IncrementalDir)?;
+    path.push(format!("{}{}.{}", prefix, incremental, EXT_REQ));
+    Ok(path)
+}
+
+#[cfg(test)]
+pub mod tests {
+    use std::env::set_current_dir;
+    use std::error::Error;
+    use std::path::PathBuf;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_zz_incremental_file_last() -> Result<(), Box<dyn Error>> {
+        let test_dir = PathBuf::from("/tmp/zxc_test");
+        set_current_dir(&test_dir)?;
+
+        let prefixes = [("q-", "sqlmap"), ("z-", "ffuf")];
+        let mut path = PathBuf::from("./history/");
+
+        for i in 1..11 {
+            path.push(i.to_string());
+            path.push(i.to_string());
+            path.set_extension("req");
+
+            for (prefix, name) in &prefixes {
+                let result = build_addon_dest(prefix, &path).await?;
+                let verify = PathBuf::from(format!(
+                    "./history/{}/addons/{}{}.req",
+                    i,
+                    prefix,
+                    i + 1
+                ));
+                assert_eq!(
+                    result, verify,
+                    "{} test failed for index {}",
+                    name, i
+                );
+            }
+
+            path.pop();
+            path.pop();
+        }
+        Ok(())
     }
 }

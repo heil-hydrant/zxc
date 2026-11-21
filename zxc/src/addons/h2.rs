@@ -1,5 +1,3 @@
-//! Host header injection for HTTP/2 addon request copies.
-
 use std::path::Path;
 
 use bytes::BytesMut;
@@ -7,35 +5,19 @@ use http_plz::OneRequest;
 use tokio::fs;
 
 use crate::forward_info::{ForwardInfo, H2Info};
-use crate::io::{FileErrorInfo, FileEvent};
+use crate::io::FileErrorInfo;
 use crate::proxy::server_info::json::ServerInfoJson;
 
 use super::AddonError;
 
 /// Ensures a `Host` header on a copied HTTP/2 request file.
-///
-/// # Steps
-///
-/// 1. Read the copied request file.
-/// 2. Parse it into a [`OneRequest`].
-/// 3. Pick the authority for the `Host` header.
-/// 4. Insert `Host` when it is missing.
-/// 5. Write the updated bytes back to the same file.
-///
-/// # Errors
-///
-/// - `AddonError::H2Request` [2] when the file is not a parsable request.
-/// - `AddonError::H2Request` [3] when no authority is available.
-/// - `AddonError::RequestFile` [1] [5] when the file cannot be read or
-///   written.
 pub async fn ensure_host_file(
     path: &Path,
     info: &ForwardInfo,
 ) -> Result<(), AddonError> {
-    let name = path.to_path_buf();
-    let bytes = fs::read(path).await.map_err(|error| {
-        FileErrorInfo::from((&name, FileEvent::Read, error))
-    })?;
+    let bytes = fs::read(path)
+        .await
+        .map_err(|e| FileErrorInfo::read_fail(path, e))?;
 
     let mut request = OneRequest::try_from(BytesMut::from(&bytes[..]))
         .map_err(|e| AddonError::H2Request(e.to_string()))?;
@@ -47,9 +29,7 @@ pub async fn ensure_host_file(
 
     fs::write(path, request.into_bytes())
         .await
-        .map_err(|error| {
-            FileErrorInfo::from((&name, FileEvent::Write, error))
-        })?;
+        .map_err(|e| FileErrorInfo::write_fail(path, e))?;
     Ok(())
 }
 
