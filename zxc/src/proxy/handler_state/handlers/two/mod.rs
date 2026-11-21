@@ -4,13 +4,14 @@ use std::fmt::Debug;
 
 use header_plz::{RequestLine, ResponseLine};
 use http_plz::Request;
+use rustc_hash::FxHashMap;
 use thiserror::Error;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::select;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::oneshot;
-use tokio::task::JoinSet;
+use tokio::task::{Id, JoinSet};
 use tracing::{Instrument, error, trace};
 use two_plz::client::{ClientBuilder, SendRequest};
 use two_plz::codec::UserError;
@@ -61,6 +62,7 @@ where
     E: AsyncReadExt + AsyncWriteExt + Unpin + Send + 'static,
 {
     let mut h2_tasks = JoinSet::new();
+    let mut stream_soldiers: FxHashMap<Id, SoldierId> = FxHashMap::default();
     let mut server_conn = ServerBuilder::new()
         .handshake(conn.reader)
         .await?;
@@ -69,11 +71,12 @@ where
         .handshake(conn.writer)
         .await?;
 
-    h2_tasks.spawn(async move {
+    let driver = h2_tasks.spawn(async move {
         if let Err(e) = client_conn.await {
             error!("h2 upstream connection driver error| {e}");
         }
     });
+    let driver_id = driver.id();
 
     let conn_id = conn.id;
     let commander_tx = conn.commander.clone();
@@ -107,7 +110,7 @@ where
                     stream = stream_id
                 );
 
-                h2_tasks.spawn(
+                let task = h2_tasks.spawn(
                     async move {
                         let res = handle_stream(
                             soldier_id,
@@ -129,12 +132,34 @@ where
                     }
                     .instrument(stream_span),
                 );
+                stream_soldiers.insert(task.id(), soldier_id);
             }
-            res = h2_tasks.join_next(), if !h2_tasks.is_empty() => {
-                if let Some(Err(e)) = res
-                    && !e.is_cancelled()
-                {
-                    error!("h2 task panicked| {e}");
+            res = h2_tasks.join_next_with_id(), if !h2_tasks.is_empty() => {
+                match res {
+                    Some(Ok((id, _))) if id == driver_id => {
+                        trace!("h2 upstream driver finished");
+                        break;
+                    }
+                    Some(Err(e)) if e.id() == driver_id => {
+                        if !e.is_cancelled() {
+                            error!("h2 upstream driver task| {e}");
+                        }
+                        break;
+                    }
+                    Some(Ok((id, _))) => {
+                        stream_soldiers.remove(&id);
+                    }
+                    Some(Err(e)) => {
+                        if let Some(soldier_id) = stream_soldiers.remove(&e.id()) {
+                            let _ = commander_tx
+                                .send(CommanderRequest::Close(soldier_id))
+                                .await;
+                        }
+                        if !e.is_cancelled() {
+                            error!("h2 task panicked| {e}");
+                        }
+                    }
+                    None => {}
                 }
             }
         }
@@ -147,6 +172,12 @@ where
         {
             error!("h2 task shutdown| {e}");
         }
+    }
+
+    for (_, soldier_id) in stream_soldiers.drain() {
+        let _ = commander_tx
+            .send(CommanderRequest::Close(soldier_id))
+            .await;
     }
 
     Ok(())
