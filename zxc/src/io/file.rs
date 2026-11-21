@@ -35,6 +35,24 @@ pub struct FileErrorInfo {
     error: io::Error,
 }
 
+impl FileErrorInfo {
+    pub fn write_fail(name: &Path, error: io::Error) -> Self {
+        Self {
+            name: name.to_path_buf(),
+            event: FileEvent::Write,
+            error,
+        }
+    }
+
+    pub fn read_fail(name: &Path, error: io::Error) -> Self {
+        Self {
+            name: name.to_path_buf(),
+            event: FileEvent::Read,
+            error,
+        }
+    }
+}
+
 impl From<(&PathBuf, FileEvent, io::Error)> for FileErrorInfo {
     fn from((name, event, error): (&PathBuf, FileEvent, io::Error)) -> Self {
         Self {
