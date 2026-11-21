@@ -1,20 +1,17 @@
-mod impl_from_commander;
-mod impl_handle_commander_msg;
-mod impl_handle_ui;
+mod impl_boundary;
 
 use std::fmt::Debug;
 use std::sync::Arc;
 use std::time::Instant;
 
 use bytes::BytesMut;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use tokio::net::UnixStream;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio_rustls::TlsConnector;
 use tracing::trace;
 use zxc_derive::{Buffer, CloseAction, FlushStorage, NotifyCommander};
 
-use crate::CAPACITY_2MB;
 use crate::async_step::AsyncStep;
 use crate::commander::codec::perform_codec_op;
 use crate::forward_info::ForwardInfo;
@@ -25,6 +22,7 @@ use crate::run::boundary::{
     Buffer, CloseAction, FlushStorage, HandleCommander, NotifyCommander,
     UiReply,
 };
+use crate::CAPACITY_2MB;
 
 // Handler for Repeater side of the PROXY
 #[derive(Buffer, FlushStorage, CloseAction, NotifyCommander)]
@@ -255,13 +253,18 @@ impl RepeaterHandler {
             //
             // - `RepeaterError::WsIdNotFound`
             // - `RepeaterWsMessage::Read`.
-            Operation::WsSend { id, is_bin } => {
+            Operation::WsSend {
+                id,
+                is_bin,
+            } => {
                 trace!("ws send| {}", id);
                 self.ws_handles
                     .iter_mut()
                     .find(|handle| handle.id == id)
                     .ok_or(RepeaterError::WsIdNotFound(id))?
-                    .send(RepeaterWsMsg::Read { is_bin })
+                    .send(RepeaterWsMsg::Read {
+                        is_bin,
+                    })
                     .await?;
                 None
             }

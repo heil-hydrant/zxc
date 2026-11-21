@@ -54,9 +54,10 @@ impl Address {
     // convert it to `String` for comparison.
     // https://docs.rs/rustls-pki-types/latest/rustls_pki_types/enum.IpAddr.html
     pub fn is_host_sni_equal(&self, sni: &ServerName) -> bool {
+        let sni = sni.to_str();
         match self {
-            Address::Socket(addr) => addr.ip().to_string() == sni.to_str(),
-            Address::Dns((dns, _)) => *dns == sni.to_str(),
+            Address::Socket(addr) => addr.ip().to_string() == sni.as_ref(),
+            Address::Dns((dns, _)) => dns.eq_ignore_ascii_case(sni.as_ref()),
         }
     }
 

@@ -1,6 +1,4 @@
-mod impl_from_commander;
-mod impl_handle_commander_msg;
-mod impl_handle_ui;
+mod impl_boundary;
 
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -10,17 +8,17 @@ use tokio::net::UnixStream;
 use tokio::sync::mpsc::Receiver;
 use zxc_derive::{Buffer, CloseAction, FlushStorage, NotifyCommander};
 
-use super::AddonError;
 use super::builder::build_addon_dest;
 use super::h2::ensure_host_file;
 use super::message::to_ui::AddonMsg;
-use crate::CAPACITY_2MB;
+use super::AddonError;
 use crate::config::Addon;
 use crate::forward_info::{ForwardInfo, Module};
-use crate::io::{DirError, UnixSockError, copy_with_request_metadata};
+use crate::io::{copy_with_request_metadata, DirError, UnixSockError};
 use crate::run::boundary::{
     Buffer, CloseAction, FlushStorage, HandleCommander, NotifyCommander,
 };
+use crate::CAPACITY_2MB;
 
 #[derive(Buffer, FlushStorage, CloseAction, NotifyCommander)]
 pub struct AddonHandler {

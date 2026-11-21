@@ -1,8 +1,4 @@
-mod impl_close_action;
-mod impl_flush_storage;
-mod impl_from_commander;
-mod impl_handle_commander_msg;
-mod impl_handle_ui;
+mod impl_boundary;
 
 use std::fmt::Debug;
 
@@ -13,16 +9,16 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use tracing::{error, trace};
 use zxc_derive::{Buffer, NotifyCommander};
 
-use crate::CAPACITY_2MB;
 use crate::history::{
-    CommanderToHistory, HISTORY_WS_HIS, HISTORY_WS_WSESS, HistoryError,
-    HistoryUIOps, HistoryWsError, HistoryWsRegisterInfo,
+    CommanderToHistory, HistoryError, HistoryUIOps, HistoryWsError,
+    HistoryWsRegisterInfo, HISTORY_WS_HIS, HISTORY_WS_WSESS,
 };
 use crate::id::SoldierId;
 use crate::io::write_and_flush;
 use crate::run::boundary::{
     Buffer, HandleCommander, NotifyCommander, UiReply,
 };
+use crate::CAPACITY_2MB;
 
 const WS_HISTORY: &str = "ws_history";
 const WS_REMOVE: &str = "ws_remove";

@@ -1,8 +1,46 @@
+use tracing::trace;
+
+use super::InterceptorHandler;
 use crate::commander::perform_codec_op;
 use crate::interceptor::{
-    InterUIOps, InterUImsg, InterceptorError, InterceptorHandler
+    InterToUI, InterUIOps, InterUImsg, InterceptorError,
 };
-use crate::run::boundary::{HandleUI, UiError, UiReply};
+use crate::run::boundary::{
+    FromCommander, HandleCommander, HandleUI, NotifyCommander, UiError,
+    UiReply,
+};
+
+impl FromCommander for InterceptorHandler {
+    type Message = InterToUI;
+
+    async fn recv(&mut self) -> Option<Self::Message> {
+        self.from_commander.recv().await
+    }
+}
+
+impl HandleCommander for InterceptorHandler {
+    type Error = InterceptorError;
+
+    async fn handle_commander_no_ui(
+        &mut self,
+        _msg: InterToUI,
+    ) -> Result<(), Self::Error> {
+        if self.intercept_state {
+            self.intercept_state = false;
+            self.to_commander
+                .send(InterUIOps::Toggle)
+                .await?;
+        }
+        Err(InterceptorError::from(UiError::NoUI))
+    }
+
+    async fn handle_commander_ui(
+        &mut self,
+        info: InterToUI,
+    ) -> Result<UiReply, Self::Error> {
+        Ok(UiReply::push(serde_json::to_string(&info)?))
+    }
+}
 
 impl HandleUI for InterceptorHandler {
     async fn handle_ui(&mut self) -> Result<UiReply, InterceptorError> {
@@ -45,5 +83,19 @@ impl HandleUI for InterceptorHandler {
             return Ok(UiReply::Reply(id, result.to_string()));
         }
         Ok(UiReply::None)
+    }
+}
+
+impl NotifyCommander for InterceptorHandler {
+    async fn notify_commander(
+        &mut self,
+    ) -> Result<(), <Self as HandleCommander>::Error> {
+        if self.intercept_state {
+            trace!("commander notified");
+            self.intercept_state = false;
+            let msg = InterUIOps::Toggle;
+            self.to_commander.send(msg).await?;
+        }
+        Ok(())
     }
 }

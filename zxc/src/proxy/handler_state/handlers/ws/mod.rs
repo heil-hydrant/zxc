@@ -32,7 +32,6 @@ where
     let serverstate = ProxyState::Receive(server);
 
     let client_span = span!(Level::TRACE, "client");
-    let _ = client_span.enter();
     let client_flow = async move {
         async_run(clientstate)
             .instrument(client_span)
@@ -41,7 +40,6 @@ where
     };
 
     let server_span = span!(Level::TRACE, "server");
-    let _ = server_span.enter();
     let server_flow = async move {
         async_run(serverstate)
             .instrument(server_span)
