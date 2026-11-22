@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [tests]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Get current date
         run: echo "RELEASE_DATE=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
       - uses: taiki-e/create-gh-release-action@v1
@@ -30,7 +30,7 @@ jobs:
     needs: create-release
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install stable toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
