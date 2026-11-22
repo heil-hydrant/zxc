@@ -9,16 +9,16 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use tracing::{error, trace};
 use zxc_derive::{Buffer, NotifyCommander};
 
+use crate::CAPACITY_2MB;
 use crate::history::{
-    CommanderToHistory, HistoryError, HistoryUIOps, HistoryWsError,
-    HistoryWsRegisterInfo, HISTORY_WS_HIS, HISTORY_WS_WSESS,
+    CommanderToHistory, HISTORY_WS_HIS, HISTORY_WS_WSESS, HistoryError,
+    HistoryUIOps, HistoryWsError, HistoryWsRegisterInfo,
 };
 use crate::id::SoldierId;
 use crate::io::write_and_flush;
 use crate::run::boundary::{
     Buffer, HandleCommander, NotifyCommander, UiReply,
 };
-use crate::CAPACITY_2MB;
 
 const WS_HISTORY: &str = "ws_history";
 const WS_REMOVE: &str = "ws_remove";
@@ -57,14 +57,14 @@ impl HistoryHandler {
     ///
     /// # Steps
     ///
-    /// 1. If the size is 1, pop the message and get its response:
-    ///    - With a socket, return `Some(response)`.
-    ///    - Without a socket, push the response to the storage.
+    /// 1. If the size is 1, pop the message and push its response, if
+    ///    any, to the storage.
     /// 2. Else, reverse `msg_storage` to maintain order, pop the elements
     ///    and store the response of each message in the storage:
     ///    - If `get_response` errors, log it and continue so the batch is
     ///      fully drained without leaving reversed leftovers.
-    ///    - With a socket, return `UiReply::Flush` for `write_vectored()`.
+    /// 3. With a socket, return `UiReply::Flush` so every buffered
+    ///    response is written in order.
     pub async fn handle_commander(
         &mut self,
         size: usize,
@@ -74,11 +74,7 @@ impl HistoryHandler {
             trace!("recv| 1");
             let msg = self.msg_storage.pop().unwrap();
             if let Some(res) = self.get_response(msg).await? {
-                if with_sock {
-                    return Ok(UiReply::push(res));
-                } else {
-                    self.ui_storage.push(res);
-                }
+                self.ui_storage.push(res);
             }
         } else {
             trace!("recv| {}", size);
@@ -90,10 +86,10 @@ impl HistoryHandler {
                     Err(e) => error!("history| {}", e),
                 }
             }
-            if with_sock {
-                return Ok(UiReply::Flush);
-            }
-        };
+        }
+        if with_sock {
+            return Ok(UiReply::Flush);
+        }
         Ok(UiReply::None)
     }
 
