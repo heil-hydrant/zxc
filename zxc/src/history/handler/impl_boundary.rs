@@ -22,6 +22,10 @@ use crate::run::boundary::{
 
 const LIMIT: usize = 100;
 
+// `writev(2)` rejects more than `IOV_MAX` slices with `EINVAL`
+// (1024 on Linux and macOS).
+const IOV_MAX: usize = 1024;
+
 // Persists buffered history entries before shutdown.
 //
 // # Steps
@@ -63,7 +67,9 @@ async fn write_history_state(
 
     let mut slices: &mut [IoSlice<'_>] = &mut io_slices;
     while !slices.is_empty() {
-        let n = file.write_vectored(slices).await?;
+        let n = file
+            .write_vectored(&slices[..slices.len().min(IOV_MAX)])
+            .await?;
         if n == 0 {
             return Err(Error::new(
                 ErrorKind::WriteZero,
@@ -100,9 +106,14 @@ impl FlushStorage for HistoryHandler {
             send.push(IoSlice::new(CLOSE_SQUARE_BRACKET.as_bytes()));
         });
 
-        let _ = unix_write_vec_and_flush(stream, &mut send)
-            .await
-            .map_err(UnixSockError::Write)?;
+        // Stay within `IOV_MAX` and end each chunk on a whole 3-slice
+        // frame so a failed chunk cannot leave a truncated envelope.
+        let chunk_size = IOV_MAX - IOV_MAX % 3;
+        for chunk in send.chunks_mut(chunk_size) {
+            let _ = unix_write_vec_and_flush(stream, chunk)
+                .await
+                .map_err(UnixSockError::Write)?;
+        }
         self.ui_storage.clear();
         Ok(())
     }
