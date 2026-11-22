@@ -1,10 +1,10 @@
-mod comm_history;
-mod comm_interceptor;
-mod comm_repeater;
+mod history_channel;
+mod interceptor_channel;
+mod repeater_channel;
 pub mod request;
 pub mod response;
 
-pub use comm_history::HistoryComm;
-pub use comm_interceptor::InterceptorComm;
-pub use comm_repeater::RepeaterComm;
+pub use history_channel::HistoryComm;
+pub use interceptor_channel::InterceptorComm;
+pub use repeater_channel::RepeaterComm;
 pub use response::CommanderResponse;

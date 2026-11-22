@@ -3,10 +3,10 @@ use tracing::error;
 
 use crate::file_types::{EXT_REQ, EXT_WREQ};
 use crate::forward_info::{ForwardInfo, Module};
-use crate::repeater::msg_from_ui::RepeaterMsg;
+use crate::repeater::messages::RepeaterMsg;
 use crate::repeater::prelude::*;
 use crate::run::boundary::{
-    FromCommander, HandleCommander, HandleUI, UiError, UiReply,
+    FromCommander, HandleCommander, HandleUI, IsUIError, UiError, UiReply,
 };
 
 impl FromCommander for RepeaterHandler {
@@ -94,6 +94,9 @@ impl HandleUI for RepeaterHandler {
         let to_send = match self.get_response(msg).await {
             Ok(Some(res)) => Some(res),
             Err(e) => {
+                if e.is_ui_error() {
+                    return Err(e);
+                }
                 error!("{}", e);
                 Some(json!({"error" : e.to_string()}).to_string())
             }

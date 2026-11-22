@@ -24,8 +24,7 @@ pub fn str_to_private(
 
 // private key - $HOME/.config/zxc/private.key
 pub fn read_private() -> Result<String, CryptoBuildError> {
-    let mut path = global_config_path()?;
-    path.push("private.key");
+    let path = global_config_path()?.join("private.key");
     read_to_string(&path).map_err(|source| CryptoBuildError::Read {
         path,
         source,

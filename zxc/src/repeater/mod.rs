@@ -9,7 +9,7 @@ pub mod file_builder;
 pub mod h2;
 pub mod handler;
 pub mod http;
-pub mod msg_from_ui;
+pub mod messages;
 pub mod prelude;
 pub mod states;
 pub mod ws;

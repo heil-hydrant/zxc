@@ -68,6 +68,15 @@ pub struct SendInfo {
     pub h2_info: Option<H2Info>,
 }
 
+// WebSocket task internal control message
+#[derive(Debug)]
+pub enum RepeaterWsMsg {
+    Read {
+        is_bin: bool,
+    },
+    Close,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -119,7 +128,11 @@ mod tests {
         let value =
             serde_json::json!([1, {"WsSend": {"id": 7, "is_bin": true}}]);
         let msg: RepeaterMsg = serde_json::from_value(value).unwrap();
-        let Operation::WsSend { id, is_bin } = msg.operation else {
+        let Operation::WsSend {
+            id,
+            is_bin,
+        } = msg.operation
+        else {
             panic!("expected WsSend");
         };
 
@@ -131,7 +144,11 @@ mod tests {
     fn test_ws_send_defaults_to_text() {
         let value = serde_json::json!([1, {"WsSend": {"id": 7}}]);
         let msg: RepeaterMsg = serde_json::from_value(value).unwrap();
-        let Operation::WsSend { id, is_bin } = msg.operation else {
+        let Operation::WsSend {
+            id,
+            is_bin,
+        } = msg.operation
+        else {
             panic!("expected WsSend");
         };
 

@@ -13,16 +13,7 @@ pub fn add_option_vec(
 /// Removes empty values and duplicates from an `Option<Vec<String>>`, then
 /// sorts it.
 ///
-/// # Steps
-///
-/// If the list is `Some`:
-///
-/// 1. Remove empty values.
-/// 2. Sort.
-/// 3. Deduplicate.
-///
 /// # Note
-///
 /// `is_empty()` is not implemented for generics:
 /// <https://github.com/rust-lang/rust/issues/35428>
 pub fn sanitize_option_vec_string(list: &mut Option<Vec<String>>) {

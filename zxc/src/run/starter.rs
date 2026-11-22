@@ -1,17 +1,11 @@
-use std::fmt::Debug;
-
-use tokio::net::UnixListener;
-use tokio::select;
-use tokio_util::sync::CancellationToken;
-use tracing::{debug, error, info, trace};
+use tracing::{error, info, trace};
 
 use super::boundary::*;
-use crate::run::runner::run_module;
 
 pub async fn start_module<T>(
     mut handler: T,
-    listener: UnixListener,
-    token: CancellationToken,
+    listener: tokio::net::UnixListener,
+    token: tokio_util::sync::CancellationToken,
 ) where
     T: FromCommander
         + HandleCommander
@@ -20,11 +14,10 @@ pub async fn start_module<T>(
         + FlushStorage
         + CloseAction
         + NotifyCommander
-        + Debug,
+        + std::fmt::Debug,
 {
-    debug!("started");
     loop {
-        select! {
+        tokio::select! {
             biased;
             _ = token.cancelled() => {
                 run_close_action(&mut handler).await;
@@ -38,7 +31,7 @@ pub async fn start_module<T>(
                         if let Err(e) = handler.flush_storage(&mut conn).await{
                             error!("flush storage| {}", e);
                         }
-                        match run_module(&mut handler, conn, &token).await {
+                        match crate::run::runner::run_module(&mut handler, conn, &token).await {
                             Ok(()) => {
                                 run_close_action(&mut handler).await;
                                 trace!("start cancelled");
@@ -48,7 +41,7 @@ pub async fn start_module<T>(
                                 if e.is_ui_error()
                                     && let Err(e) = handler.notify_commander().await {
                                         error!("notify commander| {}", e);
-                                    }
+                                }
                                 error!("run| {}", e);
                             }
                         }

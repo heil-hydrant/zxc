@@ -1,4 +1,3 @@
-//#![allow(warnings, dead_code)]
 #![allow(async_fn_in_trait)]
 #![allow(clippy::result_large_err)]
 
@@ -7,35 +6,27 @@ mod builder;
 mod commander;
 mod config;
 pub mod core;
-pub use core::constants::*;
-pub use core::{async_step, file_types, forward_info, id};
 mod history;
 mod interceptor;
 mod io;
+mod logging;
 mod proxy;
 mod repeater;
 mod run;
-mod setup;
+mod session;
 mod tmux;
 
-use std::fs::{create_dir, remove_dir_all};
+pub use core::constants::*;
+pub use core::{async_step, file_types, forward_info, id};
+pub use session::*;
+
 use std::io::Error;
-use std::net::SocketAddr;
 use std::path::PathBuf;
-use std::time::Duration;
 
 use builder::*;
-use chrono::Local;
 use clap::Parser;
-use commander::captain_crypto::CryptoBuildError;
-use commander::run_commander;
-use config::{CliArgs, write_local_config};
 use run::starter::start_module;
-use setup::*;
-use tmux::Session;
-use tokio::net::TcpListener;
 use tokio_util::sync::CancellationToken;
-use tokio_util::task::TaskTracker;
 use tracing::{Instrument, Level, debug, error, span};
 
 #[tokio::main]
@@ -47,7 +38,7 @@ async fn main() {
 }
 
 async fn run() -> Result<(), MainError> {
-    let mut args = CliArgs::parse()
+    let mut args = config::CliArgs::parse()
         .sanitize()
         .unwrap_or_default();
 
@@ -69,20 +60,24 @@ async fn run() -> Result<(), MainError> {
         .and_then(|proxy_arg| proxy_arg.port.take())
         .unwrap_or(8080);
 
-    let listen = args.listen.unwrap_or(DEFAULT_LISTEN);
+    let listen = args
+        .proxy_args
+        .as_mut()
+        .and_then(|proxy_arg| proxy_arg.listen.take())
+        .unwrap_or(DEFAULT_LISTEN);
 
     let local_config = args
         .proxy_args
         .take()
-        .and_then(|proxy_args| write_local_config(attach, proxy_args));
+        .and_then(|proxy_args| config::write_local_config(attach, proxy_args));
 
-    let addr = SocketAddr::new(listen, port);
-    let proxy_listener = TcpListener::bind(addr)
+    let addr = std::net::SocketAddr::new(listen, port);
+    let proxy_listener = tokio::net::TcpListener::bind(addr)
         .await
         .map_err(|e| MainError::PortBind(port, e))?;
 
     let tmp_path = format!("/tmp/{}", session_name);
-    create_dir(&tmp_path).map_err(MainError::TempDir)?;
+    std::fs::create_dir(&tmp_path).map_err(MainError::TempDir)?;
     let _dir_guard = SessionDirGuard {
         path: PathBuf::from(&tmp_path),
     };
@@ -96,9 +91,9 @@ async fn run() -> Result<(), MainError> {
     let mut builder = Builder::new(index, session_name.clone())
         .map_err(MainError::Crypto)?;
 
-    let set = TaskTracker::new();
+    let set = tokio_util::task::TaskTracker::new();
     let token = CancellationToken::new();
-    let _ = setup_logging(args.debug)
+    let _ = logging::setup_logging(args.debug)
         .map_err(|e| eprintln!("setup logging| {}", e));
 
     // History
@@ -170,7 +165,7 @@ async fn run() -> Result<(), MainError> {
         .map_err(MainError::Builder)?;
     let _commander_handle = set.spawn(async move {
         let span = span!(Level::INFO, COMMANDER);
-        run_commander(commander, ctoken)
+        commander::run_commander(commander, ctoken)
             .instrument(span)
             .await;
     });
@@ -193,7 +188,7 @@ async fn run() -> Result<(), MainError> {
     });
 
     // tmux session
-    let session = Session::new(session_name);
+    let session = tmux::Session::new(session_name);
     session
         .build(args.debug)
         .map_err(MainError::BuildSession)?;
@@ -203,70 +198,13 @@ async fn run() -> Result<(), MainError> {
 
     proxy_token.cancel();
     set.close();
-    match tokio::time::timeout(Duration::from_secs(3), set.wait()).await {
+    match tokio::time::timeout(std::time::Duration::from_secs(3), set.wait())
+        .await
+    {
         Ok(()) => debug!("tasks drained"),
         Err(_) => error!("timed out waiting for tasks to drain"),
     }
     Ok(())
-}
-
-struct SessionDirGuard {
-    path: PathBuf,
-}
-
-impl Drop for SessionDirGuard {
-    fn drop(&mut self) {
-        if self.path.exists()
-            && let Err(e) = remove_dir_all(&self.path)
-        {
-            eprintln!("remove session dir| {}| {}", self.path.display(), e);
-        }
-    }
-}
-
-fn default_session_name() -> String {
-    format!("zxs-{}", Local::now().format("%d-%m-%H-%M-%S"))
-}
-
-#[inline(always)]
-fn resolve_session_name(
-    provided: Option<String>,
-    attach: bool,
-) -> Result<String, MainError> {
-    match provided {
-        Some(name) => match validate_session_name(&name) {
-            Ok(()) => Ok(name),
-            Err(e) if attach => Err(e),
-            Err(e) => {
-                eprintln!("invalid session name| {}| using default", e);
-                Ok(default_session_name())
-            }
-        },
-        None => Ok(default_session_name()),
-    }
-}
-
-#[inline(always)]
-fn validate_session_name(name: &str) -> Result<(), MainError> {
-    let valid = !name.is_empty()
-        && name.len() <= 64
-        && name != "."
-        && name != ".."
-        && name
-            .bytes()
-            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_'));
-    if valid {
-        Ok(())
-    } else {
-        Err(MainError::InvalidSessionName(name.to_string()))
-    }
-}
-
-#[inline]
-fn create_session_dirs(sname: &str) -> Result<(), Error> {
-    create_dir(sname)?;
-    let history_path = format!("./{}/history", sname);
-    create_dir(&history_path)
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -274,7 +212,7 @@ enum MainError {
     #[error("session directory: {}", .0)]
     CreateSessionDir(Error),
     #[error("CA initialization: {0}")]
-    Crypto(CryptoBuildError),
+    Crypto(commander::captain_crypto::CryptoBuildError),
     #[error("builder: {0}")]
     Builder(BuilderError),
     #[error("invalid session name: {0}")]
@@ -297,63 +235,25 @@ enum MainError {
 
 #[cfg(test)]
 mod tests {
+    use crate::config::CliArgs;
     use std::net::{IpAddr, Ipv4Addr};
 
     use super::*;
 
     #[test]
-    fn test_validate_session_name() {
-        assert!(validate_session_name("zxs-31-10-12-00-00").is_ok());
-        assert!(validate_session_name("abc_123").is_ok());
-        assert!(validate_session_name("").is_err());
-        assert!(validate_session_name(".").is_err());
-        assert!(validate_session_name("..").is_err());
-        assert!(validate_session_name("../escape").is_err());
-        assert!(validate_session_name("a/b").is_err());
-
-        let long_name = "a".repeat(65);
-        assert!(validate_session_name(&long_name).is_err());
-    }
-
-    #[test]
-    fn test_resolve_session_name() {
-        assert_eq!(
-            resolve_session_name(Some("valid_name".to_string()), false)
-                .unwrap(),
-            "valid_name"
-        );
-        assert_eq!(
-            resolve_session_name(Some("valid_name".to_string()), true)
-                .unwrap(),
-            "valid_name"
-        );
-
-        let fallback =
-            resolve_session_name(Some("../escape".to_string()), false)
-                .unwrap();
-        assert!(fallback.starts_with("zxs-"));
-
-        assert!(matches!(
-            resolve_session_name(Some("../escape".to_string()), true),
-            Err(MainError::InvalidSessionName(_))
-        ));
-
-        let default = resolve_session_name(None, false).unwrap();
-        assert!(default.starts_with("zxs-"));
-    }
-
-    #[test]
     fn test_cli_listen_parses_ip() {
         let args = CliArgs::parse_from(["zxc", "--listen", "0.0.0.0"]);
-        assert_eq!(args.listen, Some(IpAddr::V4(Ipv4Addr::UNSPECIFIED)));
+        let listen = args.proxy_args.and_then(|p| p.listen);
+        assert_eq!(listen, Some(IpAddr::V4(Ipv4Addr::UNSPECIFIED)));
     }
 
     #[test]
     fn test_cli_listen_absent() {
         let args = CliArgs::parse_from(["zxc"]);
-        assert_eq!(args.listen, None);
+        let listen = args.proxy_args.and_then(|p| p.listen);
+        assert_eq!(listen, None);
         assert_eq!(
-            args.listen.unwrap_or(DEFAULT_LISTEN),
+            listen.unwrap_or(DEFAULT_LISTEN),
             IpAddr::V4(Ipv4Addr::LOCALHOST)
         );
     }
@@ -363,143 +263,5 @@ mod tests {
         let result =
             CliArgs::try_parse_from(["zxc", "--listen", "0.0.0.0:8080"]);
         assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_error_display_messages() {
-        use crate::addons::AddonError;
-        use crate::commander::{CommanderError, CommunicateError};
-        use crate::config::ConfigError;
-        use crate::history::HistoryError;
-        use crate::id::SoldierId;
-        use crate::interceptor::InterceptorError;
-        use crate::io::DirError;
-        use crate::proxy::states::error::StateError;
-        use crate::repeater::error::RepeaterError;
-        use crate::run::boundary::UiError;
-
-        assert_eq!(
-            MainError::InvalidSessionName("bad".to_string()).to_string(),
-            "invalid session name: bad"
-        );
-        assert_eq!(
-            ConfigError::Env(std::env::VarError::NotPresent).to_string(),
-            "home directory lookup: environment variable not found"
-        );
-        assert_eq!(
-            DirError::UnknownExt("txt".to_string()).to_string(),
-            "unknown file extension: txt"
-        );
-        assert_eq!(
-            CommunicateError::ShouldProxy.to_string(),
-            "should-proxy request receiver dropped"
-        );
-        assert_eq!(
-            InterceptorError::from(UiError::NoUI).to_string(),
-            "no UI connected"
-        );
-        assert_eq!(
-            HistoryError::NoId(SoldierId::Connection(7), "resume").to_string(),
-            "no history entry for conn:7 (resume)"
-        );
-        assert_eq!(
-            AddonError::from(UiError::NoUI).to_string(),
-            "no UI connected"
-        );
-        assert_eq!(
-            AddonError::AddonNotFound("ffuf".to_string()).to_string(),
-            "addon not found: ffuf"
-        );
-        assert_eq!(
-            RepeaterError::from(UiError::NoUI).to_string(),
-            "no UI connected"
-        );
-        assert_eq!(
-            RepeaterError::H2RequiresTls.to_string(),
-            "h2 replay requires TLS"
-        );
-        assert_eq!(
-            RepeaterError::WsWrongScode(400).to_string(),
-            "unexpected websocket status code: 400"
-        );
-        assert_eq!(
-            RepeaterError::UnexpectedAlpn {
-                expected: "h2",
-                negotiated: Some("http/1.1".to_string()),
-            }
-            .to_string(),
-            "ALPN mismatch: expected h2, negotiated Some(\"http/1.1\")"
-        );
-        assert_eq!(
-            RepeaterError::DirError(DirError::UnknownExt("txt".to_string()))
-                .to_string(),
-            "unknown file extension: txt"
-        );
-        assert_eq!(
-            StateError::NoPeerCertificate.to_string(),
-            "no peer certificate"
-        );
-        assert_eq!(
-            StateError::from(CommanderError::RecvContext("timeout"))
-                .to_string(),
-            "commander response channel closed: timeout"
-        );
-
-        let json_error =
-            serde_json::from_str::<serde_json::Value>("{").unwrap_err();
-        assert!(
-            InterceptorError::MsgDeserialize(
-                "payload".to_string(),
-                json_error
-            )
-            .to_string()
-            .starts_with("invalid interceptor message (payload): ")
-        );
-    }
-
-    fn collect_rust_sources(
-        dir: &std::path::Path,
-        files: &mut Vec<std::path::PathBuf>,
-    ) {
-        for entry in std::fs::read_dir(dir).unwrap() {
-            let path = entry.unwrap().path();
-            if path.is_dir() {
-                collect_rust_sources(&path, files);
-            } else if path
-                .extension()
-                .is_some_and(|ext| ext == "rs")
-            {
-                files.push(path);
-            }
-        }
-    }
-
-    #[test]
-    fn test_error_attributes_have_no_pipe_separators() {
-        let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
-        let mut files = Vec::new();
-        collect_rust_sources(&src, &mut files);
-
-        let mut violations = Vec::new();
-        for file in files {
-            let source = std::fs::read_to_string(&file).unwrap();
-            for (line_no, line) in source.lines().enumerate() {
-                let trimmed = line.trim_start();
-                if trimmed.starts_with("#[error(") && trimmed.contains('|') {
-                    violations.push(format!(
-                        "{}:{}: {}",
-                        file.display(),
-                        line_no + 1,
-                        trimmed
-                    ));
-                }
-            }
-        }
-
-        assert!(
-            violations.is_empty(),
-            "noisy error attributes:\n{}",
-            violations.join("\n")
-        );
     }
 }

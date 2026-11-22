@@ -11,14 +11,9 @@ use tracing::trace;
 
 use super::HistoryHandler;
 use crate::core::HISTORY_STATE_FILE;
-use crate::history::{HistoryError, HistoryUIOps, HistoryUImsg};
-use crate::io::{
-    unix_write_vec_and_flush, UnixSockError, CLOSE_SQUARE_BRACKET, DEFAULT_ID,
-};
-use crate::run::boundary::{
-    CloseAction, FlushStorage, FromCommander, HandleCommander, HandleUI,
-    UiReply,
-};
+use crate::history::*;
+use crate::io::*;
+use crate::run::boundary::*;
 
 const LIMIT: usize = 100;
 
@@ -27,12 +22,6 @@ const LIMIT: usize = 100;
 const IOV_MAX: usize = 1024;
 
 // Persists buffered history entries before shutdown.
-//
-// # Steps
-//
-// 1. If the storage is not empty, create and open the `.history.state`
-//    file.
-// 2. Convert the storage to `IoSlice` and write it to the state file.
 impl CloseAction for HistoryHandler {
     async fn close_action(&mut self) -> Result<(), Error> {
         if !self.ui_storage.is_empty() {
@@ -44,15 +33,6 @@ impl CloseAction for HistoryHandler {
 }
 
 /// Writes the buffered history entries to the state file.
-///
-/// # Steps
-///
-/// 1. Convert the storage to `IoSlice`.
-/// 2. Loop `write_vectored` until every slice is written.
-///
-/// # Errors
-///
-/// `ErrorKind::WriteZero` [2]
 async fn write_history_state(
     file: &mut File,
     storage: &[String],
@@ -82,16 +62,6 @@ async fn write_history_state(
 }
 
 // Flushes buffered history entries to the UI socket.
-//
-// # Steps
-//
-// 1. Build a `Vec<IoSlice>` with capacity of storage length * 3.
-// 2. For each entry in the storage, push `DEFAULT_ID`, the entry and `]`.
-// 3. Write the slices to the socket.
-//
-// # Errors
-//
-// `UnixSockError::Write` [3].
 impl FlushStorage for HistoryHandler {
     async fn flush_storage(
         &mut self,
@@ -120,20 +90,6 @@ impl FlushStorage for HistoryHandler {
 }
 
 // Buffers commander messages and releases them on a timer.
-//
-// Yields the number of messages received.
-//
-// # Steps
-//
-// 1. Set the interval to 2 seconds.
-// 2. Loop over a `select!`:
-//    a. Receive messages from the commander with `recv_many`. If the
-//       current interval is not 2 seconds, set it to 2 seconds and
-//       reset it immediately, otherwise wait for the timer to tick.
-//    b. If the interval ticked and the storage is empty, increase the
-//       interval by 2 seconds.
-//    c. If the interval ticked and there are messages, return the
-//       number of messages.
 impl FromCommander for HistoryHandler {
     type Message = usize;
 
@@ -199,18 +155,6 @@ impl HandleCommander for HistoryHandler {
 }
 
 // Handles one decoded UI message for history.
-//
-// # Steps
-//
-// 1. Deserialize the buffer to `HistoryUImsg`.
-// 2. If the operation is close, return `HistoryError::UI`.
-// 3. Otherwise send the operation to the commander.
-//
-// # Errors
-//
-// - `HistoryError::MsgDecode` [1]
-// - `HistoryError::UI` [2]
-// - `HistoryError::CommanderSend` [3]
 impl HandleUI for HistoryHandler {
     async fn handle_ui(&mut self) -> Result<UiReply, HistoryError> {
         let msg = serde_json::from_slice::<HistoryUImsg>(&self.buf)?;

@@ -1,8 +1,7 @@
-use std::io::{self, Error};
+use std::io::Error;
 use std::path::Path;
 
 use thiserror::Error;
-use tokio::fs::read_dir;
 
 #[derive(Debug, Error)]
 pub enum DirError {
@@ -11,11 +10,11 @@ pub enum DirError {
     #[error("top directory not found: {0}")]
     NoTop(String),
     #[error("incremental directory build: {0}")]
-    IncrementalDir(#[source] io::Error),
+    IncrementalDir(#[source] Error),
     #[error("directory create: {0}")]
-    CreateDir(#[source] io::Error),
+    CreateDir(#[source] Error),
     #[error("file copy: {0}")]
-    CopyFile(#[source] io::Error),
+    CopyFile(#[source] Error),
 }
 
 pub async fn incremental<T>(
@@ -27,7 +26,7 @@ where
     T: AsRef<Path>,
 {
     let mut id = 0;
-    let mut dir_list = read_dir(directory).await?;
+    let mut dir_list = tokio::fs::read_dir(directory).await?;
 
     while let Some(entry) = dir_list.next_entry().await? {
         let name = entry.file_name();

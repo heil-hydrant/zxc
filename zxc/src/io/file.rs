@@ -36,30 +36,36 @@ pub struct FileErrorInfo {
 }
 
 impl FileErrorInfo {
-    pub fn write_fail(name: &Path, error: io::Error) -> Self {
-        Self {
-            name: name.to_path_buf(),
-            event: FileEvent::Write,
-            error,
-        }
-    }
-
-    pub fn read_fail(name: &Path, error: io::Error) -> Self {
-        Self {
-            name: name.to_path_buf(),
-            event: FileEvent::Read,
-            error,
-        }
-    }
-}
-
-impl From<(&PathBuf, FileEvent, io::Error)> for FileErrorInfo {
-    fn from((name, event, error): (&PathBuf, FileEvent, io::Error)) -> Self {
+    fn new(name: &Path, event: FileEvent, error: io::Error) -> Self {
         Self {
             name: name.to_path_buf(),
             event,
             error,
         }
+    }
+
+    pub fn create_fail(name: &Path, error: io::Error) -> Self {
+        Self::new(name, FileEvent::Create, error)
+    }
+
+    pub fn write_fail(name: &Path, error: io::Error) -> Self {
+        Self::new(name, FileEvent::Write, error)
+    }
+
+    pub fn read_fail(name: &Path, error: io::Error) -> Self {
+        Self::new(name, FileEvent::Read, error)
+    }
+
+    pub fn open_fail(name: &Path, error: io::Error) -> Self {
+        Self::new(name, FileEvent::Open, error)
+    }
+
+    pub fn seek_fail(name: &Path, error: io::Error) -> Self {
+        Self::new(name, FileEvent::Seek, error)
+    }
+
+    pub fn truncate_fail(name: &Path, error: io::Error) -> Self {
+        Self::new(name, FileEvent::SetLen, error)
     }
 }
 
@@ -97,10 +103,10 @@ pub async fn create_and_write_file(
         .write(true)
         .open(path)
         .await
-        .map_err(|e| FileErrorInfo::from((path, FileEvent::Open, e)))?;
+        .map_err(|e| FileErrorInfo::open_fail(path, e))?;
     write_and_flush(&mut file, contents)
         .await
-        .map_err(|e| FileErrorInfo::from((path, FileEvent::Write, e)))?;
+        .map_err(|e| FileErrorInfo::write_fail(path, e))?;
     Ok(file)
 }
 

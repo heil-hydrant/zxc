@@ -15,7 +15,7 @@ use zxc_derive::{Buffer, CloseAction, FlushStorage, NotifyCommander};
 
 use super::AddonError;
 use super::h2::ensure_host_file;
-use super::message::to_ui::AddonMsg;
+use super::messages::AddonToUi;
 use crate::ADDONS;
 use crate::CAPACITY_2MB;
 use crate::config::Addon;
@@ -80,7 +80,7 @@ impl AddonHandler {
         let cmd =
             addon.build_cmd(name, &dest_file.to_string_lossy(), is_tls, is_h2);
 
-        let addon_msg = AddonMsg::new(cmd, dest_file);
+        let addon_msg = AddonToUi::new(cmd, dest_file);
         Ok(serde_json::to_string(&addon_msg)?)
     }
 }

@@ -1,3 +1,4 @@
+use std::net::IpAddr;
 use std::ops::Add;
 
 use clap::Args;
@@ -5,11 +6,15 @@ use clap::builder::NonEmptyStringValueParser;
 use serde::{Deserialize, Serialize};
 
 use crate::config::*;
+use crate::core::constants::DEFAULT_LISTEN;
 
 // Struct for command line arguments + Local Config
 #[cfg_attr(test, derive(PartialEq, Clone, Default))]
 #[derive(Args, Debug, Serialize, Deserialize)]
 pub struct ProxyArgs {
+    /// Interface to bind the proxy listener to
+    #[arg(short, long = "listen")]
+    pub listen: Option<IpAddr>,
     /// Proxy port to use
     #[arg(short, long = "port")]
     pub port: Option<u16>,
@@ -36,25 +41,20 @@ pub struct ProxyArgs {
 }
 
 impl ProxyArgs {
-    /// Cleans up the parsed proxy arguments.
-    ///
-    /// # Steps
-    ///
-    /// 1. If the port is `8080`, remove it.
-    /// 2. Remove empty and duplicate values from `included_domains` and
-    ///    `excluded_domains`.
-    /// 3. If all fields are empty, return `None`.
     pub fn sanitize(mut self) -> Option<ProxyArgs> {
-        // if port is 8080 , remove it
         if self.port == Some(8080) {
             self.port = None;
+        }
+        if self.listen == Some(DEFAULT_LISTEN) {
+            self.listen = None;
         }
         if self.no_ws == Some(false) {
             self.no_ws.take();
         }
         sanitize_option_vec_string(&mut self.included_domains);
         sanitize_option_vec_string(&mut self.excluded_domains);
-        if self.port.is_some()
+        if self.listen.is_some()
+            || self.port.is_some()
             || self.included_domains.is_some()
             || self.excluded_domains.is_some()
             || self.no_ws.is_some()
@@ -71,13 +71,14 @@ impl Add for ProxyArgs {
     type Output = ProxyArgs;
 
     fn add(self, rhs: Self) -> Self::Output {
+        let listen = self.listen.or(rhs.listen);
         let port = self.port.or(rhs.port);
         let no_ws = match (self.no_ws, rhs.no_ws) {
             (Some(a), Some(b)) => Some(a || b),
             (Some(a), None) | (None, Some(a)) => Some(a),
             (None, None) => None,
         };
-        // if both include and exclude are present include is given prefrence
+        // if both include and exclude are present include is given preference
         let included_domains: Option<Vec<String>> =
             if self.included_domains.is_some()
                 || rhs.included_domains.is_some()
@@ -94,6 +95,7 @@ impl Add for ProxyArgs {
         };
 
         ProxyArgs {
+            listen,
             port,
             included_domains,
             excluded_domains,
@@ -149,6 +151,24 @@ pub mod tests {
     }
 
     #[test]
+    fn test_proxyargs_sanitize_listen_default() {
+        let proxy = ProxyArgs {
+            listen: Some(DEFAULT_LISTEN),
+            ..Default::default()
+        };
+        assert!(proxy.sanitize().is_none());
+    }
+
+    #[test]
+    fn test_proxyargs_sanitize_listen_custom() {
+        let proxy = ProxyArgs {
+            listen: Some("0.0.0.0".parse().unwrap()),
+            ..Default::default()
+        };
+        assert!(proxy.sanitize().is_some());
+    }
+
+    #[test]
     fn test_proxyargs_sanitize_port_8081() {
         let proxy = ProxyArgs {
             port: Some(8081),
@@ -180,6 +200,27 @@ pub mod tests {
         let new = ProxyArgs::default();
         let old = ProxyArgs {
             port: Some(8081),
+            ..Default::default()
+        };
+        assert_eq!(new + old.clone(), old);
+    }
+
+    // Listen
+    #[test]
+    fn test_proxyargs_add_new_listen_old_no_listen() {
+        let new = ProxyArgs {
+            listen: Some("0.0.0.0".parse().unwrap()),
+            ..Default::default()
+        };
+        let old = ProxyArgs::default();
+        assert_eq!(new.clone() + old, new);
+    }
+
+    #[test]
+    fn test_proxyargs_add_new_no_listen_old_listen() {
+        let new = ProxyArgs::default();
+        let old = ProxyArgs {
+            listen: Some("0.0.0.0".parse().unwrap()),
             ..Default::default()
         };
         assert_eq!(new + old.clone(), old);

@@ -23,11 +23,11 @@ use crate::repeater::RepeaterHandler;
 
 #[derive(Debug, thiserror::Error)]
 pub enum BuilderError {
-    #[error("listener {path}: {source}")]
+    #[error("listener {path}: {error}")]
     Listener {
         path: PathBuf,
         #[source]
-        source: Error,
+        error: Error,
     },
     #[error("module not built: {0}")]
     MissingModule(&'static str),
@@ -77,9 +77,9 @@ impl Builder {
     ) -> Result<UnixListener, BuilderError> {
         let path =
             PathBuf::from(format!("/tmp/{}/{}.sock", self.sname, mod_name));
-        UnixListener::bind(&path).map_err(|source| BuilderError::Listener {
+        UnixListener::bind(&path).map_err(|e| BuilderError::Listener {
             path,
-            source,
+            error: e,
         })
     }
 
@@ -93,7 +93,7 @@ impl Builder {
         {
             Some(Ok(list)) => list,
             Some(Err(e)) if e.kind() != std::io::ErrorKind::NotFound => {
-                error!("failed to read history state| {e}");
+                error!("failed to read history state: {e}");
                 Vec::new()
             }
             _ => Vec::new(),

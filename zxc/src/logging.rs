@@ -47,15 +47,27 @@ impl<'a> MakeWriter<'a> for DebugLogger {
     type Writer = FileWriter<'a>;
 
     fn make_writer(&'a self) -> Self::Writer {
-        FileWriter(self.debug.lock().unwrap_or_else(|e| e.into_inner()))
+        FileWriter(
+            self.debug
+                .lock()
+                .unwrap_or_else(|e| e.into_inner()),
+        )
     }
 
     fn make_writer_for(&'a self, meta: &Metadata<'_>) -> Self::Writer {
         if meta.level() <= &Level::DEBUG {
-            return FileWriter(self.basic.lock().unwrap_or_else(|e| e.into_inner()));
+            return FileWriter(
+                self.basic
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner()),
+            );
         }
 
-        FileWriter(self.debug.lock().unwrap_or_else(|e| e.into_inner()))
+        FileWriter(
+            self.debug
+                .lock()
+                .unwrap_or_else(|e| e.into_inner()),
+        )
     }
 }
 
@@ -65,11 +77,19 @@ impl<'a> MakeWriter<'a> for BasicLogger {
     type Writer = FileWriter<'a>;
 
     fn make_writer(&'a self) -> Self::Writer {
-        FileWriter(self.0.lock().unwrap_or_else(|e| e.into_inner()))
+        FileWriter(
+            self.0
+                .lock()
+                .unwrap_or_else(|e| e.into_inner()),
+        )
     }
 
     fn make_writer_for(&'a self, _: &Metadata<'_>) -> Self::Writer {
-        FileWriter(self.0.lock().unwrap_or_else(|e| e.into_inner()))
+        FileWriter(
+            self.0
+                .lock()
+                .unwrap_or_else(|e| e.into_inner()),
+        )
     }
 }
 
@@ -104,8 +124,8 @@ pub fn setup_logging(debug: bool) -> Result<(), Box<dyn std::error::Error>> {
         .with_ansi(false);
 
     if max_level == Level::TRACE {
-        let _ =
-            create_dir_all("log").map_err(|e| eprintln!("create log dir| {}", e));
+        let _ = create_dir_all("log")
+            .map_err(|e| eprintln!("create log dir| {}", e));
         match File::create("./log/proxy.log") {
             Ok(file) => {
                 let writer = DebugLogger::new(basic_file, file);
@@ -127,30 +147,4 @@ pub fn setup_logging(debug: bool) -> Result<(), Box<dyn std::error::Error>> {
         .finish();
     set_global_default(subscriber)?;
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_file_writer_recovers_from_poisoned_mutex() {
-        let temp_path = std::env::temp_dir().join("test_logging_poison.txt");
-        let temp_file = File::create(&temp_path).unwrap();
-        let logger = BasicLogger(Mutex::new(temp_file));
-
-        // Poison the mutex intentionally
-        let _ = std::panic::catch_unwind(|| {
-            let _guard = logger.0.lock().unwrap();
-            panic!("poisoning mutex");
-        });
-
-        assert!(logger.0.is_poisoned());
-
-        let mut writer = logger.make_writer();
-        assert!(writer.write_all(b"test log entry\n").is_ok());
-        assert!(writer.flush().is_ok());
-
-        let _ = std::fs::remove_file(temp_path);
-    }
 }

@@ -8,15 +8,15 @@ use crate::run::boundary::UiError;
 
 #[derive(Debug, Error)]
 pub enum InterceptorError {
-    // ----- Commander -----
+    // Commander
     #[error(transparent)]
     Commander(#[from] CommanderError),
 
-    // ------ UI ------
+    // UI
     #[error("invalid interceptor message ({0}): {1}")]
     MsgDeserialize(String, #[source] serde_json::Error),
 
-    // ----- codec_op ------
+    // codec_op
     #[error(transparent)]
     Codec(#[from] CodecError),
     #[error(transparent)]

@@ -20,7 +20,7 @@ where
         .write(true)
         .open(&conn.path)
         .await
-        .map_err(|e| FileErrorInfo::from((&conn.path, FileEvent::Open, e)))?;
+        .map_err(|e| FileErrorInfo::open_fail(&conn.path, e))?;
     let one: Roneone<T> = Roneone::from((conn, file));
     let state = RepeaterState::ReadFromFile(one);
     match async_run(state).await? {

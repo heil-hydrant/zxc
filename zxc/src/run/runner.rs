@@ -1,41 +1,18 @@
 use std::time::Duration;
 
 use tokio::io::AsyncReadExt;
-use tokio::net::UnixStream;
-use tokio::select;
 use tokio::time::timeout;
-use tokio_util::sync::CancellationToken;
 use tracing::{error, info, trace};
 
 use super::boundary::*;
-use crate::io::{
-    UnixSockError, build_slice_and_write, read_from_unix, split_json_frame, write_and_flush
-};
+use crate::io::*;
 
 const CLOSE_MSG: &[u8] = br#"[0,{"Action": "Close"}]"#;
 
-/// Runs the event loop for one UI module over its Unix socket.
-///
-/// # Steps
-///
-/// 1. Select on commander messages, socket readability, and cancellation.
-/// 2. Commander message: call `handle_commander_ui` and handle the reply.
-///    `None` continues, `Reply` writes a framed reply, `Flush` drains queued
-///    storage, and errors are logged.
-/// 3. Socket read: decode every complete buffered frame, call `handle_ui`,
-///    keep the unconsumed tail, and write or flush the reply. Return on a UI
-///    error, otherwise continue.
-/// 4. Cancellation: write `CLOSE_MSG`, wait briefly for the peer to close,
-///    and return.
-///
-/// # Errors
-///
-/// - `UnixSocketError::Read` from the socket read.
-/// - `UnixSocketError::Write` from commander replies and the close message.
 pub async fn run_module<T>(
     handler: &mut T,
-    mut stream: UnixStream,
-    token: &CancellationToken,
+    mut stream: tokio::net::UnixStream,
+    token: &tokio_util::sync::CancellationToken,
 ) -> Result<(), <T as HandleCommander>::Error>
 where
     T: FromCommander + HandleCommander + Buffer + HandleUI + FlushStorage,
@@ -43,7 +20,7 @@ where
     info!("running");
     handler.buf_as_mut().clear();
     loop {
-        select! {
+        tokio::select! {
             biased;
             _ = token.cancelled() => {
                 let _ = timeout(
@@ -89,9 +66,9 @@ where
                         return Err(e.into());
                     }
                 }
-                while let Some(tail) = split_json_frame(handler.buf_as_mut()) {
+                while let Some(buf) = split_json_frame(handler.buf_as_mut()) {
                     let result = handler.handle_ui().await;
-                    *handler.buf_as_mut() = tail;
+                    *handler.buf_as_mut() = buf;
                     trace!("frame consumed");
                     match result {
                         Ok(UiReply::None) => (),

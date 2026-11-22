@@ -1,7 +1,6 @@
 mod filter;
 
-use filter::DomainFilter;
-use filter::domain_list::DomainList;
+use filter::{DomainFilter, DomainList};
 use mime_plz::ContentType;
 use mime_plz::from_extension::EXTENSION_MAP;
 use tracing::trace;
@@ -19,34 +18,10 @@ pub struct Config {
 }
 
 impl Config {
-    /// Builds the parsed proxy configuration from the local and global
-    /// config.
-    ///
-    /// # Steps
-    ///
-    /// 1. Take `excluded_content_types` and `excluded_extensions` from the
-    ///    global config.
-    /// 2. Combine the global `with_ws` and the local `no_ws` flag with
-    ///    `global && !local`:
-    ///
-    ///    ```text
-    ///    g l f
-    ///    -----
-    ///    0 0 0
-    ///    1 0 1
-    ///    0 1 0
-    ///    1 1 0
-    ///    ```
-    ///
-    /// 3. Build `filter_domains` from the local and global config through
-    ///    `combine_filter()`.
-    /// 4. Return `Some(Config)` when `with_ws` is false or any field is
-    ///    set, otherwise return `None`.
     pub fn build(
         local_config: Option<ProxyArgs>,
         mut global_config: Option<GlobalConfig>,
     ) -> Option<Config> {
-        // 1. Exclude content types and extensions
         let excluded_content_types = global_config
             .as_mut()
             .and_then(|gc| gc.excluded_content_types.take());
@@ -63,9 +38,16 @@ impl Config {
             .as_ref()
             .is_some_and(|lc| lc.no_ws.unwrap_or(false));
 
+        //    ```text
+        //    g l f
+        //    -----
+        //    0 0 0
+        //    1 0 1
+        //    0 1 0
+        //    1 1 0
+        //    ```
         let with_ws = global_ws && !local_ws;
 
-        // 5. Combine local and global config
         let filter_domains = Self::combine_filter(local_config, global_config);
 
         // sanitize
@@ -85,42 +67,26 @@ impl Config {
         }
     }
 
-    /// Combines the local and global config into a `DomainFilter`.
-    ///
-    /// # Steps
-    ///
-    /// 1. If no config is given, return `None`.
-    /// 2. With only a global config, return `DomainList::Exclude` from
-    ///    `global_config.excluded_domains`, since the global config only
-    ///    carries excluded domains.
-    /// 3. With only a local config, either include or exclude is present:
-    ///    - If `local_config.included_domains` is `Some`, return
-    ///      `DomainList::Include` from it.
-    ///    - Otherwise return `DomainList::Exclude` from
-    ///      `local_config.excluded_domains`.
-    /// 4. With both configs present:
-    ///    - If `local_config.included_domains` is `Some`, return
-    ///      `DomainList::Include` from it.
-    ///    - Otherwise combine `local_config.excluded_domains` and
-    ///      `global_config.excluded_domains` with `add_option_vec()`,
-    ///      sanitize the result with `sanitize_option_vec_string()`, and
-    ///      return `DomainList::Exclude` when the list is `Some`.
     fn combine_filter(
         local_config: Option<ProxyArgs>,
         global_config: Option<GlobalConfig>,
     ) -> Option<DomainFilter> {
         match (local_config, global_config) {
-            // 1. No config
+            //  No config
             (None, None) => None,
-
-            // 2. Only global config
+            // Only global config
+            // only `DomainList::Exclude` present in global config
             (None, Some(gc)) => {
                 trace!("no local config");
                 gc.excluded_domains
                     .map(|list| DomainFilter::Exclude(DomainList::from(list)))
             }
 
-            // 3. Only local config
+            // Only local config
+            //    - If `local_config.included_domains` is `Some`, return
+            //      `DomainList::Include`
+            //    - Otherwise return `DomainList::Exclude` from
+            //      `local_config.excluded_domains`.
             (Some(lc), None) => {
                 trace!("no global config");
                 if let Some(list) = lc.included_domains {
@@ -132,13 +98,20 @@ impl Config {
                 }
             }
 
-            // 4. Both config
+            // Both config
             (Some(lc), Some(gc)) => {
                 trace!("local and global config");
+                // `local_config.included_domains` is `Some`, return
+                // `DomainList::Include` from it.
                 if let Some(llist) = lc.included_domains {
                     Some(DomainFilter::Include(DomainList::from(llist)))
                 }
-                // 4.b. local-exclude + global-exclude
+                // local-exclude + global-exclude
+                //
+                // combine `local_config.excluded_domains` and
+                // `global_config.excluded_domains` with `add_option_vec()`,
+                // sanitize the result with `sanitize_option_vec_string()`, and
+                // return `DomainList::Exclude` when the list is `Some`.
                 else {
                     let mut list = add_option_vec(
                         gc.excluded_domains,
@@ -161,14 +134,6 @@ impl Config {
     }
 
     /// Checks whether traffic with the given extension should be logged.
-    ///
-    /// # Steps
-    ///
-    /// 1. If the extension is not empty, make it lowercase.
-    /// 2. Return `false` when the extension is in `excluded_extensions`.
-    /// 3. Otherwise look up the `ContentType` for the extension in
-    ///    `EXTENSION_MAP` and return `false` when that content type is in
-    ///    `excluded_content_types`.
     pub fn should_log(&self, mut ext: String) -> bool {
         if !ext.is_empty() {
             ext.make_ascii_lowercase();
@@ -257,6 +222,7 @@ mod tests {
     #[test]
     fn test_build_config_only_local() {
         let local_config = Some(ProxyArgs {
+            listen: None,
             port: None,
             included_domains: Some(vec!["*.google.com".to_string()]),
             excluded_domains: None,
@@ -306,6 +272,7 @@ mod tests {
     fn test_parse_config_local_exclude_global_no() {
         let elist = vec!["reddit.com".to_string(), "*.google.com".to_string()];
         let local_config: Option<ProxyArgs> = Some(ProxyArgs {
+            listen: None,
             included_domains: None,
             excluded_domains: Some(elist.clone()),
             port: Some(8080),
@@ -323,6 +290,7 @@ mod tests {
     fn test_parse_config_local_include_global_no() {
         let elist = vec!["reddit.com".to_string(), "*.google.com".to_string()];
         let local_config: Option<ProxyArgs> = Some(ProxyArgs {
+            listen: None,
             included_domains: Some(elist.clone()),
             excluded_domains: None,
             port: Some(8080),
@@ -341,6 +309,7 @@ mod tests {
         let elist = vec!["reddit.com".to_string(), "*.google.com".to_string()];
         let ilist = vec!["*.youtube.com".to_string()];
         let local_config: Option<ProxyArgs> = Some(ProxyArgs {
+            listen: None,
             included_domains: Some(ilist.clone()),
             excluded_domains: Some(elist.clone()),
             port: Some(8080),
@@ -359,6 +328,7 @@ mod tests {
         let elist = vec!["reddit.com".to_string(), "*.google.com".to_string()];
         let ilist = vec!["*.youtube.com".to_string()];
         let local_config: Option<ProxyArgs> = Some(ProxyArgs {
+            listen: None,
             included_domains: Some(ilist.clone()),
             excluded_domains: Some(elist.clone()),
             port: Some(8080),
@@ -382,6 +352,7 @@ mod tests {
     fn test_parse_config_local_execlude_global_exclude() {
         let elist = vec!["reddit.com".to_string(), "*.google.com".to_string()];
         let local_config: Option<ProxyArgs> = Some(ProxyArgs {
+            listen: None,
             included_domains: None,
             excluded_domains: Some(elist.clone()),
             port: Some(8080),

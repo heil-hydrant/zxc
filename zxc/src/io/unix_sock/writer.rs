@@ -19,21 +19,6 @@ pub async fn unix_write_vec_and_flush(
     stream: &mut UnixStream,
     mut buf: &mut [IoSlice<'_>],
 ) -> Result<usize, Error> {
-    //loop {
-    //    stream.writable().await?;
-    //    match stream.try_write_vectored(buf) {
-    //        Ok(n) => {
-    //            stream.flush().await?;
-    //            return Ok(n);
-    //        }
-    //        Err(e) => {
-    //            if matches!(e.kind(), ErrorKind::WouldBlock) {
-    //                continue;
-    //            }
-    //            return Err(e);
-    //        }
-    //    }
-    //}
     timeout(WRITE_TIMEOUT, async {
         while !buf.is_empty() {
             stream.writable().await?;
@@ -81,6 +66,7 @@ pub async fn build_slice_and_write(
     Ok(())
 }
 
+#[inline(always)]
 fn build_slice<'a>(id: &'a str, data: &'a str) -> [IoSlice<'a>; 3] {
     [
         IoSlice::new(id.as_bytes()),

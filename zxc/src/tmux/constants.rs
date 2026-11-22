@@ -1,10 +1,10 @@
-pub const TMUX: &str = "tmux";
+pub const ARGUMENTS_BEFORE_TARGET: [&str; 2] = [CMD_SEND_KEY, FLAG_TARGET];
+pub const CMD_SEND_KEY: &str = "send-keys";
+pub const ENTER: &str = "Enter";
+pub const FLAG_DETACH: &str = "-d";
+pub const FLAG_TARGET: &str = "-t";
 pub const NEW_SESSION: &str = "new-session";
 pub const NEW_WINDOW: &str = "new-window";
 pub const RENAME_WINDOW: &str = "rename-window";
-pub const FLAG_DETACH: &str = "-d";
-pub const FLAG_TARGET: &str = "-t";
-pub const ENTER: &str = "Enter";
-pub const CMD_SEND_KEY: &str = "send-keys";
-pub const ARGUMENTS_BEFORE_TARGET: [&str; 2] = [CMD_SEND_KEY, FLAG_TARGET];
 pub const SOCKET_FLAG: &str = "-L";
+pub const TMUX: &str = "tmux";

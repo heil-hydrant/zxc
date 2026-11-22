@@ -191,8 +191,8 @@ fn generate_domain_cert(
 ) -> Result<CertificateDer<'static>, CertError> {
     use std::net::IpAddr;
 
-    use rcgen::string::Ia5String;
     use rcgen::DnType;
+    use rcgen::string::Ia5String;
     use x509_parser::extensions::GeneralName;
 
     let (_, real_cert) =
@@ -230,17 +230,24 @@ fn generate_domain_cert(
 
     let mut cert_params = CertificateParams::default();
 
-    let common_name = if let Some(cn_attr) = real_cert.subject().iter_common_name().next() {
+    let common_name = if let Some(cn_attr) = real_cert
+        .subject()
+        .iter_common_name()
+        .next()
+    {
         let cn = cn_attr
             .as_str()
             .map_err(|e| CertError::X509(e.to_string()))?;
-        cert_params.distinguished_name.push(DnType::CommonName, cn);
+        cert_params
+            .distinguished_name
+            .push(DnType::CommonName, cn);
         Some(cn)
     } else {
         None
     };
 
-    if let Some(alt_names) = subject_alt_names.filter(|sans| !sans.is_empty()) {
+    if let Some(alt_names) = subject_alt_names.filter(|sans| !sans.is_empty())
+    {
         cert_params.subject_alt_names = alt_names;
     } else if let Some(cn) = common_name {
         let san = match cn.parse::<IpAddr>() {
@@ -292,9 +299,14 @@ mod tests {
         let result = generate_domain_cert(&leaf_key, leaf_cert, &signer);
         assert!(result.is_ok());
         let cert_der = result.unwrap();
-        let (_, cert) =
-            x509_parser::certificate::X509Certificate::from_der(cert_der.as_ref()).unwrap();
-        let san = cert.subject_alternative_name().unwrap().unwrap();
+        let (_, cert) = x509_parser::certificate::X509Certificate::from_der(
+            cert_der.as_ref(),
+        )
+        .unwrap();
+        let san = cert
+            .subject_alternative_name()
+            .unwrap()
+            .unwrap();
         let dns_names: Vec<_> = san
             .value
             .general_names

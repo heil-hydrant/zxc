@@ -21,6 +21,40 @@ pub struct Soldiers {
 }
 
 impl Soldiers {
+    fn get_sender(
+        &self,
+        id: SoldierId,
+        ft: &FileType,
+    ) -> Option<&Sender<CommanderResponse>> {
+        match ft {
+            FileType::Req | FileType::Res => match id {
+                SoldierId::Connection(conn_id) => self.http1.get(conn_id),
+                SoldierId::H2Stream {
+                    conn_id,
+                    stream_id,
+                } => self
+                    .http2
+                    .get_stream(conn_id, stream_id),
+            },
+            FileType::Wreq => self.ws.get_sender(&id, Role::Server),
+            FileType::Wres => self.ws.get_sender(&id, Role::Client),
+        }
+    }
+
+    async fn broadcast_none(
+        &self,
+        map: &mut FxHashMap<usize, SoldierId>,
+        ft: FileType,
+    ) {
+        for (_, soldier_id) in map.drain() {
+            if let Some(sender) = self.get_sender(soldier_id, &ft) {
+                let _ = sender
+                    .send(CommanderResponse::Resume(None))
+                    .await;
+            }
+        }
+    }
+
     pub fn add_http_handle(
         &mut self,
         id: usize,
@@ -81,47 +115,20 @@ impl Soldiers {
         ft: &FileType,
         res: CommanderResponse,
     ) -> Result<(), CommunicateError> {
-        match ft {
-            FileType::Req | FileType::Res => match id {
-                SoldierId::Connection(conn_id) => {
-                    match self.http1.get(conn_id) {
-                        Some(sender) => Ok(sender.send(res).await?),
-                        None => Err(CommunicateError::ResponseNoId(id, res)),
-                    }
-                }
-                SoldierId::H2Stream {
-                    conn_id,
-                    stream_id,
-                } => {
-                    match self
-                        .http2
-                        .get_stream(conn_id, stream_id)
-                    {
-                        Some(sender) => Ok(sender.send(res).await?),
-                        None => Err(CommunicateError::ResponseNoId(id, res)),
-                    }
-                }
-            },
-            FileType::Wreq => match self.ws.get_sender(&id, Role::Server) {
-                Some(sender) => Ok(sender.send(res).await?),
-                None => Err(CommunicateError::ResponseNoId(id, res)),
-            },
-            FileType::Wres => match self.ws.get_sender(&id, Role::Client) {
-                Some(sender) => Ok(sender.send(res).await?),
-                None => Err(CommunicateError::ResponseNoId(id, res)),
-            },
+        match self.get_sender(id, ft) {
+            Some(sender) => Ok(sender.send(res).await?),
+            None => Err(CommunicateError::ResponseNoId(id, res)),
         }
     }
 
     pub fn remove_from_http_store(&mut self, id: SoldierId) -> bool {
         match id {
             SoldierId::Connection(conn_id) => {
-                let removed_h1 = self.http1.remove(conn_id);
-                let removed_h2 = self
-                    .http2
-                    .remove_connection(conn_id)
-                    .is_some();
-                removed_h1 || removed_h2
+                self.http1.remove(conn_id)
+                    | self
+                        .http2
+                        .remove_connection(conn_id)
+                        .is_some()
             }
             SoldierId::H2Stream {
                 conn_id,
@@ -147,59 +154,24 @@ impl Soldiers {
         &mut self,
         map: &mut FxHashMap<usize, SoldierId>,
     ) {
-        for soldier_id in std::mem::take(map).into_values() {
-            let res = CommanderResponse::Resume(None);
-            match soldier_id {
-                SoldierId::Connection(conn_id) => {
-                    if let Some(sender) = self.http1.get(conn_id) {
-                        let _ = sender.send(res).await;
-                    }
-                }
-                SoldierId::H2Stream {
-                    conn_id,
-                    stream_id,
-                } => {
-                    if let Some(sender) = self
-                        .http2
-                        .get_stream(conn_id, stream_id)
-                    {
-                        let _ = sender.send(res).await;
-                    }
-                }
-            }
-        }
+        self.broadcast_none(map, FileType::Req)
+            .await;
     }
 
     pub async fn broadcast_none_wreq(
         &mut self,
         map: &mut FxHashMap<usize, SoldierId>,
     ) {
-        for soldier_id in std::mem::take(map).into_values() {
-            if let Some(sender) = self
-                .ws
-                .get_sender(&soldier_id, Role::Server)
-            {
-                let _ = sender
-                    .send(CommanderResponse::Resume(None))
-                    .await;
-            }
-        }
+        self.broadcast_none(map, FileType::Wreq)
+            .await;
     }
 
     pub async fn broadcast_none_wres(
         &mut self,
         map: &mut FxHashMap<usize, SoldierId>,
     ) {
-        for soldier_id in std::mem::take(map).into_values() {
-            if let Some(sender) = self
-                .ws
-                .get_sender(&soldier_id, Role::Client)
-            {
-                let _ = sender
-                    .send(CommanderResponse::Resume(None))
-                    .await;
-            }
-        }
+        self.broadcast_none(map, FileType::Wres)
+            .await;
     }
 }
 
@@ -220,5 +192,105 @@ mod tests {
             .await;
 
         assert!(queue.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_send_response_ft_http1() {
+        let mut soldiers = Soldiers::default();
+        let mut rx = soldiers.add_http_handle(1);
+
+        soldiers
+            .send_response_ft(
+                SoldierId::Connection(1),
+                &FileType::Req,
+                CommanderResponse::Resume(None),
+            )
+            .await
+            .expect("should send response");
+
+        match rx.recv().await {
+            Some(CommanderResponse::Resume(None)) => {}
+            other => panic!("unexpected response: {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_send_response_ft_h2() {
+        let mut soldiers = Soldiers::default();
+        let mut rx = soldiers.add_h2_stream_handle(1, 3);
+
+        soldiers
+            .send_response_ft(
+                SoldierId::H2Stream {
+                    conn_id: 1,
+                    stream_id: 3,
+                },
+                &FileType::Res,
+                CommanderResponse::Resume(None),
+            )
+            .await
+            .expect("should send response");
+
+        match rx.recv().await {
+            Some(CommanderResponse::Resume(None)) => {}
+            other => panic!("unexpected response: {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_send_response_ft_ws() {
+        let mut soldiers = Soldiers::default();
+        let (tx_client, mut rx_client) = tokio::sync::mpsc::channel(1);
+        let (tx_server, mut rx_server) = tokio::sync::mpsc::channel(1);
+        let ws_id = SoldierId::Connection(10);
+
+        soldiers.add_ws_handle(ws_id, tx_client, tx_server);
+
+        soldiers
+            .send_response_ft(
+                ws_id,
+                &FileType::Wreq,
+                CommanderResponse::Resume(None),
+            )
+            .await
+            .expect("should send wreq response");
+
+        match rx_server.recv().await {
+            Some(CommanderResponse::Resume(None)) => {}
+            other => panic!("unexpected server response: {:?}", other),
+        }
+
+        soldiers
+            .send_response_ft(
+                ws_id,
+                &FileType::Wres,
+                CommanderResponse::Resume(None),
+            )
+            .await
+            .expect("should send wres response");
+
+        match rx_client.recv().await {
+            Some(CommanderResponse::Resume(None)) => {}
+            other => panic!("unexpected client response: {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_send_response_ft_no_id() {
+        let mut soldiers = Soldiers::default();
+        let result = soldiers
+            .send_response_ft(
+                SoldierId::Connection(999),
+                &FileType::Req,
+                CommanderResponse::Resume(None),
+            )
+            .await;
+
+        match result {
+            Err(CommunicateError::ResponseNoId(id, _)) => {
+                assert_eq!(id, SoldierId::Connection(999));
+            }
+            other => panic!("expected ResponseNoId error, got: {:?}", other),
+        }
     }
 }

@@ -119,8 +119,6 @@ impl IsUIError for UiError {
 }
 
 /// Generates the shared UI error conversions for a handler error enum.
-///
-/// The enum must have a `Ui(UiError)` variant.
 #[macro_export]
 macro_rules! impl_ui_error {
     ($err:ty) => {

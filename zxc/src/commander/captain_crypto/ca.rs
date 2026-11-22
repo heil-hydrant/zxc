@@ -35,8 +35,7 @@ impl CA {
     // User generated private key and certificate
     // Read from file $HOME/.config/zxc/zxca.crt
     pub fn trusted(key_pair: KeyPair) -> Result<CA, CryptoBuildError> {
-        let mut cert_path = global_config_path()?;
-        cert_path.push("zxca.crt");
+        let cert_path = global_config_path()?.join("zxca.crt");
         let cert_str = read_to_string(&cert_path).map_err(|source| {
             CryptoBuildError::Read {
                 path: cert_path,

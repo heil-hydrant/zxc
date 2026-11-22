@@ -1,15 +1,16 @@
 pub mod addons;
-pub mod parser;
 
 use std::collections::HashMap;
+use std::env::{self, VarError};
+use std::fs::read_to_string;
+use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
 
 use mime_plz::ContentType;
 use serde::Deserialize;
 
 use crate::config::*;
 
-// Global config only contains a list of excluded domains and excluded content
-// types
 #[cfg_attr(any(test, debug_assertions), derive(PartialEq))]
 #[derive(Deserialize, Debug)]
 pub struct GlobalConfig {
@@ -21,35 +22,21 @@ pub struct GlobalConfig {
 }
 
 impl GlobalConfig {
-    /// Sanitizes the global config and returns `None` when it is empty.
-    ///
-    /// # Steps
-    ///
-    /// 1. Remove empty values from `excluded_domains`,
-    ///    `excluded_extensions` and `excluded_content_types`.
-    /// 2. Sort and deduplicate `excluded_content_types`, then remove
-    ///    `ContentType::Unknown`.
-    /// 3. Return `None` if all fields are empty.
-    ///
     /// # FIXME
     ///
     /// <https://github.com/rust-lang/rust/issues/35428>
     ///
     /// `remove_empty_and_dedup()` can be generalised.
     pub fn sanitize(mut self) -> Option<GlobalConfig> {
-        // 1. Remove empty values
         sanitize_option_vec_string(&mut self.excluded_domains);
         sanitize_option_vec_string(&mut self.excluded_extensions);
 
-        // 2. sort and dedup
         if let Some(ect) = self.excluded_content_types.as_mut() {
             ect.sort();
             ect.dedup();
-            // 2. remove ContentType::Unknown
             ect.retain(|ct| ct != &ContentType::Unknown);
         };
 
-        // 3. If all fields are empty, return None
         if self.excluded_content_types.is_some()
             || self.excluded_domains.is_some()
             || self.excluded_extensions.is_some()
@@ -64,6 +51,28 @@ impl GlobalConfig {
     pub fn parse_addons(&mut self) -> Option<HashMap<String, Addon>> {
         self.addons.take()
     }
+}
+
+static GLOBAL_CONFIG_DIR: OnceLock<PathBuf> = OnceLock::new();
+
+// $HOME/.config/zxc
+pub fn global_config_path() -> Result<&'static Path, VarError> {
+    if let Some(path) = GLOBAL_CONFIG_DIR.get() {
+        return Ok(path.as_path());
+    }
+
+    let home_dir = env::var("HOME")?;
+    let mut path = PathBuf::from(home_dir);
+    path.push(".config/zxc");
+    Ok(GLOBAL_CONFIG_DIR.get_or_init(|| path).as_path())
+}
+
+/// Parses the global config and sanitizes it.
+pub fn parse_global_config() -> Result<Option<GlobalConfig>, ConfigError> {
+    let path = global_config_path()?.join(CONFIG_FILE_NAME);
+    let contents = read_to_string(&path)?;
+    let config = toml::from_str::<GlobalConfig>(&contents)?;
+    Ok(config.sanitize())
 }
 
 #[cfg(test)]

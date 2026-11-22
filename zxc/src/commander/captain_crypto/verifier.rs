@@ -1,6 +1,6 @@
 use rustls_pki_types::{CertificateDer, ServerName, UnixTime};
 use tokio_rustls::rustls::client::danger::{
-    HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier
+    HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier,
 };
 use tokio_rustls::rustls::{DigitallySignedStruct, Error, SignatureScheme};
 

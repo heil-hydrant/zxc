@@ -1,8 +1,4 @@
 //! Configuration loading for the global config and per-session files.
-//!
-//! Parses `~/.config/zxc/config.toml`, the session `local_config.toml`, and
-//! the CLI overrides into the runtime `Config`, including the domain and
-//! content filters used by logging and interception.
 pub mod error;
 pub mod global;
 pub mod local;
@@ -13,7 +9,7 @@ mod windows;
 pub use error::ConfigError;
 pub use global::GlobalConfig;
 pub use global::addons::Addon;
-pub use global::parser::{global_config_path, parse_global_config};
+pub use global::{global_config_path, parse_global_config};
 pub use local::CliArgs;
 pub use local::io::{parse_local_config, write_local_config};
 pub use local::proxy::ProxyArgs;

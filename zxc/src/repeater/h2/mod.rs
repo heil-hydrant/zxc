@@ -49,7 +49,7 @@ where
         .write(true)
         .open(&conn.path)
         .await
-        .map_err(|e| FileErrorInfo::from((&conn.path, FileEvent::Open, e)))?;
+        .map_err(|e| FileErrorInfo::open_fail(&conn.path, e))?;
     let h2: Rh2<T> = Rh2::from((conn, file));
     let state = RepeaterState::ReadFromFile(h2);
     match async_run(state).await? {

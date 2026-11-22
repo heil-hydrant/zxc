@@ -2,8 +2,6 @@ pub mod io;
 pub mod proxy;
 mod session;
 
-use std::net::IpAddr;
-
 use clap::Parser;
 
 use self::session::SessionArgs;
@@ -16,9 +14,6 @@ pub struct CliArgs {
     pub session_args: Option<SessionArgs>,
     #[command(flatten)]
     pub proxy_args: Option<ProxyArgs>,
-    /// Interface to bind the proxy listener to
-    #[arg(short, long = "listen")]
-    pub listen: Option<IpAddr>,
     /// Debug mode
     #[arg(short, long = "debug")]
     pub debug: bool,
@@ -40,7 +35,6 @@ impl CliArgs {
         if self.debug
             || self.session_args.is_some()
             || self.proxy_args.is_some()
-            || self.listen.is_some()
         {
             Some(self)
         } else {
@@ -55,13 +49,15 @@ impl CliArgs {
     }
 
     pub fn session_name(&mut self, should_attach: bool) -> Option<String> {
-        self.session_args.as_mut().map(|sess| {
-            if should_attach {
-                sess.attach_name.take().unwrap()
-            } else {
-                sess.new_name.take().unwrap()
-            }
-        })
+        self.session_args
+            .as_mut()
+            .and_then(|sess| {
+                if should_attach {
+                    sess.attach_name.take()
+                } else {
+                    sess.new_name.take()
+                }
+            })
     }
 }
 
@@ -96,8 +92,12 @@ mod tests {
 
     #[test]
     fn test_sanitize_listen() {
-        let args = CliArgs {
+        let prxy = ProxyArgs {
             listen: Some("0.0.0.0".parse().unwrap()),
+            ..Default::default()
+        };
+        let args = CliArgs {
+            proxy_args: Some(prxy),
             ..Default::default()
         };
         assert!(args.sanitize().is_some());
@@ -157,5 +157,18 @@ mod tests {
 
         let name = args.session_name(false).unwrap();
         assert_eq!(name, "test");
+    }
+
+    #[test]
+    fn test_cli_args_session_name_mismatch_returns_none() {
+        let session_args = SessionArgs {
+            new_name: Some("test".to_string()),
+            ..Default::default()
+        };
+        let mut args = CliArgs {
+            session_args: Some(session_args),
+            ..Default::default()
+        };
+        assert!(args.session_name(true).is_none());
     }
 }

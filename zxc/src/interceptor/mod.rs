@@ -1,7 +1,7 @@
 mod error;
 mod handler;
-pub mod message;
+pub mod messages;
 
 pub use error::InterceptorError;
 pub use handler::InterceptorHandler;
-pub use message::{H2Info, InterToUI, InterUIOps, InterUImsg, ResumeInfo};
+pub use messages::{H2Info, InterToUI, InterUIOps, InterUImsg, ResumeInfo};

@@ -1,11 +1,4 @@
-use std::ffi::OsStr;
-use std::path::PathBuf;
-
-use header_plz::uri::InvalidUri;
-use http_plz::Request;
 use serde::{Deserialize, Serialize};
-
-use crate::proxy::server_info::json::ServerInfoJson;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct H2Info {
@@ -37,8 +30,8 @@ impl H2Info {
 
     pub fn apply_to_request(
         &self,
-        req: &mut Request,
-    ) -> Result<(), InvalidUri> {
+        req: &mut http_plz::Request,
+    ) -> Result<(), header_plz::uri::InvalidUri> {
         if let Some(authority) = self.authority() {
             req.try_set_authority(authority)?;
         }
@@ -60,9 +53,9 @@ pub enum Module {
 pub struct ForwardInfo {
     #[serde(skip_serializing)]
     to: Module,
-    pub file: PathBuf,
+    pub file: std::path::PathBuf,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub server_info: Option<ServerInfoJson>,
+    pub server_info: Option<crate::proxy::ServerInfoJson>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub is_h2: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -76,7 +69,7 @@ impl ForwardInfo {
         &self.to
     }
 
-    pub fn file_extension(&self) -> Option<&OsStr> {
+    pub fn file_extension(&self) -> Option<&std::ffi::OsStr> {
         self.file.extension()
     }
 }
@@ -89,7 +82,7 @@ mod tests {
     fn test_forward_info_serializes_h2_metadata() {
         let info = ForwardInfo {
             to: Module::Repeater,
-            file: PathBuf::from("history/1/1.req"),
+            file: std::path::PathBuf::from("history/1/1.req"),
             server_info: None,
             is_h2: Some(true),
             h2_info: Some(H2Info::new(

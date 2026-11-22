@@ -8,7 +8,6 @@ use super::constants::*;
 // tmux -L session_name -f $HOME/.config/zxc/tmux.conf new-session -d
 #[inline(always)]
 pub fn create_session(cmd: &mut Command) -> Result<(), Error> {
-    // get users home dir
     let home = env::var("HOME")
         .map_err(|e| Error::other(format!("Get Home Dir| {}", e)))?;
     let config = format!("{}/.config/zxc/tmux.conf", home);

@@ -1,6 +1,5 @@
 pub mod builder;
 pub mod convert;
-pub mod message;
 pub mod repeater_ws_handle;
 pub mod rwstruct;
 
@@ -10,9 +9,9 @@ pub use builder::*;
 pub use convert::*;
 use futures_util::{SinkExt, StreamExt};
 use header_plz::{OneInfoLine, OneResponseLine};
-pub use message::*;
 pub use repeater_ws_handle::*;
 pub use rwstruct::*;
+pub use super::messages::RepeaterWsMsg;
 use tokio::io::{
     AsyncRead, AsyncReadExt, AsyncSeekExt, AsyncWrite, AsyncWriteExt,
 };

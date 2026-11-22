@@ -3,6 +3,23 @@ use std::fmt::Debug;
 use tracing::{error, trace};
 use wildcard::Wildcard;
 
+// Enum which contains the included/exluded DomainList
+#[cfg_attr(any(test, debug_assertions), derive(PartialEq))]
+#[derive(Debug)]
+pub enum DomainFilter {
+    Include(DomainList),
+    Exclude(DomainList),
+}
+
+impl DomainFilter {
+    pub fn contains(&self, host: &str) -> bool {
+        match self {
+            DomainFilter::Include(list) => list.contains(host),
+            DomainFilter::Exclude(list) => !list.contains(host),
+        }
+    }
+}
+
 // Struct which contains domain names as list of string and wildcards
 pub struct DomainList {
     str: Option<Vec<String>>,
@@ -26,14 +43,12 @@ impl PartialEq for DomainList {
 }
 
 impl DomainList {
-    /// Checks whether the host matches any entry in the list.
-    ///
-    /// # Steps
-    ///
-    /// 1. Check the wildcard list.
-    /// 2. If there is no match, check the string list.
     pub fn contains(&self, host: &str) -> bool {
-        // 1. Check wildcard list
+        let host_only = host_without_port(host);
+        self.matches(host) || (host_only != host && self.matches(host_only))
+    }
+
+    fn matches(&self, host: &str) -> bool {
         if let Some(wild_list) = &self.wildcard
             && wild_list
                 .iter()
@@ -41,7 +56,6 @@ impl DomainList {
         {
             return true;
         }
-        // 2. check string list
         if let Some(str_list) = &self.str
             && str_list
                 .binary_search_by(|s| s.as_str().cmp(host))
@@ -53,22 +67,30 @@ impl DomainList {
     }
 }
 
-// Builds a domain list from raw patterns.
-//
-// # Steps
-//
-// 1. Separate the wildcard list from the string list.
-// 2. Convert the wildcard entries to `Wildcard`.
+// `Address` renders hosts as `host:port` or `[ipv6]:port`. Entries
+// without a port match the host part, while entries with a port keep
+// matching the full `host:port`.
+fn host_without_port(host: &str) -> &str {
+    match host.rsplit_once(':') {
+        Some((head, port))
+            if port.parse::<u16>().is_ok()
+                && (head.starts_with('[') || !head.contains(':')) =>
+        {
+            head
+        }
+        _ => host,
+    }
+}
+
 impl From<Vec<String>> for DomainList {
     fn from(v: Vec<String>) -> Self {
-        // 1. Separate string list and wildcard list
+        // Separate string list and wildcard list
         let (wildcard, mut str): (Vec<_>, Vec<_>) = v
             .into_iter()
             .partition(|val| val.contains('*'));
 
         trace!("wildcard| {:?}", wildcard);
 
-        // 2. Build wildcard list
         let wildcard = wildcard
             .into_iter()
             .filter_map(|val| match Wildcard::from_owned(val.into()) {
@@ -129,5 +151,54 @@ mod test {
 
         let wild = domain_list.wildcard.unwrap();
         assert!(wild[0].is_match(b"www.reddit.com"));
+    }
+
+    #[test]
+    fn test_contains_host_with_port() {
+        let domain_list = DomainList::from(vec![
+            "www.google.com".to_string(),
+            "*.example.com".to_string(),
+        ]);
+
+        assert!(domain_list.contains("www.google.com:443"));
+        assert!(domain_list.contains("www.google.com:8080"));
+        assert!(domain_list.contains("foo.example.com:443"));
+    }
+
+    #[test]
+    fn test_contains_port_specific_entry() {
+        let domain_list = DomainList::from(vec![
+            "www.facebook.com:80".to_string(),
+            "*.google.com:443".to_string(),
+        ]);
+
+        assert!(domain_list.contains("www.facebook.com:80"));
+        assert!(!domain_list.contains("www.facebook.com:443"));
+        assert!(domain_list.contains("www.google.com:443"));
+        assert!(!domain_list.contains("www.google.com:80"));
+    }
+
+    #[test]
+    fn test_contains_ipv4_host_with_port() {
+        let domain_list = DomainList::from(vec!["127.0.0.1".to_string()]);
+
+        assert!(domain_list.contains("127.0.0.1:8080"));
+    }
+
+    #[test]
+    fn test_contains_bracketed_ipv6_host_with_port() {
+        let domain_list = DomainList::from(vec!["[::1]".to_string()]);
+
+        assert!(domain_list.contains("[::1]:443"));
+    }
+
+    #[test]
+    fn test_exclude_domain_with_port() {
+        let filter = DomainFilter::Exclude(DomainList::from(vec![
+            "*.example.com".to_string(),
+        ]));
+
+        assert!(!filter.contains("foo.example.com:443"));
+        assert!(filter.contains("foo.other.com:443"));
     }
 }
