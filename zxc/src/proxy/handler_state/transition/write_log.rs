@@ -1,5 +1,5 @@
 use std::io::Error;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use bytes::BytesMut;
 use tokio::fs::File;
@@ -18,6 +18,8 @@ use crate::proxy::prelude::*;
 // Trait to get mutable references to the file and buffer.
 pub trait FileBuf {
     fn file_and_buf_as_mut(&mut self) -> (&mut File, &mut BytesMut);
+
+    fn file_path(&self) -> &Path;
 }
 
 // Trait to perform file operations.

@@ -3,8 +3,6 @@ pub mod convert;
 pub mod repeater_ws_handle;
 pub mod rwstruct;
 
-use std::io::SeekFrom;
-
 pub use builder::*;
 pub use convert::*;
 use futures_util::{SinkExt, StreamExt};
@@ -12,16 +10,13 @@ use header_plz::{OneInfoLine, OneResponseLine};
 pub use repeater_ws_handle::*;
 pub use rwstruct::*;
 pub use super::messages::RepeaterWsMsg;
-use tokio::io::{
-    AsyncRead, AsyncReadExt, AsyncSeekExt, AsyncWrite, AsyncWriteExt,
-};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::sync::mpsc::{self, Receiver};
 use tokio::{select, spawn};
 use tokio_tungstenite::tungstenite::Message;
 use tracing::{Instrument, Level, error, span, trace};
 
 use crate::async_step::AsyncStep;
-use crate::io::*;
 use crate::proxy::*;
 use crate::repeater::prelude::*;
 
@@ -131,9 +126,7 @@ where
                                 };
                                 // 2.b.3 Log client
                                 rws.log(Role::Server).await?;
-                                rws.file_as_mut().seek(SeekFrom::Start(0)).await.
-                                    map_err(|e| FileErrorInfo::from((rws.file_as_mut(),
-                                    FileEvent::Seek, e)))?;
+                                rws.rewind_scratch().await?;
                             }
                             RepeaterWsMsg::Close => {
                                 let close_msg = Message::Close(None);

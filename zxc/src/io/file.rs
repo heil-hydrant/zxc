@@ -69,29 +69,6 @@ impl FileErrorInfo {
     }
 }
 
-impl From<(&mut File, FileEvent, io::Error)> for FileErrorInfo {
-    fn from((file, event, error): (&mut File, FileEvent, io::Error)) -> Self {
-        let input = format!("{:?}", file);
-        let path = if let Some(start) = input.find("path: \"") {
-            // Find the start of ', read' after 'path: '
-            if let Some(end) = input[start..].find("\", read") {
-                // Extract the string between 'path: "' and '", read'
-                &input[(start + 7)..(start + end)]
-            } else {
-                &input
-            }
-        } else {
-            &input
-        };
-        let name = PathBuf::from(path);
-        Self {
-            name,
-            event,
-            error,
-        }
-    }
-}
-
 pub async fn create_and_write_file(
     path: &PathBuf,
     contents: &[u8],
@@ -148,14 +125,12 @@ pub async fn copy_with_request_metadata(
 pub async fn read_file(
     file: &mut File,
     buf: &mut BytesMut,
-) -> Result<(), FileErrorInfo> {
+) -> Result<(), io::Error> {
     loop {
         match file.read_buf(buf).await {
             Ok(0) => break,
             Ok(_) => continue,
-            Err(e) => {
-                return Err(FileErrorInfo::from((file, FileEvent::Read, e)));
-            }
+            Err(e) => return Err(e),
         }
     }
     Ok(())
@@ -164,16 +139,17 @@ pub async fn read_file(
 pub async fn rewrite_file(
     file: &mut File,
     buf: &[u8],
-) -> Result<(), (FileEvent, io::Error)> {
+    path: &Path,
+) -> Result<(), FileErrorInfo> {
     file.seek(SeekFrom::Start(0))
         .await
-        .map_err(|e| (FileEvent::Seek, e))?;
+        .map_err(|e| FileErrorInfo::seek_fail(path, e))?;
     file.set_len(0)
         .await
-        .map_err(|e| (FileEvent::SetLen, e))?;
+        .map_err(|e| FileErrorInfo::truncate_fail(path, e))?;
     write_and_flush(file, buf)
         .await
-        .map_err(|e| (FileEvent::Write, e))?;
+        .map_err(|e| FileErrorInfo::write_fail(path, e))?;
     Ok(())
 }
 
@@ -232,30 +208,6 @@ mod tests {
                 assert_eq!(xattr::get(&dst, name)?, Some(value.to_vec()));
             }
         }
-
-        std::fs::remove_dir_all(&dir)?;
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_file_error_info_path_has_no_trailing_quote()
-    -> Result<(), Box<dyn std::error::Error>> {
-        let dir = unique_temp_dir();
-        std::fs::create_dir_all(&dir)?;
-        let path = dir.join("error.req");
-        std::fs::write(&path, b"")?;
-        let mut file = File::open(&path).await?;
-
-        let info = FileErrorInfo::from((
-            &mut file,
-            FileEvent::Read,
-            std::io::Error::other("test"),
-        ));
-        let expected_path = path.canonicalize()?;
-        assert_eq!(
-            info.to_string(),
-            format!("file read: {}: test", expected_path.display())
-        );
 
         std::fs::remove_dir_all(&dir)?;
         Ok(())

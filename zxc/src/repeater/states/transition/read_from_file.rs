@@ -30,7 +30,9 @@ where
     T: FileBuf + ShouldUpdate + AddRaw,
 {
     let (file, buf) = conn.file_and_buf_as_mut();
-    read_file(file, buf).await?;
+    if let Err(e) = read_file(file, buf).await {
+        return Err(FileErrorInfo::read_fail(conn.file_path(), e).into());
+    }
     let nbuf = buf.split();
     if conn.should_update() {
         trace!("should_update| Y");

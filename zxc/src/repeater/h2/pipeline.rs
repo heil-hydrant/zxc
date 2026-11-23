@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use bytes::BytesMut;
 use http_plz::{NormalizerOpts, OneRequest, Request};
@@ -154,10 +154,14 @@ impl<T> Persist for Rh2<T> {
         self.update
     }
 
-    fn file_and_data(&mut self) -> (&mut File, &[u8]) {
+    fn file_data_and_path(&mut self) -> (&mut File, &[u8], &Path) {
         // safe to unwrap,
         // since data is set in read_from_file / update frame state
-        (&mut self.file, self.payload.as_ref().unwrap())
+        (
+            &mut self.file,
+            self.payload.as_ref().unwrap(),
+            self.path.as_path(),
+        )
     }
 
     fn update_path(&mut self) {

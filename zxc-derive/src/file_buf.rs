@@ -11,6 +11,10 @@ pub fn impl_file_buf(ast: &syn::DeriveInput) -> TokenStream {
             fn file_and_buf_as_mut(&mut self) -> (&mut File, &mut BytesMut) {
                 (&mut self.#var_file, &mut self.#var_buf)
             }
+
+            fn file_path(&self) -> &::std::path::Path {
+                self.path.as_path()
+            }
         }
     }
     .into()

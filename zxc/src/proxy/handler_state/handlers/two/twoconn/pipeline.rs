@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use bytes::BytesMut;
 use header_plz::{RequestLine, ResponseLine};
@@ -238,7 +238,7 @@ impl ReadWrite for TwoConn<ResponseLine> {
 
 // --- Rewrite ---
 impl<T> Rewrite for TwoConn<T> {
-    fn file_and_data(&mut self) -> (&mut File, &[u8]) {
+    fn file_data_and_path(&mut self) -> (&mut File, &[u8], &Path) {
         (
             self.file
                 .as_mut()
@@ -246,6 +246,9 @@ impl<T> Rewrite for TwoConn<T> {
             self.msg_bytes
                 .as_ref()
                 .expect("payload must be present"),
+            self.path
+                .as_deref()
+                .expect("path must be present"),
         )
     }
 }

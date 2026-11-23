@@ -5,7 +5,7 @@ use tokio::io::AsyncSeekExt;
 use tracing::trace;
 
 use crate::interceptor::*;
-use crate::io::file::{FileErrorInfo, FileEvent, read_file};
+use crate::io::file::{FileErrorInfo, read_file};
 use crate::proxy::prelude::*;
 
 pub const WS_ADD_RAW_PANIC: &str = "No add raw for ws";
@@ -29,9 +29,11 @@ where
 {
     let (file, buf) = conn.file_and_buf_as_mut();
     if let Err(e) = file.seek(SeekFrom::Start(0)).await {
-        return Err(FileErrorInfo::from((file, FileEvent::Seek, e)).into());
+        return Err(FileErrorInfo::seek_fail(conn.file_path(), e).into());
     }
-    read_file(file, buf).await?;
+    if let Err(e) = read_file(file, buf).await {
+        return Err(FileErrorInfo::read_fail(conn.file_path(), e).into());
+    }
     let fbuf = buf.split();
     if resume_info.update() {
         trace!("update| Y");

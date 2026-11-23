@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 use std::io;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use bytes::BytesMut;
@@ -214,8 +214,12 @@ impl<T, E, U> Rewrite for OneOneConn<T, E, U>
 where
     U: OneInfoLine,
 {
-    fn file_and_data(&mut self) -> (&mut File, &[u8]) {
-        (self.file.as_mut().unwrap(), self.msg_bytes.as_ref().unwrap()) // safe to unwrap
+    fn file_data_and_path(&mut self) -> (&mut File, &[u8], &Path) {
+        (
+            self.file.as_mut().unwrap(),
+            self.msg_bytes.as_ref().unwrap(),
+            self.path.as_deref().unwrap(),
+        ) // safe to unwrap
     }
 }
 

@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use bytes::BytesMut;
 use futures_util::stream::{SplitSink, SplitStream};
@@ -15,6 +15,23 @@ use crate::history::*;
 use crate::interceptor::*;
 use crate::proxy::handler_state::transition::write_history::WsHistory;
 use crate::proxy::prelude::*;
+
+// --- FileBuf & FileOps ---
+impl<T, E> FileBuf for WsConn<T, E> {
+    fn file_and_buf_as_mut(&mut self) -> (&mut File, &mut BytesMut) {
+        (self.file.as_mut().unwrap(), &mut self.buf)
+    }
+
+    fn file_path(&self) -> &Path {
+        self.path.as_path()
+    }
+}
+
+impl<T, E> FileOps for WsConn<T, E> {
+    fn attach_file(&mut self, file: File) {
+        self.file = Some(file);
+    }
+}
 
 // --- AddRaw ---
 // Blank implementation. No add_raw for ws
@@ -154,7 +171,7 @@ where
 // --- Rewrite ---
 impl<T, E> Rewrite for WsConn<T, E> {
     #[inline(always)]
-    fn file_and_data(&mut self) -> (&mut File, &[u8]) {
+    fn file_data_and_path(&mut self) -> (&mut File, &[u8], &Path) {
         panic!("No rewrite for WsHandle");
     }
 }

@@ -12,14 +12,14 @@ use tokio::fs::File;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio_tungstenite::WebSocketStream;
 use tokio_tungstenite::tungstenite::{Error, Message};
-use zxc_derive::{CanCommunicate, FileOps, GetRole, Id};
+use zxc_derive::{CanCommunicate, GetRole, Id};
 
 use crate::commander::{CommanderRequest, CommanderResponse};
 use crate::history::CommanderToHistory;
 use crate::proxy::prelude::*;
 
 // Handler for ws connection
-#[derive(FileOps, GetRole, CanCommunicate, Id)]
+#[derive(GetRole, CanCommunicate, Id)]
 pub struct WsConn<T, E> {
     pub id: SoldierId,
     role: Role,

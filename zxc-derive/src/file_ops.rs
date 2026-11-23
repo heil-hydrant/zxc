@@ -9,6 +9,10 @@ pub fn impl_file_ops(ast: &syn::DeriveInput) -> TokenStream {
             fn file_and_buf_as_mut(&mut self) -> (&mut File,&mut BytesMut) {
                 (self.file.as_mut().unwrap(), &mut self.buf)
             }
+
+            fn file_path(&self) -> &::std::path::Path {
+                self.path.as_deref().unwrap()
+            }
         }
 
         impl #impl_generics FileOps for #name #type_generics #where_clause {

@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use bytes::BytesMut;
 use futures_util::{SinkExt, StreamExt};
@@ -101,7 +101,7 @@ impl<T> Persist for RWebSocket<T> {
     }
 
     // No rewrite for ws, so always return data None
-    fn file_and_data(&mut self) -> (&mut File, &[u8]) {
+    fn file_data_and_path(&mut self) -> (&mut File, &[u8], &Path) {
         panic!("No rewrite for ws");
     }
 

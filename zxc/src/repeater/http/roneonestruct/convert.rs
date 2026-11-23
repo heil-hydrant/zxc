@@ -30,10 +30,9 @@ impl<T> From<(RepeaterConn<T>, File)> for Roneone<T> {
 //
 // # Steps
 //
-// 1. Rename the scratch file from `dir/rep.res` to `dir/scratch.wreq`
-//    and open it.
+// 1. Open the scratch file `dir/scratch.wreq`.
 // 2. Build the history file `dir/ws.wsess` and open it.
-// 3. Set the path to `dir/0.wres` and return to the original directory.
+// 3. Set the first frame path to `dir/0.wres`.
 // 4. Build the WebSocket stream with
 //    `WebSocketStream::from_raw_socket()`.
 // 5. Clear the previous buffer.
@@ -50,29 +49,27 @@ where
         mut self,
         receiver: Receiver<RepeaterWsMsg>,
     ) -> Result<RWebSocket<T>, RepeaterError> {
-        // 1. change path from dir/rep.res to dir/scratch.wreq
-        self.path
-            .set_file_name(REPEATER_WS_SCRATCH_FILENAME);
+        // 1. build scratch path dir/scratch.wreq
+        let scratch_path =
+            self.path.with_file_name(REPEATER_WS_SCRATCH_FILENAME);
 
-        let scratch_file = File::open(&self.path)
+        let scratch_file = File::open(&scratch_path)
             .await
             .map_err(RepeaterError::ScratchFile)?;
 
         // 2. build History file
-        self.path
-            .set_file_name(HISTORY_WS_WSESS);
+        let history_path = self.path.with_file_name(HISTORY_WS_WSESS);
 
         let history_file = OpenOptions::new()
             .read(true)
             .write(true)
             .create(true)
             .truncate(true)
-            .open(&self.path)
+            .open(&history_path)
             .await
             .map_err(RepeaterError::HistoryFile)?;
 
-        // 3. return to original directory
-        // dir/0.wres
+        // 3. set the frame path to dir/0.wres
         self.path.set_file_name("0");
         self.path.set_extension(EXT_WRES);
 
@@ -91,8 +88,10 @@ where
             stream,
             receiver,
             self.path,
+            scratch_path,
             scratch_file,
             self.buf,
+            history_path,
             history_file,
         ))
     }

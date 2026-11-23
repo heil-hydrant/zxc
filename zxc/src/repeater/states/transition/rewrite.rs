@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use tokio::fs::File;
 use tracing::trace;
@@ -21,7 +21,7 @@ use crate::io::*;
 pub trait Persist {
     fn should_rewrite(&self) -> bool;
 
-    fn file_and_data(&mut self) -> (&mut File, &[u8]);
+    fn file_data_and_path(&mut self) -> (&mut File, &[u8], &Path);
 
     fn update_path(&mut self);
 
@@ -38,7 +38,7 @@ pub trait Persist {
 ///   - HTTP rewrites when the frame was updated, that is, when the user
 ///     set `b:update` in the UI.
 ///   - WebSocket always returns `false`.
-/// 2. When rewriting, get the data and file and call `rewrite_file`.
+/// 2. When rewriting, get the file, data, and path and call `rewrite_file`.
 /// 3. When writing a new file:
 ///   - Update the path.
 ///   - Call `create_and_write_file`.
@@ -57,11 +57,9 @@ where
     // 1
     if conn.should_rewrite() {
         // 2
-        let (file, data) = conn.file_and_data();
+        let (file, data, path) = conn.file_data_and_path();
         trace!("rewrite| {:?}", file);
-        rewrite_file(file, data)
-            .await
-            .map_err(|(event, e)| FileErrorInfo::from((file, event, e)))?;
+        rewrite_file(file, data, path).await?;
 
         // 3
     } else {

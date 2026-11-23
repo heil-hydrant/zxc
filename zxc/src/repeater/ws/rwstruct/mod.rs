@@ -1,14 +1,15 @@
 mod pipeline;
 
-use std::path::PathBuf;
+use std::io::SeekFrom;
+use std::path::{Path, PathBuf};
 
 use bytes::{Bytes, BytesMut};
 use tokio::fs::File;
+use tokio::io::AsyncSeekExt;
 use tokio::sync::mpsc::Receiver;
 use tokio_tungstenite::WebSocketStream;
 use tokio_tungstenite::tungstenite::Message;
 use tracing::trace;
-use zxc_derive::FileBuf;
 
 use crate::io::*;
 use crate::proxy::handler_state::transition::write_history::WsHistory;
@@ -16,12 +17,13 @@ use crate::proxy::*;
 use crate::repeater::prelude::*;
 
 // RepeaterWs Handler
-#[derive(FileBuf)]
 pub struct RWebSocket<T> {
     pub stream: WebSocketStream<T>,
     pub receiver: Receiver<RepeaterWsMsg>,
     file: File, // Scratch file
+    scratch_path: PathBuf,
     history: File,
+    history_path: PathBuf,
     path: PathBuf,
     frame: Option<Message>,
     log_id: usize,
@@ -30,24 +32,39 @@ pub struct RWebSocket<T> {
     is_bin: bool,
 }
 
+impl<T> FileBuf for RWebSocket<T> {
+    fn file_and_buf_as_mut(&mut self) -> (&mut File, &mut BytesMut) {
+        (&mut self.file, &mut self.buf)
+    }
+
+    fn file_path(&self) -> &Path {
+        self.scratch_path.as_path()
+    }
+}
+
 impl<T> RWebSocket<T> {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         stream: WebSocketStream<T>,
         receiver: Receiver<RepeaterWsMsg>,
         path: PathBuf,
+        scratch_path: PathBuf,
         file: File,
         buf: BytesMut,
+        history_path: PathBuf,
         history: File,
     ) -> Self {
         RWebSocket {
             stream,
             receiver,
             file,
+            scratch_path,
+            history,
+            history_path,
             path,
             frame: None,
             log_id: 1,
             buf,
-            history,
             data: None,
             is_bin: false,
         }
@@ -84,7 +101,7 @@ impl<T> RWebSocket<T> {
         write_and_flush(&mut self.history, data.as_bytes())
             .await
             .map_err(|e: std::io::Error| {
-                FileErrorInfo::from((&mut self.history, FileEvent::Write, e))
+                FileErrorInfo::write_fail(&self.history_path, e)
             })
     }
 
@@ -96,7 +113,11 @@ impl<T> RWebSocket<T> {
         self.is_bin = is_bin;
     }
 
-    pub fn file_as_mut(&mut self) -> &mut File {
-        &mut self.file
+    pub async fn rewind_scratch(&mut self) -> Result<(), FileErrorInfo> {
+        self.file
+            .seek(SeekFrom::Start(0))
+            .await
+            .map_err(|e| FileErrorInfo::seek_fail(&self.scratch_path, e))?;
+        Ok(())
     }
 }
