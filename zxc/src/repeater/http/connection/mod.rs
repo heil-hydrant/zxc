@@ -1,18 +1,37 @@
+use std::path::PathBuf;
+
 use bytes::BytesMut;
 use tokio::fs::{File, OpenOptions};
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::sync::mpsc::Receiver;
 use tokio_tungstenite::WebSocketStream;
 use tokio_tungstenite::tungstenite::protocol;
+use zxc_derive::FileBuf;
 
-use super::Roneone;
 use crate::CAPACITY_2MB;
 use crate::file_types::EXT_WRES;
-use crate::history::HISTORY_WS_WSESS;
 use crate::repeater::prelude::*;
 
-// Convert (RepeaterConn<T>, File) -> Roneone
+mod pipeline;
 
+// repeater http handler struct
+#[derive(FileBuf)]
+pub struct Roneone<T> {
+    buf: BytesMut,
+    path: PathBuf,
+    stream: T,
+    file: File,
+    payload: Option<BytesMut>,
+    update: bool,
+}
+
+impl<T> Roneone<T> {
+    pub fn get_payload(&mut self) -> Option<BytesMut> {
+        self.payload.take()
+    }
+}
+
+// Convert (RepeaterConn<T>, File) -> Roneone
 impl<T> From<(RepeaterConn<T>, File)> for Roneone<T> {
     fn from((conn, file): (RepeaterConn<T>, File)) -> Self {
         Self {
@@ -27,20 +46,6 @@ impl<T> From<(RepeaterConn<T>, File)> for Roneone<T> {
 }
 
 // Converts `Roneone` into `RWebSocket`.
-//
-// # Steps
-//
-// 1. Open the scratch file `dir/scratch.wreq`.
-// 2. Build the history file `dir/ws.wsess` and open it.
-// 3. Set the first frame path to `dir/0.wres`.
-// 4. Build the WebSocket stream with
-//    `WebSocketStream::from_raw_socket()`.
-// 5. Clear the previous buffer.
-//
-// # Errors
-//
-// `WsCreationError::NoPath` [2] [4].
-
 impl<T> ToRepeaterWs<T> for Roneone<T>
 where
     T: AsyncRead + AsyncWrite + Unpin,
@@ -49,16 +54,19 @@ where
         mut self,
         receiver: Receiver<RepeaterWsMsg>,
     ) -> Result<RWebSocket<T>, RepeaterError> {
-        // 1. build scratch path dir/scratch.wreq
-        let scratch_path =
-            self.path.with_file_name(REPEATER_WS_SCRATCH_FILENAME);
+        // build scratch path dir/scratch.wreq
+        let scratch_path = self
+            .path
+            .with_file_name(REPEATER_WS_SCRATCH_FILENAME);
 
         let scratch_file = File::open(&scratch_path)
             .await
             .map_err(RepeaterError::ScratchFile)?;
 
-        // 2. build History file
-        let history_path = self.path.with_file_name(HISTORY_WS_WSESS);
+        // build History file
+        let history_path = self
+            .path
+            .with_file_name(crate::history::HISTORY_WS_WSESS);
 
         let history_file = OpenOptions::new()
             .read(true)
@@ -69,11 +77,11 @@ where
             .await
             .map_err(RepeaterError::HistoryFile)?;
 
-        // 3. set the frame path to dir/0.wres
+        // set the frame path to dir/0.wres
         self.path.set_file_name("0");
         self.path.set_extension(EXT_WRES);
 
-        // 4. build new ws stream
+        // build new ws stream
         let stream = WebSocketStream::from_raw_socket(
             self.stream,
             protocol::Role::Client,
@@ -81,7 +89,7 @@ where
         )
         .await;
 
-        // 5. Clear Buffer
+        // Clear Buffer
         self.buf.clear();
 
         Ok(RWebSocket::new(

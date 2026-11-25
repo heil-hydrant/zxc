@@ -1,16 +1,15 @@
 pub mod connection;
 pub mod error;
 
-use std::fmt::{Debug, Display, Formatter};
+use std::fmt::{Debug, Display};
 use std::marker::Unpin;
 
 pub use connection::{Connection, ZStream};
 pub use error::*;
 use header_plz::OneRequestLine;
-use tokio::io::{AsyncReadExt, AsyncWriteExt, copy_bidirectional_with_sizes};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio::sync::mpsc::{Receiver, Sender};
-use tokio::sync::oneshot;
 use tokio_rustls::StartHandshake;
 pub use tokio_rustls::client::TlsStream as ClientTlsStream;
 pub use tokio_rustls::server::TlsStream as ServerTlsStream;
@@ -27,7 +26,7 @@ use crate::proxy::handler_state::handlers::{
 };
 use crate::proxy::prelude::*;
 
-pub const PROXY_ESTABLISHED: &[u8; 39] =
+const PROXY_ESTABLISHED: &[u8; 39] =
     b"HTTP/1.1 200 Connection established\r\n\r\n";
 
 // type alias
@@ -144,7 +143,7 @@ where
             }
 
             Self::ShouldProxy(conn, server_info) => {
-                let (tx, rx) = oneshot::channel();
+                let (tx, rx) = tokio::sync::oneshot::channel();
                 let request = CommanderRequest::ShouldProxy(
                     conn.id,
                     server_info.address().to_string(),
@@ -182,7 +181,7 @@ where
                         .await
                         .map_err(StateError::ServerWrite)
                 }?;
-                let _ = copy_bidirectional_with_sizes(
+                let _ = tokio::io::copy_bidirectional_with_sizes(
                     &mut conn.reader,
                     &mut conn.writer,
                     CAPACITY_2MB,
@@ -300,7 +299,7 @@ where
 }
 
 impl<T> Display for ConnectionState<T> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::ReadInitialClientData(_) => write!(f, "initial_read"),
             Self::DetermineEncryption(_) => write!(f, "encryption"),

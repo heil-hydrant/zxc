@@ -11,9 +11,7 @@ use crate::core::constants::REQUEST_XATTRS;
 use crate::io::write_and_flush;
 
 #[derive(Debug, Error)]
-pub enum FileEvent {
-    #[error("create")]
-    Create,
+enum FileEvent {
     #[error("write")]
     Write,
     #[error("read")]
@@ -44,10 +42,6 @@ impl FileErrorInfo {
         }
     }
 
-    pub fn create_fail(name: &Path, error: io::Error) -> Self {
-        Self::new(name, FileEvent::Create, error)
-    }
-
     pub fn write_fail(name: &Path, error: io::Error) -> Self {
         Self::new(name, FileEvent::Write, error)
     }
@@ -64,7 +58,7 @@ impl FileErrorInfo {
         Self::new(name, FileEvent::Seek, error)
     }
 
-    pub fn truncate_fail(name: &Path, error: io::Error) -> Self {
+    fn truncate_fail(name: &Path, error: io::Error) -> Self {
         Self::new(name, FileEvent::SetLen, error)
     }
 }

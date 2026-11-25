@@ -1,12 +1,12 @@
-mod pipeline;
-
 use std::io::SeekFrom;
 use std::path::{Path, PathBuf};
 
 use bytes::{Bytes, BytesMut};
 use tokio::fs::File;
-use tokio::io::AsyncSeekExt;
-use tokio::sync::mpsc::Receiver;
+use tokio::io::{AsyncRead, AsyncSeekExt, AsyncWrite};
+use tokio::sync::mpsc::error::SendError;
+use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::task::JoinHandle;
 use tokio_tungstenite::WebSocketStream;
 use tokio_tungstenite::tungstenite::Message;
 use tracing::trace;
@@ -15,6 +15,8 @@ use crate::io::*;
 use crate::proxy::handler_state::transition::write_history::WsHistory;
 use crate::proxy::*;
 use crate::repeater::prelude::*;
+
+mod pipeline;
 
 // RepeaterWs Handler
 pub struct RWebSocket<T> {
@@ -72,24 +74,16 @@ impl<T> RWebSocket<T> {
 
     /// Writes a frame entry to the history file.
     ///
-    /// Entries use `id | role.as_arrow() | size`, with a trailing `| b`
-    /// for binary frames.
-    ///
-    /// # Steps
-    ///
-    /// 1. Get the size and binary flag. `Server` data comes from
-    ///    `self.data`; `Client` data comes from `self.frame`.
-    /// 2. Build `id | as_arrow(role) | size [| b]`.
-    ///
-    /// # Errors
-    ///
-    /// `FileErrorInfo`.
+    /// format:
+    /// `id | role.as_arrow() | size`, with a trailing `| b` for binary frames.
     pub async fn log(&mut self, role: Role) -> Result<(), FileErrorInfo> {
         let (size, is_bin) = match role {
             Role::Server => (self.data_as_ref().len(), self.is_bin),
             Role::Client => (
                 self.response_data().len(),
-                self.frame.as_ref().is_some_and(Message::is_binary),
+                self.frame
+                    .as_ref()
+                    .is_some_and(Message::is_binary),
             ),
         };
 
@@ -119,5 +113,55 @@ impl<T> RWebSocket<T> {
             .await
             .map_err(|e| FileErrorInfo::seek_fail(&self.scratch_path, e))?;
         Ok(())
+    }
+}
+
+/// Converts connection types into `RepeaterWs` implementations.
+///
+/// A trait instead of a method to leave room for HTTP/2.
+///
+/// # Errors
+///
+/// `WsCreationError`.
+pub trait ToRepeaterWs<T>
+where
+    T: AsyncRead + AsyncWrite + Unpin,
+{
+    async fn to_rws(
+        self,
+        receiver: Receiver<RepeaterWsMsg>,
+    ) -> Result<RWebSocket<T>, RepeaterError>;
+}
+
+/// Handle for a `RepeaterWs` task.
+///
+/// The sender carries messages from the repeater to the WebSocket task.
+///
+/// flow: `repeater_ui` -> `repeater_main_task` -> `ws-task`.
+pub struct RepeaterWsHandle {
+    pub id: usize,
+    sender: Sender<RepeaterWsMsg>,
+    pub handle: JoinHandle<()>,
+}
+
+impl RepeaterWsHandle {
+    pub fn new(
+        id: usize,
+        sender: Sender<RepeaterWsMsg>,
+        handle: JoinHandle<()>,
+    ) -> Self {
+        RepeaterWsHandle {
+            id,
+            sender,
+            handle,
+        }
+    }
+
+    // Send a message to ws task
+    pub async fn send(
+        &self,
+        msg: RepeaterWsMsg,
+    ) -> Result<(), SendError<RepeaterWsMsg>> {
+        self.sender.send(msg).await
     }
 }

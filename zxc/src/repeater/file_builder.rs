@@ -1,6 +1,5 @@
 use std::path::PathBuf;
 
-use tokio::fs::create_dir;
 use tracing::trace;
 
 use crate::file_types::{EXT_REQ, EXT_WREQ};
@@ -10,41 +9,13 @@ pub const REPEATER_HTTP_FILENAME_REQ: &str = "rep.req";
 pub const REPEATER_HTTP_FILENAME_RES: &str = "rep.res";
 pub const REPEATER_WS_SCRATCH_FILENAME: &str = "scratch.wreq";
 
-pub const REPEATER_HTTP_BUILD_INFO: (usize, &str, &str) =
+const REPEATER_HTTP_BUILD_INFO: (usize, &str, &str) =
     (3, "r-", REPEATER_HTTP_FILENAME_REQ);
 
-pub const REPEATER_WS_BUILD_INFO: (usize, &str, &str) =
+const REPEATER_WS_BUILD_INFO: (usize, &str, &str) =
     (4, "r-ws-", REPEATER_WS_SCRATCH_FILENAME);
 
 /// Builds the repeater destination path and copies the source file into it.
-///
-/// # Steps
-///
-/// 1. Select the build info for the extension: threshold, prefix, and
-///    destination filename.
-/// 2. Check that the path has at least `threshold` components, for
-///    example `./history/1/1.req` or `./history/1/websocket/1.wreq`.
-/// 3. Pop components until `components - threshold` remain to get the
-///    top directory, for example `./history/1`.
-/// 4. Get the next incremental index for the prefix by calling
-///    `incremental()`.
-/// 5. Build the destination directory by pushing the prefix and index,
-///    for example `./history/1/r-1` or `./history/1/websocket/r-ws-1`.
-/// 6. Create the directory.
-/// 7. Build the destination file by pushing the destination filename,
-///    for example `./history/1/r-1/rep.req` or
-///    `./history/1/websocket/r-ws-1/scratch.wreq`.
-/// 8. Copy `src_file` to the destination.
-///
-/// # Errors
-///
-/// Returns [`DirError`] for the following conditions:
-///
-/// - `UnknownExt`: the extension has no build info. [1]
-/// - `NoTop`: the path has fewer components than the threshold. [2]
-/// - `IncrementalDir`: the incremental index cannot be resolved. [4]
-/// - `CreateDir`: the destination directory cannot be created. [6]
-/// - `CopyFile`: the source file cannot be copied. [8]
 pub async fn build_repeater_dest(
     src_file: &PathBuf,
     extension: &str,
@@ -60,27 +31,33 @@ pub async fn build_repeater_dest(
         }
     };
 
+    //  Check that the path has at least `threshold` components,
+    //  for example `./history/1/1.req` or `./history/1/websocket/1.wreq`.
     if path.components().count() < threshold {
         return Err(DirError::NoTop(src_file.to_string_lossy().to_string()));
     }
 
+    // Pop components until `components - threshold` remain to get the top
+    // directory, for example `./history/1`.
     for _ in 0..(path.components().count() - threshold) {
         path.pop();
     }
-
     trace!("top| {}", &path.to_string_lossy());
 
+    // Build the destination directory by pushing the prefix and index, for
+    // example `./history/1/r-1` or `./history/1/websocket/r-ws-1`.
     let next = incremental(&path, prefix, true)
         .await
         .map_err(DirError::IncrementalDir)?;
-
     path.push(format!("{}{}", prefix, next));
     trace!("top_dir| {}", &path.to_string_lossy());
-
-    create_dir(&path)
+    tokio::fs::create_dir(&path)
         .await
         .map_err(DirError::CreateDir)?;
 
+    // Build the destination file by pushing the destination filename, for
+    // example `./history/1/r-1/rep.req` or
+    // `./history/1/websocket/r-ws-1/scratch.wreq`.
     path.push(dest_filename);
     trace!("dest_file| {}", &path.to_string_lossy());
 

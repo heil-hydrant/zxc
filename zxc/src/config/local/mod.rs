@@ -11,7 +11,7 @@ use crate::config::*;
 #[derive(Parser, Debug, Default)]
 pub struct CliArgs {
     #[command(flatten)]
-    pub session_args: Option<SessionArgs>,
+    session_args: Option<SessionArgs>,
     #[command(flatten)]
     pub proxy_args: Option<ProxyArgs>,
     /// Debug mode

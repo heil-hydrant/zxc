@@ -28,24 +28,6 @@ impl HandleCommander for RepeaterHandler {
     }
 
     // Forwards a `ForwardInfo` to the repeater or back to the commander.
-    //
-    // # Steps
-    //
-    // 1. If the message targets the repeater:
-    //    a. Get the extension.
-    //    b. Build the destination file from the extension:
-    //       `req` uses `build_repeater_dest_req`;
-    //       `wreq` uses `build_repeater_dest_ws`.
-    // 2. Set the message file to the destination file.
-    // 3. Serialize the message and return the string.
-    // 4. Otherwise send the message to the commander.
-    //
-    // # Errors
-    //
-    // - `RepeaterError::NoExtension` [1.a]
-    // - `RepeaterError::UnknownExtension` [1.b]
-    // - `RepeaterError::MsgSerializing` [3]
-    // - `RepeaterError::CommanderSend` [4]
     async fn handle_commander_ui(
         &mut self,
         mut msg: ForwardInfo,
@@ -69,23 +51,9 @@ impl HandleCommander for RepeaterHandler {
 }
 
 // Handles one decoded UI message for the repeater.
-//
-// # Steps
-//
-// 1. Parse the buffer into `RepeaterMsg`.
-// 2. Set the reply ID to `0` for repeater messages, otherwise reuse
-//    `msg.id`.
-// 3. Call `get_response()` with the message.
-//    a. A `Some` response is converted to a string.
-//    b. An `Err` response becomes a JSON object with the error string.
-// 4. Return `(id, data)` when a response is produced.
-//
-// # Errors
-//
-// `RepeaterError::MsgSerializing` [1].
 impl HandleUI for RepeaterHandler {
     async fn handle_ui(&mut self) -> Result<UiReply, RepeaterError> {
-        let msg = serde_json::from_slice::<RepeaterMsg>(&self.buf)?; // 1
+        let msg = serde_json::from_slice::<RepeaterMsg>(&self.buf)?;
         let id = if msg.to_repeater() {
             0
         } else {

@@ -158,7 +158,7 @@ impl Config {
         false
     }
 
-    pub fn in_excluded_extensions(&self, extension: &str) -> bool {
+    fn in_excluded_extensions(&self, extension: &str) -> bool {
         if self
             .excluded_extensions
             .as_ref()

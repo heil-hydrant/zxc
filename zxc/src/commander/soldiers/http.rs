@@ -3,7 +3,6 @@ use tokio::sync::mpsc::{self, Receiver, Sender};
 
 use crate::commander::CommanderResponse;
 
-// Stores map of soldier communication channels
 #[derive(Default)]
 pub struct HttpCommStorage {
     store: FxHashMap<usize, Sender<CommanderResponse>>,

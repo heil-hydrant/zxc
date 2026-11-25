@@ -1,7 +1,6 @@
 use bytes::BytesMut;
 use futures_util::StreamExt;
 use header_plz::OneResponseLine;
-use tokio::fs::create_dir;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_tungstenite::WebSocketStream;
 use tokio_tungstenite::tungstenite::protocol;
@@ -18,10 +17,10 @@ use crate::proxy::prelude::*;
 // T: Client
 // E: Server
 
-pub type TupleWs<T, E> = (WsConn<E, T>, WsConn<T, E>);
+pub(crate) type TupleWs<T, E> = (WsConn<E, T>, WsConn<T, E>);
 
 // Trait to convert to TupleWs
-pub trait ToWs<T, E> {
+pub(crate) trait ToWs<T, E> {
     async fn convert(self) -> Result<TupleWs<T, E>, WsCreationError>;
 }
 
@@ -60,7 +59,7 @@ where
         let mut path = self.path.take().unwrap(); // safe to unwrap
         path.pop();
         path.push("websocket");
-        create_dir(&path).await?; // 1
+        tokio::fs::create_dir(&path).await?; // 1
         trace!("ws dir| {}", path.display());
 
         // 2. Register WebSocket in Commander

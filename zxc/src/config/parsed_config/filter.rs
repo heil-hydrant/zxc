@@ -6,13 +6,13 @@ use wildcard::Wildcard;
 // Enum which contains the included/exluded DomainList
 #[cfg_attr(any(test, debug_assertions), derive(PartialEq))]
 #[derive(Debug)]
-pub enum DomainFilter {
+pub(super) enum DomainFilter {
     Include(DomainList),
     Exclude(DomainList),
 }
 
 impl DomainFilter {
-    pub fn contains(&self, host: &str) -> bool {
+    pub(super) fn contains(&self, host: &str) -> bool {
         match self {
             DomainFilter::Include(list) => list.contains(host),
             DomainFilter::Exclude(list) => !list.contains(host),
@@ -21,7 +21,7 @@ impl DomainFilter {
 }
 
 // Struct which contains domain names as list of string and wildcards
-pub struct DomainList {
+pub(super) struct DomainList {
     str: Option<Vec<String>>,
     wildcard: Option<Vec<Wildcard<'static>>>,
 }
@@ -43,7 +43,7 @@ impl PartialEq for DomainList {
 }
 
 impl DomainList {
-    pub fn contains(&self, host: &str) -> bool {
+    pub(super) fn contains(&self, host: &str) -> bool {
         let host_only = host_without_port(host);
         self.matches(host) || (host_only != host && self.matches(host_only))
     }

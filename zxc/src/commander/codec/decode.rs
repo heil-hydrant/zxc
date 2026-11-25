@@ -4,7 +4,7 @@ use base64::engine::general_purpose;
 use super::Codec;
 use super::error::DecodeError;
 
-pub fn perform_decode(
+pub(super) fn perform_decode(
     codec: &Codec,
     data: &[u8],
 ) -> Result<Vec<u8>, DecodeError> {

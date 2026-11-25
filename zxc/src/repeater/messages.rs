@@ -10,15 +10,16 @@ use crate::proxy::server_info::json::ServerInfoJson;
 ///
 /// Supported messages:
 ///
-/// ```text
 /// [0,{"Encode" : {"Codec": Base64, "data": "aGVsbG8gd29ybGQ="}}]
 /// [0,{"Decode" : {"Codec": Base64, "data": "aGVsbG8gd29ybGQ="}}]
-/// [0,{"Send" : {"file": "1.req", "update": true, "server_info": {
-///  "scheme": "https", "host": "www.google.com", "update": true,
-///  "sni": "www.google.com"}]`]
+/// [0,{"Send" : {  "file": "1.req",
+///                 "update": true,
+///                 "server_info": {
+///                     "scheme": "https",
+///                     "host": "www.google.com",
+///                     "sni": "www.google.com"     }]]
 /// [0,{"WsEstablish": "1.req"}}]
 /// [0,{"WsSend": {"id": 1, "is_bin": true}}]
-/// ```
 #[derive(Debug, Deserialize)]
 pub struct RepeaterMsg {
     pub id: usize,
@@ -36,6 +37,7 @@ impl RepeaterMsg {
 
 #[derive(Debug, Deserialize)]
 pub enum Operation {
+    // codec
     Encode {
         codec: Codec,
         data: String,
@@ -54,6 +56,7 @@ pub enum Operation {
         is_bin: bool,
     },
     WsClose(usize),
+    // general
     Forward(ForwardInfo),
     Close,
 }

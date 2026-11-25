@@ -1,8 +1,7 @@
 pub mod addons;
 
 use std::collections::HashMap;
-use std::env::{self, VarError};
-use std::fs::read_to_string;
+use std::env::VarError;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
@@ -61,7 +60,7 @@ pub fn global_config_path() -> Result<&'static Path, VarError> {
         return Ok(path.as_path());
     }
 
-    let home_dir = env::var("HOME")?;
+    let home_dir = std::env::var("HOME")?;
     let mut path = PathBuf::from(home_dir);
     path.push(".config/zxc");
     Ok(GLOBAL_CONFIG_DIR.get_or_init(|| path).as_path())
@@ -70,7 +69,7 @@ pub fn global_config_path() -> Result<&'static Path, VarError> {
 /// Parses the global config and sanitizes it.
 pub fn parse_global_config() -> Result<Option<GlobalConfig>, ConfigError> {
     let path = global_config_path()?.join(CONFIG_FILE_NAME);
-    let contents = read_to_string(&path)?;
+    let contents = std::fs::read_to_string(&path)?;
     let config = toml::from_str::<GlobalConfig>(&contents)?;
     Ok(config.sanitize())
 }

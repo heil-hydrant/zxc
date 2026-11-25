@@ -15,6 +15,6 @@ pub use local::io::{parse_local_config, write_local_config};
 pub use local::proxy::ProxyArgs;
 pub use misc::{add_option_vec, sanitize_option_vec_string};
 pub use parsed_config::Config;
-pub use windows::*;
+pub(crate) use windows::*;
 
 pub const CONFIG_FILE_NAME: &str = "config.toml";

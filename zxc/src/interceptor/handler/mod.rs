@@ -1,7 +1,5 @@
 mod impl_boundary;
 
-use std::fmt::Debug;
-
 use bytes::BytesMut;
 use tokio::net::UnixStream;
 use tokio::sync::mpsc::{Receiver, Sender};
@@ -36,7 +34,7 @@ impl InterceptorHandler {
     }
 }
 
-impl Debug for InterceptorHandler {
+impl std::fmt::Debug for InterceptorHandler {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "interceptor")
     }

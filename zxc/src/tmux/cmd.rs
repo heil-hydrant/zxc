@@ -1,5 +1,3 @@
-use std::env;
-use std::fs::metadata;
 use std::io::Error;
 use std::process::Command;
 
@@ -7,12 +5,12 @@ use super::constants::*;
 
 // tmux -L session_name -f $HOME/.config/zxc/tmux.conf new-session -d
 #[inline(always)]
-pub fn create_session(cmd: &mut Command) -> Result<(), Error> {
-    let home = env::var("HOME")
+pub(super) fn create_session(cmd: &mut Command) -> Result<(), Error> {
+    let home = std::env::var("HOME")
         .map_err(|e| Error::other(format!("Get Home Dir| {}", e)))?;
     let config = format!("{}/.config/zxc/tmux.conf", home);
     // check if config file exists
-    metadata(&config)?;
+    std::fs::metadata(&config)?;
     cmd.arg("-f")
         .arg(config)
         .arg(NEW_SESSION)
@@ -22,13 +20,13 @@ pub fn create_session(cmd: &mut Command) -> Result<(), Error> {
 
 // tmux -L session_name ls
 #[inline(always)]
-pub fn list_sessions(cmd: &mut Command) {
+pub(super) fn list_sessions(cmd: &mut Command) {
     cmd.arg("ls");
 }
 
 // tmux -L session_name list-windows -F "#{window_index}"
 #[inline(always)]
-pub fn list_windows(cmd: &mut Command) {
+pub(super) fn list_windows(cmd: &mut Command) {
     cmd.arg("list-windows")
         .arg("-F")
         .arg("#{window_index}");
@@ -36,13 +34,13 @@ pub fn list_windows(cmd: &mut Command) {
 
 // tmux -L session_name new-window
 #[inline(always)]
-pub fn create_window(cmd: &mut Command) {
+pub(super) fn create_window(cmd: &mut Command) {
     cmd.arg(NEW_WINDOW);
 }
 
 // tmux -L session_name rename-window -t target_window module
 #[inline(always)]
-pub fn rename_window(cmd: &mut Command, target: usize, name: &str) {
+pub(super) fn rename_window(cmd: &mut Command, target: usize, name: &str) {
     cmd.arg(RENAME_WINDOW)
         .arg(FLAG_TARGET)
         .arg(target.to_string())
@@ -51,7 +49,7 @@ pub fn rename_window(cmd: &mut Command, target: usize, name: &str) {
 
 // tmux -L session_name send-keys -t target_window module Enter
 #[inline(always)]
-pub fn run_module(cmd: &mut Command, target: &str, name: &str) {
+pub(super) fn run_module(cmd: &mut Command, target: &str, name: &str) {
     cmd.args(ARGUMENTS_BEFORE_TARGET)
         .arg(target)
         .arg(name)
@@ -60,7 +58,7 @@ pub fn run_module(cmd: &mut Command, target: &str, name: &str) {
 
 // tmux -L session_name setenv ZXC 1
 #[inline(always)]
-pub fn set_env(cmd: &mut Command, name: &str, value: &str) {
+pub(super) fn set_env(cmd: &mut Command, name: &str, value: &str) {
     cmd.arg("setenv").arg(name).arg(value);
 }
 
@@ -68,7 +66,7 @@ pub fn set_env(cmd: &mut Command, name: &str, value: &str) {
 //
 // default, history window (:1).
 #[inline(always)]
-pub fn attach_session(cmd: &mut Command) {
+pub(super) fn attach_session(cmd: &mut Command) {
     cmd.arg("attach").arg("-t").arg(":1");
 }
 

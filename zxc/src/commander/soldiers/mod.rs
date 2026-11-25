@@ -8,16 +8,16 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use self::http::HttpCommStorage;
 use self::http2::Http2CommStorage;
 use self::ws::WsCommStorage;
-use super::{CommanderResponse, CommunicateError, WS_REGISTER};
+use super::{CommanderResponse, CommunicateError};
 use crate::file_types::FileType;
 use crate::id::SoldierId;
 use crate::proxy::Role;
 
 #[derive(Default)]
 pub struct Soldiers {
-    pub http1: HttpCommStorage,
-    pub http2: Http2CommStorage,
-    pub ws: WsCommStorage,
+    http1: HttpCommStorage,
+    http2: Http2CommStorage,
+    ws: WsCommStorage,
 }
 
 impl Soldiers {
@@ -96,7 +96,7 @@ impl Soldiers {
             .pop_sender(id)
             .ok_or(CommunicateError::NoId(
                 SoldierId::Connection(id),
-                WS_REGISTER,
+                crate::WS_REGISTER,
             ))
     }
 

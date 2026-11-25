@@ -12,12 +12,12 @@ use crate::commander::*;
 pub struct ZStream;
 
 pub struct Connection<T, E> {
-    pub id: usize,
-    pub commander: Sender<CommanderRequest>,
-    pub request: Option<OneRequest>,
-    pub buf: BytesMut,
-    pub reader: T, // client
-    pub writer: E, // server
+    pub(crate) id: usize,
+    pub(crate) commander: Sender<CommanderRequest>,
+    pub(crate) request: Option<OneRequest>,
+    pub(crate) buf: BytesMut,
+    pub(crate) reader: T, // client
+    pub(crate) writer: E, // server
 }
 
 impl<T, E> Connection<T, E> {

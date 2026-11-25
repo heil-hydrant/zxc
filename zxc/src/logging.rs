@@ -1,4 +1,4 @@
-use std::fs::{File, create_dir_all};
+use std::fs::File;
 use std::io::{self, Write};
 use std::sync::{Mutex, MutexGuard};
 
@@ -11,7 +11,7 @@ use tracing_subscriber::field::MakeExt;
 use tracing_subscriber::fmt::time::OffsetTime;
 use tracing_subscriber::fmt::{MakeWriter, format};
 
-pub struct FileWriter<'a>(MutexGuard<'a, File>);
+struct FileWriter<'a>(MutexGuard<'a, File>);
 
 impl Write for FileWriter<'_> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
@@ -28,14 +28,14 @@ impl Write for FileWriter<'_> {
 }
 
 // Custom Logger to write error to stderr and other traces to file
-pub struct DebugLogger {
+struct DebugLogger {
     basic: Mutex<File>,
     debug: Mutex<File>,
 }
 
 impl DebugLogger {
     #[inline(always)]
-    pub fn new(basic: File, debug: File) -> Self {
+    fn new(basic: File, debug: File) -> Self {
         Self {
             basic: Mutex::new(basic),
             debug: Mutex::new(debug),
@@ -71,7 +71,7 @@ impl<'a> MakeWriter<'a> for DebugLogger {
     }
 }
 
-pub struct BasicLogger(Mutex<File>);
+struct BasicLogger(Mutex<File>);
 
 impl<'a> MakeWriter<'a> for BasicLogger {
     type Writer = FileWriter<'a>;
@@ -124,7 +124,7 @@ pub fn setup_logging(debug: bool) -> Result<(), Box<dyn std::error::Error>> {
         .with_ansi(false);
 
     if max_level == Level::TRACE {
-        let _ = create_dir_all("log")
+        let _ = std::fs::create_dir_all("log")
             .map_err(|e| eprintln!("create log dir| {}", e));
         match File::create("./log/proxy.log") {
             Ok(file) => {

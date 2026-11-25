@@ -6,7 +6,6 @@ use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
 use bytes::BytesMut;
-use tokio::fs::create_dir;
 use tracing::trace;
 
 use tokio::net::UnixStream;
@@ -46,7 +45,7 @@ impl AddonHandler {
     }
 
     /// Builds the serialized addon command for a forwarded request.
-    pub async fn build_cmd_string(
+    pub(super) async fn build_cmd_string(
         &self,
         info: ForwardInfo,
     ) -> Result<String, AddonError> {
@@ -92,7 +91,7 @@ impl Debug for AddonHandler {
 }
 
 /// Builds the destination path for a copied addon request.
-pub async fn build_addon_dest(
+async fn build_addon_dest(
     prefix: &str,
     src_file: &Path,
 ) -> Result<PathBuf, DirError> {
@@ -108,7 +107,7 @@ pub async fn build_addon_dest(
     }
     trace!("top| {}", &path.to_string_lossy());
     path.push(ADDONS);
-    if let Err(e) = create_dir(&path).await
+    if let Err(e) = tokio::fs::create_dir(&path).await
         && !matches!(e.kind(), ErrorKind::AlreadyExists)
     {
         return Err(DirError::CreateDir(e));

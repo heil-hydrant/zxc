@@ -154,7 +154,7 @@ using their respective aliases.
 * http/1.1, http/2 and websocket support.
 
 ## Prerequisites
-* getfattr
+* getfattr (Linux) or xattr (built-in on macOS)
 * tmux
 * vim (> 8.2.4684) with the following features
   - channel
@@ -165,8 +165,14 @@ using their respective aliases.
 * column (optional for indenting history files)
 
 ### Packages
+Linux (Debian/Ubuntu):
 ```
 attr tmux vim ffuf sqlmap bsdmainutils
+```
+
+macOS (Homebrew):
+```
+brew install tmux vim ffuf sqlmap
 ```
 
 ## Installation
@@ -234,6 +240,7 @@ zxc
 ```
   -n, --new-name <NEW_NAME>         Session name to create
   -a, --attach <ATTACH_NAME>        Attach to existing session
+  -l, --listen <LISTEN>             Interface to bind the proxy listener to
   -p, --port <PORT>                 Proxy port to use [default: 8080]
   -i, --include <INCLUDED_DOMAINS>  List of domains to proxy
   -e, --exclude <EXCLUDED_DOMAINS>  List of domains to relay
@@ -291,7 +298,7 @@ Window is non modifiable and read only.
 
 ### Repeater
 Repeater window is used to repeat requests. The original request is copied to a
-folder named `r-$id` for http and `r-ws-$id` for websocket within the
+folder named `r-$id` for http and `websocket/r-ws-$id` for websocket within the
 specific history folder.
 
 Command             | Description                       | Availability
@@ -473,7 +480,9 @@ Command             | Description
 ViewWsSessionHistory| View highlighted ws req/res in split.<br>Default binding is `<CR>`.</br>
 
 ### wreq [websocket request]
-Binary Frames are indicated by 'b' in right corner of status line.
+Binary Frames are indicated by 'b' in right corner of status line. The `b:is_bin`
+buffer variable marks the frame as binary (`true` for binary, `false` for text).
+It is set when opening binary frames and toggled with `WsBinary`.
 
 Command             | Description
 :---------          | :---------
@@ -551,6 +560,8 @@ config][local_config.toml].
 
 Keys                | Description                           | Possible Values
 :---------          | :---------                            | :---------
+listen              | Interface to bind proxy listener to   | ip address (default 127.0.0.1)
+port                | Proxy port to use                     | number (default 8080)
 included_domains    | List of domains to proxy              | string list
 excluded_domains    | List of domains to relay              | string list
 no_ws               | Whether to relay websocket requests   | bool (default false)

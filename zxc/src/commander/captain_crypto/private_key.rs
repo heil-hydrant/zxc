@@ -9,7 +9,7 @@ use crate::config::global_config_path;
 // https://github.com/rustls/pemfile/issues/39
 
 // Convert &str (PRIVATE_KEY) to PrivateKeyDer
-pub fn str_to_private(
+pub(super) fn str_to_private(
     pk: &str,
 ) -> Result<PrivateKeyDer<'static>, CryptoBuildError> {
     let (new_key, _) = read_one_from_slice(pk.as_bytes())
@@ -23,7 +23,7 @@ pub fn str_to_private(
 }
 
 // private key - $HOME/.config/zxc/private.key
-pub fn read_private() -> Result<String, CryptoBuildError> {
+pub(super) fn read_private() -> Result<String, CryptoBuildError> {
     let path = global_config_path()?.join("private.key");
     read_to_string(&path).map_err(|source| CryptoBuildError::Read {
         path,

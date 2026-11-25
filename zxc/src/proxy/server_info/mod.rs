@@ -2,7 +2,7 @@ pub mod address;
 pub mod json;
 pub mod scheme;
 
-use std::fmt::{Display, Formatter};
+use std::fmt::Display;
 
 use address::Address;
 use address::error::AddressError;
@@ -103,7 +103,7 @@ impl TryFrom<ServerInfoJson> for ServerInfo {
 }
 
 impl Display for ServerInfo {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}|{}", self.scheme, self.address)
     }
 }

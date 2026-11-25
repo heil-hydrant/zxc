@@ -13,10 +13,51 @@ use crate::proxy::handler_state::handlers::read_http;
 use crate::proxy::*;
 use crate::repeater::prelude::*;
 
+// Based on b:update variable set by user in UI
+impl<T> ShouldUpdate for Roneone<T> {
+    #[inline(always)]
+    fn should_update(&self) -> bool {
+        self.update
+    }
+}
+
 impl<T> AddRaw for Roneone<T> {
     fn add_raw(&mut self, buf: BytesMut) -> Result<(), UpdateMsgError> {
         self.payload = Some(buf);
         Ok(())
+    }
+}
+
+impl<T> RepeaterBytesToFrame for Roneone<T> {
+    type Frame = OneRequest;
+
+    fn parse_frame(
+        &mut self,
+        buf: BytesMut,
+    ) -> Result<Self::Frame, UpdateMsgError> {
+        let mut req = OneRequest::try_from(buf)?;
+        http_plz::NormalizerOpts::builder()
+            .build()
+            .normalize(&mut req);
+        Ok(req)
+    }
+
+    fn frame_to_payload(&mut self, frame: Self::Frame) {
+        self.payload = Some(frame.into_bytes())
+    }
+}
+
+impl<T> Persist for Roneone<T> {
+    // If frame was uploaded, then rewrite
+    #[inline]
+    fn should_rewrite(&self) -> bool {
+        self.update
+    }
+
+    fn file_data_and_path(&mut self) -> (&mut File, &[u8], &Path) {
+        // safe to unwrap,
+        // since data is set in read_from_file / update frame state
+        (&mut self.file, self.payload.as_ref().unwrap(), self.path.as_path())
     }
 }
 
@@ -42,60 +83,6 @@ where
             .map_err(OneOneRWError::Write)?;
         trace!("write");
         Ok(RepeaterState::Receive(self))
-    }
-}
-
-impl<T> RepeaterBytesToFrame for Roneone<T> {
-    type Frame = OneRequest;
-
-    fn parse_frame(
-        &mut self,
-        buf: BytesMut,
-    ) -> Result<Self::Frame, UpdateMsgError> {
-        Ok(OneRequest::try_from(buf)?)
-    }
-
-    fn frame_to_payload(&mut self, frame: Self::Frame) {
-        self.payload = Some(frame.into_bytes())
-    }
-}
-
-const NEWRITE_ERROR: &str = "No new Write for http";
-impl<T> Persist for Roneone<T> {
-    // If frame was uploaded, then rewrite
-    #[inline]
-    fn should_rewrite(&self) -> bool {
-        self.update
-    }
-
-    fn file_data_and_path(&mut self) -> (&mut File, &[u8], &Path) {
-        // safe to unwrap,
-        // since data is set in read_from_file / update frame state
-        (
-            &mut self.file,
-            self.payload.as_ref().unwrap(),
-            self.path.as_path(),
-        )
-    }
-
-    fn update_path(&mut self) {
-        panic!("{}", NEWRITE_ERROR)
-    }
-
-    fn data_as_ref(&self) -> &[u8] {
-        panic!("{}", NEWRITE_ERROR)
-    }
-
-    fn path_as_ref(&self) -> &PathBuf {
-        panic!("{}", NEWRITE_ERROR)
-    }
-}
-
-// Based on b:update variable set by user in UI
-impl<T> ShouldUpdate for Roneone<T> {
-    #[inline(always)]
-    fn should_update(&self) -> bool {
-        self.update
     }
 }
 

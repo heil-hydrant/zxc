@@ -46,7 +46,7 @@ impl HandleUI for InterceptorHandler {
     async fn handle_ui(&mut self) -> Result<UiReply, InterceptorError> {
         let msg = serde_json::from_slice::<InterUImsg>(&self.buf)
             .map_err(|e| InterceptorError::from((&self.buf, e)))?;
-        let id = msg.id;
+        let id = msg.id();
         let result = match msg.op() {
             InterUIOps::Toggle
             | InterUIOps::Resume(_)

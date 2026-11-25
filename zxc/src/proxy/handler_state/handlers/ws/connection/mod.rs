@@ -1,8 +1,5 @@
 #![allow(clippy::too_many_arguments)]
 
-pub mod convert;
-mod pipeline;
-
 use std::path::PathBuf;
 
 use bytes::BytesMut;
@@ -17,6 +14,11 @@ use zxc_derive::{CanCommunicate, GetRole, Id};
 use crate::commander::{CommanderRequest, CommanderResponse};
 use crate::history::CommanderToHistory;
 use crate::proxy::prelude::*;
+
+mod convert;
+mod pipeline;
+
+pub(crate) use convert::ToWs;
 
 // Handler for ws connection
 #[derive(GetRole, CanCommunicate, Id)]

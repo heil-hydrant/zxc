@@ -1,7 +1,7 @@
 mod convert;
 pub mod error;
 
-use std::fmt::{Display, Formatter};
+use std::fmt::Display;
 use std::net::SocketAddr;
 
 pub use error::AddressError;
@@ -73,7 +73,7 @@ impl Address {
 }
 
 impl Display for Address {
-    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Address::Socket(socket_addr) => write!(f, "{}", socket_addr),
             Address::Dns((host, port)) => write!(f, "{}:{}", host, port),

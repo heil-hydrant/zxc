@@ -13,58 +13,18 @@ use crate::proxy::handler_state::WS_ADD_RAW_PANIC;
 use crate::proxy::*;
 use crate::repeater::prelude::*;
 
+// WebSocket frames are always new, so this always returns `true`.
+impl<T> ShouldUpdate for RWebSocket<T> {
+    #[inline(always)]
+    fn should_update(&self) -> bool {
+        true
+    }
+}
+
 // Blanket Implementation
 impl<T> AddRaw for RWebSocket<T> {
     fn add_raw(&mut self, _: BytesMut) -> Result<(), UpdateMsgError> {
         panic!("{}", WS_ADD_RAW_PANIC);
-    }
-}
-
-impl<T> ReadWrite for RWebSocket<T>
-where
-    T: AsyncRead + AsyncWrite + Unpin,
-{
-    type Error = WsError;
-    type State = RepeaterState<Self>;
-
-    // Reads the next frame and transitions to `WriteResponse`.
-    //
-    // # Transitions
-    //
-    // `Receive` -> `WriteResponse`.
-    //
-    // # Errors
-    //
-    // - `WsError::Read`
-    // - `WsError::Close`.
-
-    async fn read(mut self) -> Result<RepeaterState<Self>, WsError> {
-        let Some(msg) = self.stream.next().await else {
-            return Err(WsError::Close);
-        };
-        self.frame = Some(msg?);
-        trace!("Y");
-        Ok(RepeaterState::WriteResponse(self))
-    }
-
-    // Transitions `WriteResponse` to `Receive` or `End`.
-    async fn write(mut self) -> Result<RepeaterState<Self>, WsError> {
-        let frame = self
-            .frame
-            .take()
-            .ok_or(WsError::NoMsg)?;
-        let is_close = frame.is_close();
-        self.stream
-            .send(frame)
-            .await
-            .map_err(|_| WsError::Write)?;
-        trace!("Y");
-        if !is_close {
-            trace!("continue");
-            return Ok(RepeaterState::Receive(self));
-        }
-        trace!("close frame");
-        Ok(RepeaterState::End(self))
     }
 }
 
@@ -84,6 +44,7 @@ impl<T> RepeaterBytesToFrame for RWebSocket<T> {
                 Err(_) => Message::Binary(bytes.clone()),
             }
         };
+        // TODO: needed ?
         self.is_bin = msg.is_binary();
         self.data = Some(bytes);
         Ok(msg)
@@ -121,12 +82,40 @@ impl<T> Persist for RWebSocket<T> {
     }
 }
 
-// WebSocket frames are always new, so this always returns `true`.
+impl<T> ReadWrite for RWebSocket<T>
+where
+    T: AsyncRead + AsyncWrite + Unpin,
+{
+    type Error = WsError;
+    type State = RepeaterState<Self>;
 
-impl<T> ShouldUpdate for RWebSocket<T> {
-    #[inline(always)]
-    fn should_update(&self) -> bool {
-        true
+    async fn read(mut self) -> Result<RepeaterState<Self>, WsError> {
+        let Some(msg) = self.stream.next().await else {
+            return Err(WsError::Close);
+        };
+        self.frame = Some(msg?);
+        trace!("Y");
+        Ok(RepeaterState::WriteResponse(self))
+    }
+
+    // Transitions `WriteResponse` to `Receive` or `End`.
+    async fn write(mut self) -> Result<RepeaterState<Self>, WsError> {
+        let frame = self
+            .frame
+            .take()
+            .ok_or(WsError::NoMsg)?;
+        let is_close = frame.is_close();
+        self.stream
+            .send(frame)
+            .await
+            .map_err(|_| WsError::Write)?;
+        trace!("Y");
+        if !is_close {
+            trace!("continue");
+            return Ok(RepeaterState::Receive(self));
+        }
+        trace!("close frame");
+        Ok(RepeaterState::End(self))
     }
 }
 

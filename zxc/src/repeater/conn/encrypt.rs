@@ -7,21 +7,6 @@ use tokio_rustls::client::TlsStream;
 use crate::commander::{ALPN_H1, ALPN_H2};
 use crate::repeater::prelude::*;
 
-// Converts `RepeaterConn<TcpStream>` into
-// `RepeaterConn<TlsStream<TcpStream>>`.
-//
-// # Steps
-//
-// 1. Get the SNI from `ServerInfo`.
-// 2. Override ALPN for the protocol being replayed.
-// 3. Encrypt the connection with `TlsConnector`.
-// 4. Verify the negotiated ALPN.
-//
-// # Errors
-//
-// - `RepeaterError::Encrypt`
-// - `RepeaterError::UnexpectedAlpn`
-
 impl RepeaterConn<TcpStream> {
     pub async fn encrypt(
         self,

@@ -21,7 +21,6 @@ pub use core::{async_step, file_types, forward_info, id};
 pub use session::*;
 
 use std::io::Error;
-use std::path::PathBuf;
 
 use builder::*;
 use clap::Parser;
@@ -79,7 +78,7 @@ async fn run() -> Result<(), MainError> {
     let tmp_path = format!("/tmp/{}", session_name);
     std::fs::create_dir(&tmp_path).map_err(MainError::TempDir)?;
     let _dir_guard = SessionDirGuard {
-        path: PathBuf::from(&tmp_path),
+        path: std::path::PathBuf::from(&tmp_path),
     };
 
     let index = if attach {

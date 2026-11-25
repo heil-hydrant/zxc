@@ -1,4 +1,4 @@
-use std::fmt::{Display, Formatter};
+use std::fmt::Display;
 
 use bytes::BytesMut;
 
@@ -40,98 +40,23 @@ where
             // # Transitions
             //
             // `ReadFromFile` -> `UpdateFrame` | `Send`.
-            //
-            // # Note
-            //
-            // Requires `FileBuf + ShouldUpdate + AddRaw`.
-            //
-            // # Errors
-            //
-            // - `ProtocolError::File`
-            // - `ProtocolError::UpdateFrame`
             Self::ReadFromFile(conn) => read_from_file(conn).await,
-
             // Converts the buffered bytes into a frame.
-            //
-            // # Transitions
-            //
-            // `UpdateFrame` -> `ReWrite`.
-            //
-            // # Note
-            //
-            // Requires `RepeaterBytesToFrame`.
-            //
-            // # Errors
-            //
-            // `ProtocolError::UpdateFrame`.
             Self::UpdateFrame(mut conn, buf) => {
                 let frame = conn.parse_frame(buf)?;
                 conn.frame_to_payload(frame);
                 Ok(RepeaterState::ReWrite(conn))
             }
             // Persists the payload to disk.
-            //
-            // # Transitions
-            //
-            // `ReWrite` -> `Send`.
-            //
-            // # Note
-            //
-            // Requires `Persist`.
-            //
-            // # Errors
-            //
-            // `ProtocolError::File`.
             Self::ReWrite(mut conn) => {
                 conn = rewrite(conn).await?;
                 Ok(Self::Send(conn))
             }
-
-            // Sends the request and waits for the response.
-            //
-            // # Transitions
-            //
-            // `Send` -> `Receive`.
-            //
-            // # Note
-            //
-            // Requires `ReadWrite`.
-            //
-            // # Errors
-            //
-            // - `RepeaterError::ReadHttp`
-            // - `RepeaterError::WsIo`
+            // Sends the request.
             Self::Send(conn) => conn.write().await.map_err(Into::into),
-
             // Reads the response or frame from the server.
-            //
-            // # Transitions
-            //
-            // `Receive` -> `WriteResponse`.
-            //
-            // # Note
-            //
-            // Requires `ReadWrite`.
-            //
-            // # Errors
-            //
-            // - `RepeaterError::ReadHttp`
-            // - `RepeaterError::WsIo`
             Self::Receive(conn) => conn.read().await.map_err(Into::into),
-
             // Logs the response to disk.
-            //
-            // # Transitions
-            //
-            // `WriteResponse` -> `End`.
-            //
-            // # Note
-            //
-            // Requires `WriteResponse`.
-            //
-            // # Errors
-            //
-            // `ProtocolError::File`.
             Self::WriteResponse(mut conn) => {
                 conn = log_response(conn).await?;
                 Ok(Self::End(conn))
@@ -147,7 +72,7 @@ where
 }
 
 impl<T> Display for RepeaterState<T> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
             Self::ReadFromFile(_) => "read_from_file",
             Self::UpdateFrame(..) => "update_frame",

@@ -3,7 +3,6 @@ use std::time::Duration;
 
 use tokio::io::AsyncWriteExt;
 use tokio::net::UnixStream;
-use tokio::time::timeout;
 
 use crate::io::*;
 
@@ -19,7 +18,7 @@ pub async fn unix_write_vec_and_flush(
     stream: &mut UnixStream,
     mut buf: &mut [IoSlice<'_>],
 ) -> Result<usize, Error> {
-    timeout(WRITE_TIMEOUT, async {
+    tokio::time::timeout(WRITE_TIMEOUT, async {
         while !buf.is_empty() {
             stream.writable().await?;
             match stream.try_write_vectored(buf) {

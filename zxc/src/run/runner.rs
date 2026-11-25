@@ -1,7 +1,4 @@
-use std::time::Duration;
-
 use tokio::io::AsyncReadExt;
-use tokio::time::timeout;
 use tracing::{error, info, trace};
 
 use super::boundary::*;
@@ -23,12 +20,12 @@ where
         tokio::select! {
             biased;
             _ = token.cancelled() => {
-                let _ = timeout(
-                    Duration::from_millis(300),
+                let _ = tokio::time::timeout(
+                    std::time::Duration::from_millis(300),
                     write_and_flush(&mut stream, CLOSE_MSG),
                 ).await;
                 let mut eof_buf = [0u8; 1];
-                let _ = timeout(Duration::from_millis(300), stream.read(&mut eof_buf)).await;
+                let _ = tokio::time::timeout(std::time::Duration::from_millis(300), stream.read(&mut eof_buf)).await;
                 trace!("runner| cancelled cleanly");
                 return Ok(());
             }

@@ -5,31 +5,15 @@ use tracing::trace;
 use crate::io::*;
 
 /// Logs the response to a file.
-///
-/// # Transitions
-///
-/// `WriteResponse` -> `End`.
 pub trait WriteResponse {
     fn update_response_path(&mut self);
+
     fn response_path(&self) -> &PathBuf;
+
     fn response_data(&self) -> &[u8];
 }
 
 /// Logs the response to disk.
-///
-/// # Steps
-///
-/// 1. Update the response path.
-/// 2. Get the path.
-/// 3. Create the file and write the data.
-///
-/// # Transitions
-///
-/// `WriteResponse` -> `End`.
-///
-/// # Errors
-///
-/// `std::io::Error`.
 pub async fn log_response<T>(mut conn: T) -> Result<T, FileErrorInfo>
 where
     T: WriteResponse,

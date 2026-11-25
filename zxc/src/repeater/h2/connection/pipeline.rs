@@ -1,26 +1,18 @@
 use std::path::{Path, PathBuf};
 
 use bytes::BytesMut;
-use http_plz::{NormalizerOpts, OneRequest, Request};
+use http_plz::{OneRequest, Request};
 use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tracing::trace;
 use two_plz::client::ClientBuilder;
 
 use super::Rh2;
-use crate::CAPACITY_2MB;
 use crate::forward_info::H2Info;
 use crate::proxy::*;
 use crate::repeater::prelude::*;
 
 /// Builds an H2 request from the raw `rep.req` bytes.
-///
-/// # Steps
-///
-/// 1. Parse the logged HTTP/1.1 style bytes into a `OneRequest`.
-/// 2. If `normalize` is true, fix the body headers.
-/// 3. Convert the `OneRequest` into an H2 `Request`.
-/// 4. Apply only the pseudo headers supplied by the UI.
 ///
 /// # Note
 ///
@@ -34,8 +26,7 @@ fn build_h2_request(
 ) -> Result<Request, UpdateMsgError> {
     let mut one = OneRequest::try_from(buf)?;
     if normalize {
-        NormalizerOpts::builder()
-            .close_connection(false)
+        http_plz::NormalizerOpts::builder()
             .build()
             .normalize(&mut one);
     }
@@ -46,29 +37,53 @@ fn build_h2_request(
     Ok(request)
 }
 
-// Convert (RepeaterConn<T>, File) -> Rh2<T>
-impl<T> From<(RepeaterConn<T>, File)> for Rh2<T> {
-    fn from((conn, file): (RepeaterConn<T>, File)) -> Self {
-        Self {
-            buf: BytesMut::with_capacity(CAPACITY_2MB),
-            path: conn.path,
-            stream: Some(conn.stream),
-            file,
-            payload: None,
-            update: conn.update,
-            h2_info: conn.h2_info,
-            pending_request: None,
-            client_conn: None,
-            response_future: None,
-        }
+// Based on b:update variable set by user in UI
+impl<T> ShouldUpdate for Rh2<T> {
+    #[inline(always)]
+    fn should_update(&self) -> bool {
+        self.update
     }
 }
 
 impl<T> AddRaw for Rh2<T> {
     fn add_raw(&mut self, buf: BytesMut) -> Result<(), UpdateMsgError> {
-        let request = build_h2_request(buf, self.h2_info.as_ref(), false)?;
-        self.pending_request = Some(request);
+        self.pending_request =
+            Some(build_h2_request(buf, self.h2_info.as_ref(), false)?);
         Ok(())
+    }
+}
+
+impl<T> RepeaterBytesToFrame for Rh2<T> {
+    type Frame = Request;
+
+    fn parse_frame(
+        &mut self,
+        buf: BytesMut,
+    ) -> Result<Self::Frame, UpdateMsgError> {
+        build_h2_request(buf, self.h2_info.as_ref(), true)
+    }
+
+    fn frame_to_payload(&mut self, frame: Self::Frame) {
+        let payload = frame
+            .clone()
+            .into_one_rep()
+            .into_bytes();
+        self.payload = Some(payload);
+        self.pending_request = Some(frame);
+    }
+}
+
+impl<T> Persist for Rh2<T> {
+    // If frame was uploaded, then rewrite
+    #[inline]
+    fn should_rewrite(&self) -> bool {
+        self.update
+    }
+
+    fn file_data_and_path(&mut self) -> (&mut File, &[u8], &Path) {
+        // safe to unwrap,
+        // since data is set in read_from_file / update frame state
+        (&mut self.file, self.payload.as_ref().unwrap(), self.path.as_path())
     }
 }
 
@@ -126,65 +141,6 @@ where
     }
 }
 
-impl<T> RepeaterBytesToFrame for Rh2<T> {
-    type Frame = Request;
-
-    fn parse_frame(
-        &mut self,
-        buf: BytesMut,
-    ) -> Result<Self::Frame, UpdateMsgError> {
-        build_h2_request(buf, self.h2_info.as_ref(), true)
-    }
-
-    fn frame_to_payload(&mut self, frame: Self::Frame) {
-        let payload = frame
-            .clone()
-            .into_one_rep()
-            .into_bytes();
-        self.payload = Some(payload);
-        self.pending_request = Some(frame);
-    }
-}
-
-const NEWRITE_ERROR: &str = "No new Write for h2";
-impl<T> Persist for Rh2<T> {
-    // If frame was uploaded, then rewrite
-    #[inline]
-    fn should_rewrite(&self) -> bool {
-        self.update
-    }
-
-    fn file_data_and_path(&mut self) -> (&mut File, &[u8], &Path) {
-        // safe to unwrap,
-        // since data is set in read_from_file / update frame state
-        (
-            &mut self.file,
-            self.payload.as_ref().unwrap(),
-            self.path.as_path(),
-        )
-    }
-
-    fn update_path(&mut self) {
-        panic!("{}", NEWRITE_ERROR)
-    }
-
-    fn data_as_ref(&self) -> &[u8] {
-        panic!("{}", NEWRITE_ERROR)
-    }
-
-    fn path_as_ref(&self) -> &PathBuf {
-        panic!("{}", NEWRITE_ERROR)
-    }
-}
-
-// Based on b:update variable set by user in UI
-impl<T> ShouldUpdate for Rh2<T> {
-    #[inline(always)]
-    fn should_update(&self) -> bool {
-        self.update
-    }
-}
-
 impl<T> WriteResponse for Rh2<T> {
     // rep.res
     fn update_response_path(&mut self) {
@@ -196,9 +152,8 @@ impl<T> WriteResponse for Rh2<T> {
         &self.path
     }
 
-    // safe to unwrap
-    // since, payload set in read state
     fn response_data(&self) -> &[u8] {
+        // safe to unwrap
         self.payload.as_ref().unwrap()
     }
 }

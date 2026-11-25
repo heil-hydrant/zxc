@@ -117,7 +117,7 @@ impl InterToUI {
 }
 
 #[derive(Debug, Serialize)]
-pub struct WsInfo {
+struct WsInfo {
     log_id: usize,
     #[serde(skip_serializing_if = "Option::is_none")]
     is_bin: Option<bool>,
@@ -142,11 +142,15 @@ impl WsInfo {
 
 #[derive(Deserialize, Debug)]
 pub struct InterUImsg {
-    pub id: usize,
-    pub operation: InterUIOps,
+    id: usize,
+    operation: InterUIOps,
 }
 
 impl InterUImsg {
+    pub fn id(&self) -> usize {
+        self.id
+    }
+
     pub fn op(&self) -> &InterUIOps {
         &self.operation
     }
@@ -201,7 +205,7 @@ pub enum InterUIOps {
 //           wres
 
 #[derive(Debug, Deserialize)]
-pub enum FtSpecific {
+enum FtSpecific {
     #[serde(rename = "req")]
     Req {
         server_info: Option<ServerInfoJson>,

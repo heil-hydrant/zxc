@@ -1,6 +1,6 @@
-use std::net::{IpAddr, Ipv4Addr};
+use std::net::IpAddr;
 
-pub const DEFAULT_LISTEN: IpAddr = IpAddr::V4(Ipv4Addr::LOCALHOST);
+pub const DEFAULT_LISTEN: IpAddr = IpAddr::V4(std::net::Ipv4Addr::LOCALHOST);
 
 pub const CAPACITY_2MB: usize = 65536 * 32;
 
@@ -10,6 +10,8 @@ pub const INTERCEPTOR: &str = "interceptor";
 pub const HISTORY: &str = "history";
 pub const REPEATER: &str = "repeater";
 pub const ADDONS: &str = "addons";
+
+pub const WS_REGISTER: &str = "ws_register";
 
 pub const HISTORY_STATE_FILE: &str = ".history.state";
 

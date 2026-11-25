@@ -7,7 +7,6 @@ use crate::commander::CommanderResponse;
 use crate::id::{Id, SoldierId};
 use crate::proxy::Role;
 
-// Structure that contains ws communication info
 #[derive(Id)]
 pub struct WsComm {
     id: SoldierId,

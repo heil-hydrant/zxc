@@ -60,7 +60,7 @@ impl HistoryHandler {
     ///      fully drained without leaving reversed leftovers.
     /// 3. With a socket, return `UiReply::Flush` so every buffered
     ///    response is written in order.
-    pub async fn handle_commander(
+    pub(super) async fn handle_commander(
         &mut self,
         size: usize,
         with_sock: bool,
@@ -195,7 +195,7 @@ impl Debug for HistoryHandler {
     }
 }
 
-pub async fn open_ws_history(
+async fn open_ws_history(
     mut info: HistoryWsRegisterInfo,
 ) -> Result<File, std::io::Error> {
     info.path.push(HISTORY_WS_WSESS);

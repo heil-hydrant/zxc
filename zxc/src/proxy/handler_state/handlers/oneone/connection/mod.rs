@@ -1,13 +1,9 @@
-mod convert;
-mod pipeline;
-
 use std::fmt::{Debug, Display};
 use std::path::PathBuf;
 
 use bytes::BytesMut;
 use header_plz::OneInfoLine;
 use http_plz::OneOne;
-pub use pipeline::OneOneRWError;
 use tokio::fs::File;
 use tokio::sync::mpsc::{Receiver, Sender};
 use zxc_derive::{CanCommunicate, FileOps, GetRole, Id, Log, SendHistory};
@@ -15,6 +11,11 @@ use zxc_derive::{CanCommunicate, FileOps, GetRole, Id, Log, SendHistory};
 use crate::commander::{CommanderRequest, CommanderResponse};
 use crate::history::CommanderToHistory;
 use crate::proxy::prelude::*;
+
+mod convert;
+mod pipeline;
+
+pub use pipeline::OneOneRWError;
 
 #[derive(FileOps, GetRole, CanCommunicate, Id, SendHistory, Log)]
 pub struct OneOneConn<T, E, U>

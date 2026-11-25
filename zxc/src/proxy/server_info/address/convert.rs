@@ -18,7 +18,7 @@ use crate::proxy::prelude::*;
 ///
 /// - `AddressError::NoHost` [2]
 /// - `AddressError::PortParse` [3]
-pub fn split_dns_host_and_port(
+fn split_dns_host_and_port(
     addr: &str,
 ) -> Result<(&str, u16), AddressError> {
     let (host, port_str) = addr

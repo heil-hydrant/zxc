@@ -34,7 +34,7 @@ pub struct CA {
 impl CA {
     // User generated private key and certificate
     // Read from file $HOME/.config/zxc/zxca.crt
-    pub fn trusted(key_pair: KeyPair) -> Result<CA, CryptoBuildError> {
+    pub(super) fn trusted(key_pair: KeyPair) -> Result<CA, CryptoBuildError> {
         let cert_path = global_config_path()?.join("zxca.crt");
         let cert_str = read_to_string(&cert_path).map_err(|source| {
             CryptoBuildError::Read {
@@ -51,7 +51,7 @@ impl CA {
     }
 
     // Per session CA Certificate
-    pub fn untrusted(key_pair: KeyPair) -> Result<CA, CryptoBuildError> {
+    pub(super) fn untrusted(key_pair: KeyPair) -> Result<CA, CryptoBuildError> {
         let issuer = Issuer::new(CertificateParams::default(), key_pair);
         Ok(CA {
             issuer,
@@ -61,7 +61,7 @@ impl CA {
     }
 
     // Temporary CA generated when the user CA is unavailable
-    pub fn ephemeral() -> Result<CA, CryptoBuildError> {
+    pub(super) fn ephemeral() -> Result<CA, CryptoBuildError> {
         let mut params = CertificateParams::default();
         params.is_ca = IsCa::Ca(BasicConstraints::Unconstrained);
         params.distinguished_name = DistinguishedName::new();
@@ -84,15 +84,15 @@ impl CA {
         })
     }
 
-    pub fn signer(&self) -> &Issuer<'_, KeyPair> {
+    pub(super) fn signer(&self) -> &Issuer<'_, KeyPair> {
         &self.issuer
     }
 
-    pub fn store(&self) -> &HashMap<(CertDigest, Alpn), Arc<ServerConfig>> {
+    pub(super) fn store(&self) -> &HashMap<(CertDigest, Alpn), Arc<ServerConfig>> {
         &self.store
     }
 
-    pub fn add_config(
+    pub(super) fn add_config(
         &mut self,
         digest: CertDigest,
         alpn: Alpn,

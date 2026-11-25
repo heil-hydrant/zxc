@@ -6,7 +6,6 @@ use clap::builder::NonEmptyStringValueParser;
 use serde::{Deserialize, Serialize};
 
 use crate::config::*;
-use crate::core::constants::DEFAULT_LISTEN;
 
 // Struct for command line arguments + Local Config
 #[cfg_attr(test, derive(PartialEq, Clone, Default))]
@@ -45,7 +44,7 @@ impl ProxyArgs {
         if self.port == Some(8080) {
             self.port = None;
         }
-        if self.listen == Some(DEFAULT_LISTEN) {
+        if self.listen == Some(crate::core::constants::DEFAULT_LISTEN) {
             self.listen = None;
         }
         if self.no_ws == Some(false) {
@@ -153,7 +152,7 @@ pub mod tests {
     #[test]
     fn test_proxyargs_sanitize_listen_default() {
         let proxy = ProxyArgs {
-            listen: Some(DEFAULT_LISTEN),
+            listen: Some(crate::core::constants::DEFAULT_LISTEN),
             ..Default::default()
         };
         assert!(proxy.sanitize().is_none());

@@ -18,14 +18,6 @@ impl SoldierId {
     }
 
     #[inline(always)]
-    pub const fn h2_stream(conn_id: usize, stream_id: u32) -> Self {
-        Self::H2Stream {
-            conn_id,
-            stream_id,
-        }
-    }
-
-    #[inline(always)]
     pub fn conn_id(&self) -> usize {
         match *self {
             Self::Connection(id)

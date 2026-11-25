@@ -7,22 +7,9 @@ use crate::repeater::prelude::*;
 
 /// Reads the payload from disk and applies the update policy.
 ///
-/// # Steps
-///
-/// 1. Read from the file.
-/// 2. Transition to `UpdateFrame` when `should_update` is `true`. This
-///    is always true for WebSocket and the default for HTTP.
-/// 3. Otherwise add the raw data and transition to `Send`. HTTP only,
-///    when the user sets `b:update` to `false` in the UI.
-///
 /// # Transitions
 ///
 /// `ReadFromFile` -> `UpdateFrame` | `Send`.
-///
-/// # Errors
-///
-/// - `ProtocolError::File` [1]
-/// - `ProtocolError::UpdateFrame` [3]
 pub async fn read_from_file<T>(
     mut conn: T,
 ) -> Result<RepeaterState<T>, ProtocolError>
@@ -33,12 +20,12 @@ where
     if let Err(e) = read_file(file, buf).await {
         return Err(FileErrorInfo::read_fail(conn.file_path(), e).into());
     }
-    let nbuf = buf.split();
+    let data = buf.split();
     if conn.should_update() {
         trace!("should_update| Y");
-        return Ok(RepeaterState::UpdateFrame(conn, nbuf));
+        return Ok(RepeaterState::UpdateFrame(conn, data));
     }
     trace!("should_update| N");
-    conn.add_raw(nbuf)?;
+    conn.add_raw(data)?;
     Ok(RepeaterState::Send(conn))
 }

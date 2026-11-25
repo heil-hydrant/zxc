@@ -21,7 +21,6 @@ pub use communicate::response::{CommanderResponse, WrongMessage};
 pub use communicate::{HistoryComm, InterceptorComm, RepeaterComm};
 pub use error::*;
 pub use protocol::*;
-use tokio::fs::create_dir;
 use tokio::sync::mpsc::{Receiver, Sender, channel};
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, trace};
@@ -33,8 +32,6 @@ use crate::forward_info::{ForwardInfo, Module};
 use crate::history::{CommanderToHistory, HistoryUIOps};
 use crate::id::SoldierId;
 use crate::interceptor::InterUIOps;
-
-const WS_REGISTER: &str = "ws_register";
 
 pub struct Commander {
     captain_crypto: CaptainCrypto,
@@ -70,7 +67,7 @@ impl Commander {
         }
     }
 
-    pub async fn handle_soldier(
+    async fn handle_soldier(
         &mut self,
         request: CommanderRequest,
     ) -> Result<(), CommunicateError> {
@@ -139,22 +136,6 @@ impl Commander {
                 Ok(())
             }
 
-            // Registers a WebSocket connection.
-            //
-            // # Steps
-            //
-            // 1. Pop the server sender from the HTTP storage.
-            // 2. Create an `mpsc::channel<CommanderResponse>` for the
-            //    client. The server already has a receiver and the
-            //    commander holds the sender.
-            // 3. Build a new reply with the receivers and send it through
-            //    the popped sender.
-            // 4. Add the senders to the WebSocket storage by calling
-            //    `add_ws_handle()`.
-            //
-            // # Errors
-            //
-            // `CommunicateError::NoId`.
             CommanderRequest::WsRegister(id) => {
                 let conn_id = id.conn_id();
                 let server_sender = self.soldiers.pop_http_sender(conn_id)?;
@@ -172,14 +153,6 @@ impl Commander {
                 Ok(())
             }
 
-            // Closes an HTTP or WebSocket connection.
-            //
-            // # Steps
-            //
-            // 1. Try to remove from the HTTP storage.
-            // 2. Otherwise remove from the WebSocket storage.
-            // 3. If removed from the WebSocket storage, send
-            //    `CommanderToHistory::RemoveWs` to history.
             CommanderRequest::Close(id) => {
                 self.comm_interceptor.purge_soldier(id);
                 if self.soldiers.remove_from_http_store(id) {
@@ -194,10 +167,6 @@ impl Commander {
                 }
                 Ok(())
             }
-            // Http Related
-            // Common Associcated Value:
-            //      id: usize
-            //      Connection Id
             _ => {
                 let (id, response) = match request {
                     CommanderRequest::GetClientConnector(id) => {
@@ -248,17 +217,6 @@ impl Commander {
                         (SoldierId::Connection(id), response)
                     }
 
-                    // Decides whether to log an HTTP request by extension.
-                    //
-                    // `ext` is the request extension.
-                    //
-                    // # Steps
-                    //
-                    // 1. If config is `Some`, call `config.should_log()`
-                    //    with the extension; otherwise `true`.
-                    // 2. If true, call `self.get_http_log_path()` with the
-                    //    ID to get the new path and
-                    //    `Sender<CommanderToHistory>`.
                     CommanderRequest::ShouldLogHttp(id, ext) => {
                         let result = self
                             .config
@@ -275,18 +233,6 @@ impl Commander {
                         (id, response)
                     }
 
-                    // Decides whether to log an HTTP request by content type.
-                    //
-                    // `ct` is the content type.
-                    //
-                    // # Steps
-                    //
-                    // 1. If config is `Some`, call
-                    //    `!config.in_excluded_content_types()` with the
-                    //    content type.
-                    // 2. If true, call `self.get_http_log_path()` with the
-                    //    ID to get the new path and
-                    //    `Sender<CommanderToHistory>`.
                     CommanderRequest::ShouldLogHttpCt(id, ct) => {
                         let result =
                             self.config
@@ -324,7 +270,7 @@ impl Commander {
         }
     }
 
-    pub async fn get_http_log_path(
+    async fn get_http_log_path(
         &mut self,
         id: SoldierId,
     ) -> Option<(usize, PathBuf, Sender<CommanderToHistory>)> {
@@ -339,8 +285,7 @@ impl Commander {
         Some((index, path, self.comm_history.to_history.clone()))
     }
 
-    pub async fn empty_resume_queue(&mut self) {
-        // http
+    async fn empty_resume_queue(&mut self) {
         self.soldiers
             .broadcast_none_http(
                 self.comm_interceptor
@@ -349,7 +294,6 @@ impl Commander {
             .await;
         trace!("http queue emptied");
 
-        // wreq
         self.soldiers
             .broadcast_none_wreq(
                 self.comm_interceptor
@@ -358,7 +302,6 @@ impl Commander {
             .await;
         trace!("wreq queue emptied");
 
-        // wres
         self.soldiers
             .broadcast_none_wres(
                 self.comm_interceptor
@@ -368,21 +311,7 @@ impl Commander {
         trace!("wres queue emptied");
     }
 
-    /// Handles messages sent from the interceptor window.
-    ///
-    /// # Steps
-    ///
-    /// 1. On `Toggle`, call `interceptor_handle.toggle()`.
-    /// 2. If the intercept status is false, empty the interceptor queue.
-    /// 3. On `Forward`, call `interceptor_handle.forward()`.
-    /// 4. On resume of a `wreq` that needs a response, call
-    ///    `set_ws_need_response(id)`.
-    /// 5. For resume and drop messages, get the log id, file type, and
-    ///    response.
-    /// 6. Get the connection id from the log id by calling
-    ///    `conn_id_from_log_id`.
-    /// 7. Send the response to the respective soldier.
-    pub async fn handle_interceptor(
+    async fn handle_interceptor(
         &mut self,
         msg: InterUIOps,
     ) -> Result<(), CommunicateError> {
@@ -430,7 +359,7 @@ impl Commander {
         }
     }
 
-    pub async fn handle_history(
+    async fn handle_history(
         &mut self,
         msg: HistoryUIOps,
     ) -> Result<(), CommunicateError> {
@@ -472,15 +401,6 @@ impl Commander {
 const MAX_HTTP_LOG_INDEX_ATTEMPTS: usize = 1024;
 
 /// Creates an incrementing HTTP log directory under `base`.
-///
-/// # Steps
-///
-/// 1. Build `<base>/<index>`.
-/// 2. Try `create_dir`.
-///    - `Ok`: return the index and path.
-///    - `AlreadyExists`: increment the index and retry.
-///    - Other errors are logged and return `None`.
-/// 3. Return `None` after `max_attempts` is exhausted.
 async fn create_http_log_dir(
     base: &Path,
     start_index: usize,
@@ -490,7 +410,7 @@ async fn create_http_log_dir(
     let mut path = base.to_path_buf();
     for _ in 0..max_attempts {
         path.push(index.to_string());
-        match create_dir(&path).await {
+        match tokio::fs::create_dir(&path).await {
             Ok(()) => return Some((index, path)),
             Err(e) if e.kind() == ErrorKind::AlreadyExists => {
                 trace!(

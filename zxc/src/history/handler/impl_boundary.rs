@@ -10,7 +10,6 @@ use tokio::time::{interval_at, Instant};
 use tracing::trace;
 
 use super::HistoryHandler;
-use crate::core::HISTORY_STATE_FILE;
 use crate::history::*;
 use crate::io::*;
 use crate::run::boundary::*;
@@ -25,7 +24,7 @@ const IOV_MAX: usize = 1024;
 impl CloseAction for HistoryHandler {
     async fn close_action(&mut self) -> Result<(), Error> {
         if !self.ui_storage.is_empty() {
-            let mut file = File::create_new(HISTORY_STATE_FILE).await?;
+            let mut file = File::create_new(crate::core::HISTORY_STATE_FILE).await?;
             write_history_state(&mut file, &self.ui_storage).await?;
         }
         Ok(())

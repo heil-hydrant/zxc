@@ -4,11 +4,11 @@ use serde::{Deserialize, Serialize};
 #[derive(Deserialize, Serialize, Debug)]
 pub struct Addon {
     pub prefix: String,
-    pub request_flag: String,
-    pub http_flag: Option<String>,
-    pub https_flag: Option<String>,
-    pub http2_flag: Option<String>,
-    pub add_flag: Option<String>,
+    request_flag: String,
+    http_flag: Option<String>,
+    https_flag: Option<String>,
+    http2_flag: Option<String>,
+    add_flag: Option<String>,
 }
 
 // Format: addon_name request_flag $file http/https_flag http2_flag add_flag

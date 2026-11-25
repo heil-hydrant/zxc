@@ -1,4 +1,4 @@
-use std::io::{BufRead, BufReader, Error, ErrorKind};
+use std::io::{BufRead, Error, ErrorKind};
 use std::process::{Command, ExitStatus};
 use std::thread::sleep;
 use std::time::{Duration, Instant};
@@ -49,13 +49,13 @@ impl Session {
 
     // Cmd: tmux -L session_name -f $HOME/config/tmux.conf new-session -d
     #[inline]
-    pub fn create_session(&self) -> Result<(), Error> {
+    fn create_session(&self) -> Result<(), Error> {
         let mut cmd = self.cmd();
         create_session(&mut cmd)?;
         ensure_success(cmd.status()?, "create session")
     }
 
-    pub fn sleep_till_session_creation(&self) -> Result<(), Error> {
+    fn sleep_till_session_creation(&self) -> Result<(), Error> {
         let deadline = Instant::now() + STARTUP_TIMEOUT;
         let mut cmd = self.cmd();
         list_sessions(&mut cmd);
@@ -74,7 +74,7 @@ impl Session {
         }
     }
 
-    pub fn create_windows(&self) -> Result<(), Error> {
+    fn create_windows(&self) -> Result<(), Error> {
         for (index, (_, name, _)) in WINDOWS.iter().enumerate() {
             if index != 0 {
                 let mut cmd = self.cmd();
@@ -90,7 +90,7 @@ impl Session {
         Ok(())
     }
 
-    pub fn sleep_till_windows_creation(&self) -> Result<(), Error> {
+    fn sleep_till_windows_creation(&self) -> Result<(), Error> {
         let deadline = Instant::now() + STARTUP_TIMEOUT;
         let mut cmd = self.cmd();
         // tmux -L session_name list-windows -F "#{window_index}"
@@ -99,7 +99,7 @@ impl Session {
         loop {
             let result = cmd.output()?;
             ensure_success(result.status, "list windows")?;
-            if BufReader::new(result.stdout.as_slice())
+            if std::io::BufReader::new(result.stdout.as_slice())
                 .lines()
                 .count()
                 == 4
@@ -116,7 +116,7 @@ impl Session {
         }
     }
 
-    pub fn start_modules(&self) -> Result<(), Error> {
+    fn start_modules(&self) -> Result<(), Error> {
         for (_, name, target) in WINDOWS.iter() {
             let mut cmd = self.cmd();
             // tmux -L session_name send-keys -t module.target() module Enter
@@ -126,7 +126,7 @@ impl Session {
         Ok(())
     }
 
-    pub fn set_env(&self, name: &str, value: &str) -> Result<(), Error> {
+    fn set_env(&self, name: &str, value: &str) -> Result<(), Error> {
         let mut cmd = self.cmd();
         // tmux -L session_name setenv env_var env_value
         set_env(&mut cmd, name, value);

@@ -9,7 +9,7 @@ pub use super::states::establish_state::RepeaterConnState;
 pub use super::states::rstate::RepeaterState;
 pub use super::states::transition::*;
 pub use super::ws::{
-    build_repeater_dest_ws, spawn_repeater_ws, RWebSocket, RepeaterWsHandle,
-    RepeaterWsMsg, ToRepeaterWs,
+    RWebSocket, RepeaterWsHandle, RepeaterWsMsg, ToRepeaterWs,
+    build_repeater_dest_ws, spawn_repeater_ws,
 };
 pub use crate::proxy::handler_state::transition::FileBuf;

@@ -1,4 +1,4 @@
-use std::io::{BufRead, BufReader, Error, Read};
+use std::io::{BufRead, Error, Read};
 use std::path::PathBuf;
 
 use tokio::net::UnixListener;
@@ -193,7 +193,7 @@ where
     T: Read,
 {
     let mut result = Vec::new();
-    let f = BufReader::new(file);
+    let f = std::io::BufReader::new(file);
     let lines = f.lines();
     for raw_line in lines {
         match raw_line {

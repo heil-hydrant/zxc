@@ -8,12 +8,12 @@ use tokio_rustls::rustls::{DigitallySignedStruct, Error, SignatureScheme};
 // Does not verify the certificate.
 // Always returns true.
 #[derive(Debug)]
-pub struct CertVerifier {
+pub(super) struct CertVerifier {
     schemes: Vec<SignatureScheme>,
 }
 
 impl CertVerifier {
-    pub fn new(schemes: Vec<SignatureScheme>) -> CertVerifier {
+    pub(super) fn new(schemes: Vec<SignatureScheme>) -> CertVerifier {
         CertVerifier {
             schemes,
         }

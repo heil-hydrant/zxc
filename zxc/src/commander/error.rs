@@ -51,7 +51,7 @@ pub enum CommunicateError {
     #[error("no commander entry for {0} ({1})")]
     NoId(SoldierId, &'static str),
 
-    // History
+    // Repeater
     #[error("repeater forward")]
     ToRepeater(#[from] SendError<ForwardInfo>),
 

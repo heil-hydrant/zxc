@@ -88,7 +88,7 @@ impl InterceptorComm {
             ))
     }
 
-    pub fn purge_connection(&mut self, conn_id: usize) {
+    fn purge_connection(&mut self, conn_id: usize) {
         self.http_queue
             .retain(|_, sid| sid.conn_id() != conn_id);
         self.wreq_queue

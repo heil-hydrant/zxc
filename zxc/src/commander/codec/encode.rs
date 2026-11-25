@@ -7,7 +7,7 @@ use form_urlencoded::byte_serialize;
 use super::Codec;
 use super::error::EncodeError;
 
-pub fn perform_encode(
+pub(super) fn perform_encode(
     codec: &Codec,
     data: &[u8],
 ) -> Result<Vec<u8>, EncodeError> {

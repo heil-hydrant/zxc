@@ -13,13 +13,13 @@ use crate::proxy::prelude::*;
 /// Holds the information needed to rebuild the request half of the
 /// connection.
 pub struct AdditionalHandlerInfo {
-    pub log_id: usize,
-    pub payload: BytesMut,
-    pub path: PathBuf,
-    pub should_intercept: bool,
-    pub receiver: Receiver<CommanderResponse>,
-    pub server_info: ServerInfo,
-    pub history_sender: Option<Sender<CommanderToHistory>>,
+    pub(crate) log_id: usize,
+    pub(crate) payload: BytesMut,
+    pub(crate) path: PathBuf,
+    pub(crate) should_intercept: bool,
+    pub(crate) receiver: Receiver<CommanderResponse>,
+    pub(crate) server_info: ServerInfo,
+    pub(crate) history_sender: Option<Sender<CommanderToHistory>>,
 }
 
 impl AdditionalHandlerInfo {
