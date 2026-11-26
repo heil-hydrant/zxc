@@ -7,7 +7,7 @@ use tokio::fs::File;
 use tokio::sync::mpsc::{Receiver, Sender};
 use two_plz::client::{ResponseFuture, SendRequest};
 use two_plz::server::SendResponse;
-use zxc_derive::{CanCommunicate, FileOps, GetRole, Id, Log, SendHistory};
+use zxc_derive::{AttachFile, CanCommunicate, GetRole, Id, Log, SendHistory};
 
 use crate::commander::{CommanderRequest, CommanderResponse};
 use crate::history::CommanderToHistory;
@@ -17,7 +17,7 @@ use crate::proxy::prelude::*;
 mod convert;
 mod pipeline;
 
-#[derive(GetRole, Id, CanCommunicate, FileOps, SendHistory, Log)]
+#[derive(GetRole, Id, CanCommunicate, AttachFile, SendHistory, Log)]
 pub struct TwoConn<T> {
     pub(crate) id: SoldierId,
     pub(crate) role: Role,

@@ -1,6 +1,8 @@
 use thiserror::Error;
 use tokio::sync::mpsc::error::SendError;
 use two_plz::codec::UserError;
+use two_plz::error::OpError;
+use two_plz::preface::PrefaceError;
 
 use crate::commander::*;
 use crate::history::*;
@@ -11,19 +13,13 @@ use crate::proxy::prelude::*;
 #[derive(Error, Debug)]
 pub enum ProtocolError {
     // H11
-    #[error("http: {0}")]
+    #[error("h1: {0}")]
     OneOne(#[from] OneOneRWError),
-    #[error("h2: {0}")]
     // H2
-    Two(#[from] two_plz::error::OpError),
-    #[error("h2 preface: {0}")]
-    H2Preface(#[from] two_plz::preface::PrefaceError),
-    #[error("h2 connection closed before response")]
-    H2Closed,
-    #[error("h2 request is missing")]
-    H2MissingRequest,
+    #[error("h2: {0}")]
+    H2(#[from] Http2Error),
     // WebSocket
-    #[error("websocket: {0}")]
+    #[error("ws: {0}")]
     Ws(#[from] WsError),
 
     //  File Ops
@@ -33,6 +29,18 @@ pub enum ProtocolError {
     //  Update Frame
     #[error(transparent)]
     UpdateFrame(#[from] UpdateMsgError),
+}
+
+impl From<OpError> for ProtocolError {
+    fn from(e: OpError) -> Self {
+        Self::H2(Http2Error::Op(e))
+    }
+}
+
+impl From<PrefaceError> for ProtocolError {
+    fn from(e: PrefaceError) -> Self {
+        Self::H2(Http2Error::Preface(e))
+    }
 }
 
 #[derive(Error, Debug)]
@@ -80,13 +88,19 @@ impl From<OneOneRWError> for ProxyStateError {
 
 impl From<two_plz::error::OpError> for ProxyStateError {
     fn from(e: two_plz::error::OpError) -> Self {
-        Self::Protocol(ProtocolError::Two(e))
+        Self::Protocol(ProtocolError::H2(Http2Error::Op(e)))
     }
 }
 
 impl From<two_plz::preface::PrefaceError> for ProxyStateError {
     fn from(e: two_plz::preface::PrefaceError) -> Self {
-        Self::Protocol(ProtocolError::H2Preface(e))
+        Self::Protocol(ProtocolError::H2(Http2Error::Preface(e)))
+    }
+}
+
+impl From<Http2Error> for ProxyStateError {
+    fn from(e: Http2Error) -> Self {
+        Self::Protocol(ProtocolError::H2(e))
     }
 }
 

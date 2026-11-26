@@ -14,7 +14,7 @@ pub enum HandleOneOneError<T, E> {
     // client/server state
     #[error(transparent)]
     ProxyError(#[from] ProxyStateError),
-    // ----- client state => client conn
+    // client state => client conn
     #[error("server send: {1}")]
     SendToServer(OneOneConn<T, E, OneRequestLine>, #[source] ProxyStateError),
     #[error("new connection required")]

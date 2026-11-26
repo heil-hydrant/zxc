@@ -45,12 +45,12 @@ impl<T> From<(RepeaterConn<T>, File)> for Roneone<T> {
     }
 }
 
-// Converts `Roneone` into `RWebSocket`.
-impl<T> ToRepeaterWs<T> for Roneone<T>
+impl<T> Roneone<T>
 where
     T: AsyncRead + AsyncWrite + Unpin,
 {
-    async fn to_rws(
+    /// Converts an upgraded HTTP/1.1 connection into a WebSocket repeater.
+    pub async fn into_rws(
         mut self,
         receiver: Receiver<RepeaterWsMsg>,
     ) -> Result<RWebSocket<T>, RepeaterError> {

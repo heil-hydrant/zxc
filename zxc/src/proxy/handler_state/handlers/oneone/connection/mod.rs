@@ -6,7 +6,7 @@ use header_plz::OneInfoLine;
 use http_plz::OneOne;
 use tokio::fs::File;
 use tokio::sync::mpsc::{Receiver, Sender};
-use zxc_derive::{CanCommunicate, FileOps, GetRole, Id, Log, SendHistory};
+use zxc_derive::{AttachFile, CanCommunicate, GetRole, Id, Log, SendHistory};
 
 use crate::commander::{CommanderRequest, CommanderResponse};
 use crate::history::CommanderToHistory;
@@ -17,7 +17,7 @@ mod pipeline;
 
 pub use pipeline::OneOneRWError;
 
-#[derive(FileOps, GetRole, CanCommunicate, Id, SendHistory, Log)]
+#[derive(AttachFile, GetRole, CanCommunicate, Id, SendHistory, Log)]
 pub struct OneOneConn<T, E, U>
 where
     U: OneInfoLine,

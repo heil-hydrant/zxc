@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use bytes::BytesMut;
 use header_plz::{RequestLine, ResponseLine};
-use http_plz::{Message, OneRequest, OneResponse, Request, Response};
+use http_plz::{OneRequest, OneResponse, Request, Response};
 use tokio::fs::File;
 use tokio::sync::mpsc::Sender;
 
@@ -12,179 +12,7 @@ use crate::history::*;
 use crate::interceptor::*;
 use crate::proxy::prelude::*;
 
-// --- AddRaw ---
-impl<T> AddRaw for TwoConn<T> {
-    fn add_raw(&mut self, buf: BytesMut) -> Result<(), UpdateMsgError> {
-        self.msg_bytes = Some(buf);
-        Ok(())
-    }
-}
-
-// --- BytesToMsg ---
-impl BytesToMsg for TwoConn<RequestLine> {
-    type Msg = Message<RequestLine>;
-
-    fn parse_bytes(&self, buf: BytesMut) -> Result<Self::Msg, UpdateMsgError> {
-        let req = reparse_request(self.msg.as_ref(), buf)?;
-
-        tracing::trace!(
-            "h2 reparsed| authority={:?} scheme={:?}",
-            req.authority(),
-            req.scheme()
-        );
-        Ok(req)
-    }
-
-    fn add_msg(&mut self, msg: Self::Msg) {
-        self.msg = Some(msg);
-    }
-
-    fn apply_h2_info(
-        &mut self,
-        h2_info: Option<&H2Info>,
-    ) -> Result<(), UpdateMsgError> {
-        let (Some(h2_info), Some(req)) = (h2_info, self.msg.as_mut()) else {
-            return Ok(());
-        };
-        set_h2_pseudo_headers(req, h2_info)?;
-        tracing::trace!(
-            "h2 applied| authority={:?} scheme={:?}",
-            req.authority(),
-            req.scheme()
-        );
-        Ok(())
-    }
-}
-
-impl BytesToMsg for TwoConn<ResponseLine> {
-    type Msg = Message<ResponseLine>;
-
-    fn parse_bytes(&self, buf: BytesMut) -> Result<Self::Msg, UpdateMsgError> {
-        Ok(Response::try_from(OneResponse::try_from(buf)?)?)
-    }
-
-    fn add_msg(&mut self, msg: Self::Msg) {
-        self.msg = Some(msg);
-    }
-}
-
-// --- DropMsg ---
-// close the stream if msg is dropped
-impl<T> DropMsg for TwoConn<T> {
-    #[inline(always)]
-    fn continue_on_drop() -> Result<(), ProxyStateError> {
-        Err(ProxyStateError::Drop)
-    }
-}
-
-// --- MsgToBytes ---
-impl MsgToBytes for TwoConn<RequestLine> {
-    fn msg_to_bytes(&mut self) {
-        self.msg_bytes = Some(
-            self.msg
-                .as_ref()
-                .unwrap()
-                .clone()
-                .into_one_rep()
-                .into_bytes(),
-        );
-    }
-}
-
-impl MsgToBytes for TwoConn<ResponseLine> {
-    fn msg_to_bytes(&mut self) {
-        self.msg_bytes = Some(
-            self.msg
-                .as_ref()
-                .unwrap()
-                .clone()
-                .into_one_rep()
-                .into_bytes(),
-        );
-    }
-}
-
-fn request_h2_info(req: &Request) -> Option<H2Info> {
-    let authority = req
-        .authority()
-        .filter(|authority| !authority.is_empty())
-        .map(str::to_string);
-    let scheme = req
-        .scheme()
-        .map(|scheme| scheme.as_str().to_string());
-
-    if authority.is_none() && scheme.is_none() {
-        None
-    } else {
-        Some(H2Info::new(authority, scheme))
-    }
-}
-
-fn set_h2_pseudo_headers(
-    req: &mut Request,
-    h2_info: &H2Info,
-) -> Result<(), UpdateMsgError> {
-    h2_info.apply_to_request(req)?;
-    Ok(())
-}
-
-fn reparse_request(
-    old: Option<&Request>,
-    buf: BytesMut,
-) -> Result<Request, UpdateMsgError> {
-    let mut req = Request::try_from(OneRequest::try_from(buf)?)?;
-    if let Some(old) = old {
-        copy_h2_pseudo_headers(old, &mut req)?;
-    }
-    Ok(req)
-}
-
-fn copy_h2_pseudo_headers(
-    from: &Request,
-    to: &mut Request,
-) -> Result<(), UpdateMsgError> {
-    if let Some(authority) = from.authority() {
-        to.try_set_authority(authority)?;
-    }
-    if let Some(scheme) = from.scheme() {
-        to.try_set_scheme(scheme.as_str())?;
-    }
-    Ok(())
-}
-
-// --- Intercept ---
-impl Intercept for TwoConn<RequestLine> {
-    fn get_inter_info(&self) -> InterToUI {
-        tracing::trace!("h2 intercepted| {:?}", self.msg.as_ref());
-        let info = ServerInfoJson::from(&self.server_info);
-        let h2_info = self
-            .msg
-            .as_ref()
-            .and_then(request_h2_info);
-        InterToUI::build_h2_req(self.log_id, Some(info), h2_info)
-    }
-}
-
-impl Intercept for TwoConn<ResponseLine> {
-    fn get_inter_info(&self) -> InterToUI {
-        InterToUI::build_http_res(self.log_id)
-    }
-}
-
-// --- UpdateLogExt ---
-impl UpdateLogExt for TwoConn<RequestLine> {
-    fn update_extension(&mut self) {
-        update_http_req_ext(&mut self.path, self.log_id);
-    }
-}
-
-impl UpdateLogExt for TwoConn<ResponseLine> {
-    fn update_extension(&mut self) {
-        update_http_res_ext(&mut self.path);
-    }
-}
-
-// --- ReadWrite ---
+// ReadWrite
 impl ReadWrite for TwoConn<RequestLine> {
     type Error = ProxyStateError;
     type State = ProxyState<Self>;
@@ -230,46 +58,20 @@ impl ReadWrite for TwoConn<ResponseLine> {
         let msg = self
             .msg
             .take()
-            .ok_or(ProtocolError::H2MissingRequest)?;
+            .ok_or(Http2Error::MissingRequest)?;
         self.send_response.send_response(msg)?;
         Ok(ProxyState::End(self))
     }
 }
 
-// --- Rewrite ---
-impl<T> Rewrite for TwoConn<T> {
-    fn file_data_and_path(&mut self) -> (&mut File, &[u8], &Path) {
-        (
-            self.file
-                .as_mut()
-                .expect("file must be present"),
-            self.msg_bytes
-                .as_ref()
-                .expect("payload must be present"),
-            self.path
-                .as_deref()
-                .expect("path must be present"),
-        )
-    }
-}
-
-// --- ShouldIntercept ---
-impl ShouldIntercept for TwoConn<RequestLine> {}
-
-impl ShouldIntercept for TwoConn<ResponseLine> {
-    #[inline(always)]
-    fn should_intercept(&self) -> Option<bool> {
-        Some(self.need_response)
-    }
-}
-
-// --- CanLog & ShouldLog & HttpRequestLog ---
+// CanLog
 impl<T> CanLog for TwoConn<T> {
     fn can_log(&self) -> bool {
         self.path.is_some()
     }
 }
 
+// ShouldLog & HttpRequestLog
 impl HttpRequestLog for TwoConn<RequestLine> {
     fn id(&self) -> SoldierId {
         self.id
@@ -304,30 +106,34 @@ impl ShouldLog for TwoConn<ResponseLine> {
     }
 }
 
-// --- ShouldRewrite ---
-impl<T> ShouldRewrite for TwoConn<T> {
-    #[inline(always)]
-    fn should_rewrite(&self, resume_info: &ResumeInfo) -> bool {
-        resume_info.update()
+// MsgToBytes
+impl MsgToBytes for TwoConn<RequestLine> {
+    fn msg_to_bytes(&mut self) {
+        self.msg_bytes = Some(
+            self.msg
+                .as_ref()
+                .unwrap()
+                .clone()
+                .into_one_rep()
+                .into_bytes(),
+        );
     }
 }
 
-// --- UpdateResumeInfo ---
-impl UpdateResumeInfo for TwoConn<RequestLine> {
-    fn update_resume_info(&mut self, resume_info: &ResumeInfo) {
-        self.need_response = resume_info.need_response();
-        if let Err(e) = self.apply_h2_info(resume_info.h2_info()) {
-            tracing::error!("h2 info| {e}");
-        }
+impl MsgToBytes for TwoConn<ResponseLine> {
+    fn msg_to_bytes(&mut self) {
+        self.msg_bytes = Some(
+            self.msg
+                .as_ref()
+                .unwrap()
+                .clone()
+                .into_one_rep()
+                .into_bytes(),
+        );
     }
 }
 
-impl UpdateResumeInfo for TwoConn<ResponseLine> {
-    #[inline(always)]
-    fn update_resume_info(&mut self, _: &ResumeInfo) {}
-}
-
-// --- GetHistory ---
+// GetHistory
 impl GetHistory for TwoConn<RequestLine> {
     fn get_history(&self) -> HistoryEnum<'_> {
         let msg = self.msg.as_ref().unwrap();
@@ -349,6 +155,181 @@ impl GetHistory for TwoConn<ResponseLine> {
             msg.content_length(),
         )
     }
+}
+
+// UpdateLogExt
+impl UpdateLogExt for TwoConn<RequestLine> {
+    fn update_extension(&mut self) {
+        update_http_req_ext(&mut self.path, self.log_id);
+    }
+}
+
+impl UpdateLogExt for TwoConn<ResponseLine> {
+    fn update_extension(&mut self) {
+        update_http_res_ext(&mut self.path);
+    }
+}
+
+// ShouldIntercept
+impl ShouldIntercept for TwoConn<RequestLine> {}
+
+impl ShouldIntercept for TwoConn<ResponseLine> {
+    #[inline(always)]
+    fn should_intercept(&self) -> Option<bool> {
+        Some(self.need_response)
+    }
+}
+
+// Intercept
+impl Intercept for TwoConn<RequestLine> {
+    fn get_inter_info(&self) -> InterToUI {
+        let info = ServerInfoJson::from(&self.server_info);
+        let h2_info = self
+            .msg
+            .as_ref()
+            .and_then(request_h2_info);
+        InterToUI::build_h2_req(self.log_id, Some(info), h2_info)
+    }
+}
+
+impl Intercept for TwoConn<ResponseLine> {
+    fn get_inter_info(&self) -> InterToUI {
+        InterToUI::build_http_res(self.log_id)
+    }
+}
+
+// DropMsg
+// HTTP/2 closes the stream if the message is dropped.
+impl<T> DropMsg for TwoConn<T> {}
+
+// UpdateResumeInfo
+impl UpdateResumeInfo for TwoConn<RequestLine> {
+    fn update_resume_info(
+        &mut self,
+        resume_info: &ResumeInfo,
+    ) -> Result<(), UpdateMsgError> {
+        self.need_response = resume_info.need_response();
+        if let (Some(h2_info), Some(req)) =
+            (resume_info.h2_info(), self.msg.as_mut())
+        {
+            set_h2_pseudo_headers(req, h2_info)?;
+            tracing::trace!(
+                "h2 applied| authority={:?} scheme={:?}",
+                req.authority(),
+                req.scheme()
+            );
+        }
+        Ok(())
+    }
+}
+
+impl UpdateResumeInfo for TwoConn<ResponseLine> {
+    #[inline(always)]
+    fn update_resume_info(
+        &mut self,
+        _: &ResumeInfo,
+    ) -> Result<(), UpdateMsgError> {
+        Ok(())
+    }
+}
+
+// AddRaw
+impl AddRaw for TwoConn<RequestLine> {
+    fn add_raw(&mut self, buf: BytesMut) -> Result<(), UpdateMsgError> {
+        self.msg = Some(reparse_request(self.msg.as_ref(), buf)?);
+        Ok(())
+    }
+}
+
+impl AddRaw for TwoConn<ResponseLine> {
+    fn add_raw(&mut self, buf: BytesMut) -> Result<(), UpdateMsgError> {
+        self.msg = Some(Response::try_from(OneResponse::try_from(buf)?)?);
+        Ok(())
+    }
+}
+
+// BytesToMsg
+impl BytesToMsg for TwoConn<RequestLine> {
+    fn parse_bytes(&mut self, buf: BytesMut) -> Result<(), UpdateMsgError> {
+        self.msg = Some(reparse_request(self.msg.as_ref(), buf)?);
+        Ok(())
+    }
+}
+
+impl BytesToMsg for TwoConn<ResponseLine> {
+    fn parse_bytes(&mut self, buf: BytesMut) -> Result<(), UpdateMsgError> {
+        self.msg = Some(Response::try_from(OneResponse::try_from(buf)?)?);
+        Ok(())
+    }
+}
+
+fn request_h2_info(req: &Request) -> Option<H2Info> {
+    let authority = req
+        .authority()
+        .filter(|authority| !authority.is_empty())
+        .map(str::to_string);
+    let scheme = req
+        .scheme()
+        .map(|scheme| scheme.as_str().to_string());
+
+    if authority.is_none() && scheme.is_none() {
+        None
+    } else {
+        Some(H2Info::new(authority, scheme))
+    }
+}
+
+// ShouldRewrite
+impl<T> ShouldRewrite for TwoConn<T> {
+    #[inline(always)]
+    fn should_rewrite(&self, resume_info: &ResumeInfo) -> bool {
+        resume_info.update()
+    }
+}
+
+// Rewrite
+impl<T> Rewrite for TwoConn<T> {
+    fn file_data_and_path(&mut self) -> (&mut File, &[u8], &Path) {
+        (
+            self.file.as_mut().unwrap(),
+            self.msg_bytes.as_ref().unwrap(),
+            self.path.as_deref().unwrap(),
+        )
+    }
+}
+
+// Helper functions
+fn set_h2_pseudo_headers(
+    req: &mut Request,
+    h2_info: &H2Info,
+) -> Result<(), UpdateMsgError> {
+    h2_info.apply_to_request(req)?;
+    Ok(())
+}
+
+fn reparse_request(
+    old: Option<&Request>,
+    buf: BytesMut,
+) -> Result<Request, UpdateMsgError> {
+    let mut req = Request::try_from(OneRequest::try_from(buf)?)?;
+    if let Some(old) = old {
+        copy_request_pseudo_headers(old, &mut req)?;
+    }
+    Ok(req)
+}
+
+#[inline(always)]
+fn copy_request_pseudo_headers(
+    from: &Request,
+    to: &mut Request,
+) -> Result<(), UpdateMsgError> {
+    if let Some(authority) = from.authority() {
+        to.try_set_authority(authority)?;
+    }
+    if let Some(scheme) = from.scheme() {
+        to.try_set_scheme(scheme.as_str())?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -487,7 +468,7 @@ mod tests {
         old.try_set_scheme("https").unwrap();
 
         let mut new = origin_form_request();
-        copy_h2_pseudo_headers(&old, &mut new).unwrap();
+        copy_request_pseudo_headers(&old, &mut new).unwrap();
 
         assert_eq!(new.authority(), Some("internal.local:8443"));
         assert_eq!(
@@ -505,7 +486,7 @@ mod tests {
         old.try_set_scheme("https").unwrap();
 
         let mut new = origin_form_request();
-        copy_h2_pseudo_headers(&old, &mut new).unwrap();
+        copy_request_pseudo_headers(&old, &mut new).unwrap();
 
         let h2_info = H2Info::new(
             Some("override.local".to_string()),

@@ -1,4 +1,3 @@
-mod convert;
 pub mod encrypt;
 
 use bytes::BytesMut;
@@ -33,6 +32,27 @@ impl<T, E> Connection<T, E> {
             id: index,
             reader: conn,
             writer: ZStream,
+        }
+    }
+}
+
+// Type-changing struct; see
+// https://github.com/rust-lang/rust/issues/86555.
+
+// Establish Server Connection = ZStream -> Tcp
+// Complete Handshake = Tls
+// TlsTcp = TlsTls -> TlsTcp
+// TcpTls = TcpTcp -> TcpTls
+
+impl<T, E, U> From<(Connection<T, E>, U)> for Connection<T, U> {
+    fn from((conn, stream): (Connection<T, E>, U)) -> Self {
+        Connection {
+            writer: stream,
+            buf: conn.buf,
+            commander: conn.commander,
+            request: conn.request,
+            id: conn.id,
+            reader: conn.reader,
         }
     }
 }

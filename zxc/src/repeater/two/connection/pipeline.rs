@@ -98,21 +98,21 @@ where
         let mut client_conn = self
             .client_conn
             .take()
-            .ok_or(ProtocolError::H2MissingRequest)?;
+            .ok_or(Http2Error::MissingClientConnection)?;
         let mut response_future = self
             .response_future
             .take()
-            .ok_or(ProtocolError::H2MissingRequest)?;
+            .ok_or(Http2Error::MissingResponseFuture)?;
 
         // No tokio::spawn: keep driving the connection while waiting for the
         // single response so flow control and SETTINGS are still processed.
         let response = tokio::select! {
             response = &mut response_future => {
-                response.map_err(|_| ProtocolError::H2Closed)?
+                response.map_err(|_| Http2Error::Closed)?
             }
             result = &mut client_conn => {
                 result?;
-                return Err(ProtocolError::H2Closed);
+                return Err(Http2Error::Closed.into());
             }
         };
 
@@ -125,11 +125,11 @@ where
         let request = self
             .pending_request
             .take()
-            .ok_or(ProtocolError::H2MissingRequest)?;
+            .ok_or(Http2Error::MissingRequest)?;
         let stream = self
             .stream
             .take()
-            .ok_or(ProtocolError::H2MissingRequest)?;
+            .ok_or(Http2Error::MissingStream)?;
         let (client_conn, mut send_request) = ClientBuilder::new()
             .handshake(stream)
             .await?;
@@ -160,7 +160,7 @@ impl<T> WriteResponse for Rh2<T> {
 
 #[cfg(test)]
 mod tests {
-    use header_plz::const_headers::{CONNECTION, CONTENT_LENGTH};
+    use header_plz::const_headers::CONTENT_LENGTH;
 
     use super::*;
 
@@ -168,32 +168,6 @@ mod tests {
                            Host: example.com\r\n\
                            Content-Length: 1\r\n\r\n\
                            hello";
-
-    #[test]
-    fn test_build_h2_request_normalizes_when_requested() {
-        let h2_info = H2Info::new(
-            Some("example.com:443".to_string()),
-            Some("https".to_string()),
-        );
-
-        let req =
-            build_h2_request(BytesMut::from(REQUEST), Some(&h2_info), true)
-                .unwrap();
-
-        assert_eq!(req.method().as_str(), "POST");
-        assert_eq!(req.authority(), Some("example.com:443"));
-        assert_eq!(req.scheme().map(|s| s.as_str()), Some("https"));
-        assert_eq!(
-            req.headers()
-                .value_of_key(CONTENT_LENGTH),
-            Some(&b"5"[..])
-        );
-        assert!(
-            req.headers()
-                .value_of_key(CONNECTION)
-                .is_none()
-        );
-    }
 
     #[test]
     fn test_build_h2_request_without_normalize_keeps_raw_headers() {

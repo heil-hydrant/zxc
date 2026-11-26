@@ -1,5 +1,6 @@
 //! I/O helpers shared by the proxy and the UI runners.
 pub mod file;
+pub mod file_attr;
 pub mod inc_dir;
 pub mod socket;
 pub mod unix_sock;

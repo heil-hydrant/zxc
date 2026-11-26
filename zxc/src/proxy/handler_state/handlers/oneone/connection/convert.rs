@@ -10,7 +10,7 @@ use crate::proxy::handler_state::role::Role;
 use crate::proxy::prelude::*;
 use crate::proxy::server_info::ServerInfo;
 use crate::proxy::states::{
-    ClientTlsStream, Connection, ConnectionState, ServerTlsStream, Tcp
+    ClientTlsStream, Connection, ConnectionState, ServerTlsStream, Tcp,
 };
 
 //  Connection + Receiver<CommanderResponse> + ServerInfo =>

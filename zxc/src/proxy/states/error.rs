@@ -12,15 +12,15 @@ use crate::proxy::prelude::*;
 
 #[derive(Error, Debug)]
 pub enum StateError {
-    // ----- Read Initial Client Data -----
+    // Read Initial Client Data
     #[error("http: {0}")]
     InitialRead(#[from] OneOneRWError),
 
-    // ----- Determine Server -----
+    // Determine Server
     #[error(transparent)]
     Address(#[from] AddressError),
 
-    // ----- Establish Conn -----
+    // Establish Conn
     #[error(transparent)]
     ServerConnect(#[from] ConnectError),
 
@@ -31,18 +31,17 @@ pub enum StateError {
     #[error("server establishment write: {0}")]
     ServerWrite(#[source] io::Error),
 
-    // ----- Client Encrypt -----
-    // Client Handshake
+    // Client Encrypt
     #[error("client handshake: {0}")]
     ClientHandshake(#[source] io::Error),
 
-    // ----- Server Encrypt -----
+    // Server Encrypt
     #[error(transparent)]
     InvalidDns(#[from] InvalidDnsNameError),
     #[error(transparent)]
     ServerEncrypt(#[from] ServerEncryptError),
 
-    // ----- Complete Handshake -----
+    // Complete Handshake
     #[error("no peer certificate")]
     NoPeerCertificate,
     #[error(transparent)]
@@ -50,11 +49,11 @@ pub enum StateError {
     #[error("client handshake completion: {0}")]
     ClientEncrypt(#[source] io::Error),
 
-    // ----- Protocol Handler -----
+    // Protocol Handler
     #[error(transparent)]
     Handler(#[from] ProxyStateError),
 
-    // ----- Communicate -----
+    // Communicate
     #[error(transparent)]
     Commander(#[from] CommanderError),
 }

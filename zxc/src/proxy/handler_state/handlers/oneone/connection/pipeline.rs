@@ -28,86 +28,7 @@ use crate::proxy::handler_state::handlers::read_http;
 use crate::proxy::prelude::*;
 use crate::proxy::states::ClientTlsStream;
 
-// --- AddRaw ---
-impl<T, E, U> AddRaw for OneOneConn<T, E, U>
-where
-    U: OneInfoLine,
-{
-    fn add_raw(&mut self, buf: BytesMut) -> Result<(), UpdateMsgError> {
-        self.msg_bytes = Some(buf);
-        Ok(())
-    }
-}
-
-// --- BytesToMsg ---
-impl<T, E, U> BytesToMsg for OneOneConn<T, E, U>
-where
-    U: OneInfoLine + Debug,
-    OneMessageHead<U>: ParseBodyHeaders,
-{
-    type Msg = OneOne<U>;
-
-    fn parse_bytes(&self, buf: BytesMut) -> Result<Self::Msg, UpdateMsgError> {
-        Ok(OneOne::<U>::try_from(buf)?)
-    }
-
-    fn add_msg(&mut self, msg: Self::Msg) {
-        self.msg = Some(msg);
-    }
-}
-
-// --- DropMsg ---
-// Http/1.1 always close connection
-impl<T, E, U> DropMsg for OneOneConn<T, E, U>
-where
-    U: OneInfoLine,
-{
-    #[inline(always)]
-    fn continue_on_drop() -> Result<(), ProxyStateError> {
-        Err(ProxyStateError::Drop)
-    }
-}
-
-// --- MsgToBytes ---
-impl<T, E, U> MsgToBytes for OneOneConn<T, E, U>
-where
-    U: OneInfoLine + Debug,
-    OneMessageHead<U>: ParseBodyHeaders,
-{
-    fn msg_to_bytes(&mut self) {
-        // safe to unwrap
-        self.msg_bytes = Some(self.msg.take().unwrap().into_bytes());
-    }
-}
-
-// --- Intercept ---
-impl<T, E> Intercept for OneOneConn<T, E, OneRequestLine> {
-    fn get_inter_info(&self) -> InterToUI {
-        let info = ServerInfoJson::from(&self.server_info);
-        InterToUI::build_http_req(self.log_id, Some(info))
-    }
-}
-
-impl<T, E> Intercept for OneOneConn<T, E, OneResponseLine> {
-    fn get_inter_info(&self) -> InterToUI {
-        InterToUI::build_http_res(self.log_id)
-    }
-}
-
-// --- UpdateLogExt ---
-impl<T, E> UpdateLogExt for OneOneConn<T, E, OneRequestLine> {
-    fn update_extension(&mut self) {
-        update_http_req_ext(&mut self.path, self.log_id);
-    }
-}
-
-impl<T, E> UpdateLogExt for OneOneConn<T, E, OneResponseLine> {
-    fn update_extension(&mut self) {
-        update_http_res_ext(&mut self.path);
-    }
-}
-
-// --- ReadWrite ---
+// ReadWrite
 #[derive(Debug, Error)]
 pub enum OneOneRWError {
     #[error("read: {0}")]
@@ -167,73 +88,7 @@ where
     }
 }
 
-// --- Reconnect ---
-impl<T> Reconnect for OneOneConn<T, TcpStream, OneRequestLine>
-where
-    T: AsyncReadExt + AsyncWriteExt + Unpin,
-{
-    fn can_reconnect(&self, server_info: &ServerInfo) -> bool {
-        !server_info.is_tls()
-    }
-
-    async fn reconnect(&mut self) -> Result<(), ProxyStateError> {
-        self.writer = establish_connection(self.address()).await?;
-        Ok(())
-    }
-}
-
-impl<T> Reconnect for OneOneConn<T, ClientTlsStream<TcpStream>, OneRequestLine>
-where
-    T: AsyncReadExt + AsyncWriteExt + Unpin,
-{
-    fn can_reconnect(&self, server_info: &ServerInfo) -> bool {
-        server_info.is_tls()
-    }
-
-    async fn reconnect(&mut self) -> Result<(), ProxyStateError> {
-        let tcp = establish_connection(self.address()).await?;
-        trace!("Reconnected");
-        let server_name = self.server_info.sni_or_host()?;
-        let tls = server_encrypt(
-            self.id.conn_id(),
-            &mut self.commander_sendr,
-            &mut self.commander_recvr,
-            server_name,
-            tcp,
-            true, // HTTP/1.1 pipeline: negotiate h1 only
-        )
-        .await?;
-        trace!("Encrypted");
-        self.writer = tls;
-        Ok(())
-    }
-}
-
-// --- Rewrite ---
-impl<T, E, U> Rewrite for OneOneConn<T, E, U>
-where
-    U: OneInfoLine,
-{
-    fn file_data_and_path(&mut self) -> (&mut File, &[u8], &Path) {
-        (
-            self.file.as_mut().unwrap(),
-            self.msg_bytes.as_ref().unwrap(),
-            self.path.as_deref().unwrap(),
-        ) // safe to unwrap
-    }
-}
-
-// --- ShouldIntercept ---
-impl<T, E> ShouldIntercept for OneOneConn<T, E, OneRequestLine> {}
-
-impl<T, E> ShouldIntercept for OneOneConn<T, E, OneResponseLine> {
-    #[inline(always)]
-    fn should_intercept(&self) -> Option<bool> {
-        Some(self.need_response)
-    }
-}
-
-// --- CanLog & ShouldLog & HttpRequestLog ---
+// CanLog
 impl<T, E, U> CanLog for OneOneConn<T, E, U>
 where
     U: OneInfoLine,
@@ -244,6 +99,7 @@ where
     }
 }
 
+// ShouldLog & HttpRequestLog
 impl<T, E> HttpRequestLog for OneOneConn<T, E, OneRequestLine> {
     fn id(&self) -> SoldierId {
         self.id
@@ -298,35 +154,23 @@ impl<T, E> ShouldLog for OneOneConn<T, E, OneResponseLine> {
     }
 }
 
-// --- ShouldRewrite ---
-impl<T, E, U> ShouldRewrite for OneOneConn<T, E, U>
+// MsgToBytes
+impl<T, E, U> MsgToBytes for OneOneConn<T, E, U>
 where
-    U: OneInfoLine,
+    U: OneInfoLine + Debug,
+    OneMessageHead<U>: ParseBodyHeaders,
 {
-    #[inline(always)]
-    fn should_rewrite(&self, resume_info: &ResumeInfo) -> bool {
-        resume_info.update()
+    fn msg_to_bytes(&mut self) {
+        self.msg_bytes = Some(self.msg.take().unwrap().into_bytes());
     }
 }
 
-// --- UpdateResumeInfo ---
-impl<T, E> UpdateResumeInfo for OneOneConn<T, E, OneRequestLine> {
-    fn update_resume_info(&mut self, resume_info: &ResumeInfo) {
-        self.need_response = resume_info.need_response();
-    }
-}
-
-// Blanket implementation
-impl<T, E> UpdateResumeInfo for OneOneConn<T, E, OneResponseLine> {
-    #[inline(always)]
-    fn update_resume_info(&mut self, _: &ResumeInfo) {}
-}
-
-// --- GetHistory ---
+// GetHistory
 impl<T, E> GetHistory for OneOneConn<T, E, OneRequestLine> {
     fn get_history(&self) -> HistoryEnum<'_> {
         let req = self.msg.as_ref().unwrap(); // safe to unwrap
-        let method = std::str::from_utf8(req.method_bytes()).unwrap_or("GET");
+        let method =
+            std::str::from_utf8(req.method_bytes()).unwrap_or("UNKNOWN");
         HistoryEnum::http_request(
             self.log_id,
             &self.server_info,
@@ -344,5 +188,157 @@ impl<T, E> GetHistory for OneOneConn<T, E, OneResponseLine> {
             .map(|s| s.as_u16())
             .unwrap_or_default();
         HistoryEnum::http_response(self.log_id, status, res.content_length())
+    }
+}
+
+// UpdateLogExt
+impl<T, E> UpdateLogExt for OneOneConn<T, E, OneRequestLine> {
+    fn update_extension(&mut self) {
+        update_http_req_ext(&mut self.path, self.log_id);
+    }
+}
+
+impl<T, E> UpdateLogExt for OneOneConn<T, E, OneResponseLine> {
+    fn update_extension(&mut self) {
+        update_http_res_ext(&mut self.path);
+    }
+}
+
+// ShouldIntercept
+impl<T, E> ShouldIntercept for OneOneConn<T, E, OneRequestLine> {}
+
+impl<T, E> ShouldIntercept for OneOneConn<T, E, OneResponseLine> {
+    #[inline(always)]
+    fn should_intercept(&self) -> Option<bool> {
+        Some(self.need_response)
+    }
+}
+
+// Intercept
+impl<T, E> Intercept for OneOneConn<T, E, OneRequestLine> {
+    fn get_inter_info(&self) -> InterToUI {
+        let info = ServerInfoJson::from(&self.server_info);
+        InterToUI::build_http_req(self.log_id, Some(info))
+    }
+}
+
+impl<T, E> Intercept for OneOneConn<T, E, OneResponseLine> {
+    fn get_inter_info(&self) -> InterToUI {
+        InterToUI::build_http_res(self.log_id)
+    }
+}
+
+// DropMsg
+// HTTP/1.1 always closes the connection.
+impl<T, E, U> DropMsg for OneOneConn<T, E, U> where U: OneInfoLine {}
+
+// UpdateResumeInfo
+impl<T, E> UpdateResumeInfo for OneOneConn<T, E, OneRequestLine> {
+    fn update_resume_info(
+        &mut self,
+        resume_info: &ResumeInfo,
+    ) -> Result<(), UpdateMsgError> {
+        self.need_response = resume_info.need_response();
+        Ok(())
+    }
+}
+
+impl<T, E> UpdateResumeInfo for OneOneConn<T, E, OneResponseLine> {
+    #[inline(always)]
+    fn update_resume_info(
+        &mut self,
+        _: &ResumeInfo,
+    ) -> Result<(), UpdateMsgError> {
+        Ok(())
+    }
+}
+
+// AddRaw
+impl<T, E, U> AddRaw for OneOneConn<T, E, U>
+where
+    U: OneInfoLine,
+{
+    fn add_raw(&mut self, buf: BytesMut) -> Result<(), UpdateMsgError> {
+        self.msg_bytes = Some(buf);
+        Ok(())
+    }
+}
+
+// BytesToMsg
+impl<T, E, U> BytesToMsg for OneOneConn<T, E, U>
+where
+    U: OneInfoLine + Debug,
+    OneMessageHead<U>: ParseBodyHeaders,
+{
+    fn parse_bytes(&mut self, buf: BytesMut) -> Result<(), UpdateMsgError> {
+        self.msg = Some(OneOne::<U>::try_from(buf)?);
+        Ok(())
+    }
+}
+
+// ShouldRewrite
+impl<T, E, U> ShouldRewrite for OneOneConn<T, E, U>
+where
+    U: OneInfoLine,
+{
+    #[inline(always)]
+    fn should_rewrite(&self, resume_info: &ResumeInfo) -> bool {
+        resume_info.update()
+    }
+}
+
+// Rewrite
+impl<T, E, U> Rewrite for OneOneConn<T, E, U>
+where
+    U: OneInfoLine,
+{
+    fn file_data_and_path(&mut self) -> (&mut File, &[u8], &Path) {
+        (
+            self.file.as_mut().unwrap(),
+            self.msg_bytes.as_ref().unwrap(),
+            self.path.as_deref().unwrap(),
+        ) // safe to unwrap
+    }
+}
+
+// Reconnect
+impl<T> Reconnect for OneOneConn<T, TcpStream, OneRequestLine>
+where
+    T: AsyncReadExt + AsyncWriteExt + Unpin,
+{
+    fn can_reconnect(&self, server_info: &ServerInfo) -> bool {
+        !server_info.is_tls()
+    }
+
+    async fn reconnect(&mut self) -> Result<(), ProxyStateError> {
+        self.writer = establish_connection(self.address()).await?;
+        Ok(())
+    }
+}
+
+impl<T> Reconnect for OneOneConn<T, ClientTlsStream<TcpStream>, OneRequestLine>
+where
+    T: AsyncReadExt + AsyncWriteExt + Unpin,
+{
+    fn can_reconnect(&self, server_info: &ServerInfo) -> bool {
+        server_info.is_tls()
+    }
+
+    async fn reconnect(&mut self) -> Result<(), ProxyStateError> {
+        let tcp = establish_connection(self.address()).await?;
+        trace!("Reconnected");
+        let server_name = self.server_info.sni_or_host()?;
+        let tls = server_encrypt(
+            self.id.conn_id(),
+            &mut self.commander_sendr,
+            &mut self.commander_recvr,
+            server_name,
+            tcp,
+            true, // HTTP/1.1 pipeline: negotiate h1 only
+        )
+        .await?;
+        trace!("Encrypted");
+        self.writer = tls;
+        Ok(())
     }
 }

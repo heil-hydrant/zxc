@@ -35,28 +35,34 @@ where
     let ext = match method {
         Method::GET => {
             let path = path();
-            let ext = Path::new(path.as_ref())
+            match Path::new(path.as_ref())
                 .extension()
                 .and_then(|e| e.to_str())
                 .map(str::to_string)
-                .unwrap_or_default();
-            trace!("extension| {}", ext);
-            if ext.is_empty() {
-                trace!("no ext");
-                if let Some(ct) = headers
-                    .value_of_key(ACCEPT)
-                    .and_then(|bytes| std::str::from_utf8(bytes).ok())
-                    .and_then(ContentType::from_accept_header)
-                {
-                    trace!("accept header| {}", ct);
-                    return Some(CommanderRequest::ShouldLogHttpCt(id, ct));
+            {
+                Some(ext) => {
+                    trace!("extension| {}", ext);
+                    Some(ext)
                 }
-                trace!("no accept header");
+                None => {
+                    trace!("no ext");
+                    if let Some(ct) = headers
+                        .value_of_key(ACCEPT)
+                        .and_then(|bytes| std::str::from_utf8(bytes).ok())
+                        .and_then(ContentType::from_accept_header)
+                    {
+                        trace!("accept header| {}", ct);
+                        return Some(CommanderRequest::ShouldLogHttpCt(
+                            id, ct,
+                        ));
+                    }
+                    trace!("no accept header");
+                    None
+                }
             }
-            ext
         }
         Method::HEAD | Method::OPTIONS | Method::TRACE => return None,
-        _ => String::new(),
+        _ => None,
     };
     Some(CommanderRequest::ShouldLogHttp(id, ext))
 }
@@ -87,6 +93,7 @@ pub trait ShouldLog {
         unreachable!("{}", SHOULD_LOG_UNREACHABLE)
     }
 
+    // should message be converted to bytes before sending
     #[inline(always)]
     fn needs_msg_to_bytes(&self) -> bool {
         false

@@ -9,7 +9,7 @@ use tokio::io::{
     BufReader,
 };
 use tokio::select;
-use tokio::sync::mpsc::{self, Receiver};
+use tokio::sync::mpsc;
 use tokio_tungstenite::tungstenite::Message;
 use tracing::{Instrument, Level, error, span, trace};
 
@@ -126,8 +126,8 @@ pub async fn spawn_repeater_ws<T>(
 where
     T: AsyncWriteExt + AsyncReadExt + Unpin + Send + 'static,
 {
-    let mut hconn = handle_http(conn).await?;
-    let response = hconn.get_payload().unwrap();
+    let mut http_conn = handle_http(conn).await?;
+    let response = http_conn.get_payload().unwrap();
     let scode = OneResponseLine::try_build_infoline(response)?
         .status()?
         .into();
@@ -135,8 +135,9 @@ where
         101 => {
             let span = span!(Level::INFO, "repeater_ws", index);
             let (tx, rx) = mpsc::channel::<RepeaterWsMsg>(1);
+            let rws = http_conn.into_rws(rx).await?;
             let task = tokio::spawn(async move {
-                if let Err(e) = repeater_handle_ws(hconn, rx)
+                if let Err(e) = repeater_handle_ws(rws)
                     .instrument(span)
                     .await
                 {
@@ -151,15 +152,12 @@ where
 }
 
 /// Handles the WebSocket repeater task.
-async fn repeater_handle_ws<T, E>(
-    conn: T,
-    receiver: Receiver<RepeaterWsMsg>,
+async fn repeater_handle_ws<T>(
+    mut rws: RWebSocket<T>,
 ) -> Result<(), RepeaterError>
 where
-    T: ToRepeaterWs<E>,
-    E: AsyncRead + AsyncWrite + Unpin,
+    T: AsyncRead + AsyncWrite + Unpin,
 {
-    let mut rws = conn.to_rws(receiver).await?;
     trace!("ws start");
     loop {
         select! {

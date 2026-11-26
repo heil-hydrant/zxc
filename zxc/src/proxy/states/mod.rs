@@ -22,7 +22,7 @@ use crate::io::socket::establish_connection;
 use crate::io::write_and_flush;
 use crate::proxy::handler_state::handlers::oneoneconn::OneOneConn;
 use crate::proxy::handler_state::handlers::{
-    handle_http, handle_http2, read_http
+    handle_http, handle_http2, read_http,
 };
 use crate::proxy::prelude::*;
 
@@ -223,19 +223,11 @@ where
                                 server_info,
                             ));
                         client.msg.take();
-                        let _alpn = client
-                            .reader
-                            .get_ref()
-                            .1
-                            .alpn_protocol()
-                            .unwrap_or_default();
                         let client_state = ProxyState::Receive(client);
                         handle_http(client_state).await
                     }
                     Protocol::Two => {
-                        if let Err(e) =
-                            handle_http2(conn, recvr, server_info).await
-                        {
+                        if let Err(e) = handle_http2(conn, server_info).await {
                             tracing::error!("h2 connection error| {e}");
                         }
                         Ok(Self::End)

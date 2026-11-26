@@ -1,7 +1,6 @@
 pub mod additional_handler_info;
 pub mod error;
 pub mod handlers;
-pub mod read_write;
 pub mod role;
 pub mod transition;
 
@@ -9,7 +8,6 @@ use std::fmt::Display;
 
 use bytes::BytesMut;
 pub use error::ProxyStateError;
-pub use read_write::ReadWrite;
 pub use role::GetRole;
 pub use transition::*;
 
@@ -50,7 +48,7 @@ where
         + CanCommunicate
         + CanLog
         + DropMsg
-        + FileOps
+        + AttachFile
         + GetHistory
         + GetRole
         + Id

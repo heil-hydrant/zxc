@@ -134,14 +134,18 @@ impl Config {
     }
 
     /// Checks whether traffic with the given extension should be logged.
-    pub fn should_log(&self, mut ext: String) -> bool {
-        if !ext.is_empty() {
-            ext.make_ascii_lowercase();
-            if self.in_excluded_extensions(&ext) {
-                return false;
-            } else if let Some(ct) = EXTENSION_MAP.get(ext.as_str()).copied() {
-                return !self.in_excluded_content_types(ct);
-            }
+    ///
+    /// `None` means the request has no extension and is always logged.
+    pub fn should_log(&self, ext: Option<String>) -> bool {
+        let Some(mut ext) = ext else {
+            return true;
+        };
+        ext.make_ascii_lowercase();
+        if self.in_excluded_extensions(&ext) {
+            return false;
+        }
+        if let Some(ct) = EXTENSION_MAP.get(ext.as_str()).copied() {
+            return !self.in_excluded_content_types(ct);
         }
         true
     }
@@ -391,11 +395,12 @@ mod tests {
             with_ws: false,
         };
 
-        assert!(config.should_log("html".to_string()));
-        assert!(!config.should_log("png".to_string()));
-        assert!(!config.should_log("css".to_string()));
-        assert!(!config.should_log("jpg".to_string()));
-        assert!(!config.should_log("svg".to_string()));
-        assert!(!config.should_log("mp4".to_string()));
+        assert!(config.should_log(Some("html".to_string())));
+        assert!(!config.should_log(Some("png".to_string())));
+        assert!(!config.should_log(Some("css".to_string())));
+        assert!(!config.should_log(Some("jpg".to_string())));
+        assert!(!config.should_log(Some("svg".to_string())));
+        assert!(!config.should_log(Some("mp4".to_string())));
+        assert!(config.should_log(None));
     }
 }

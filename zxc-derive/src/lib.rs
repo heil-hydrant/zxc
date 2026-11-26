@@ -1,8 +1,8 @@
+mod attach_file;
 mod buffer;
 mod can_communicate;
 mod close_action;
 mod file_buf;
-mod file_ops;
 mod flush_storage;
 mod get_path;
 mod id;
@@ -27,10 +27,10 @@ pub fn getpath(input: TokenStream) -> TokenStream {
     get_path::impl_get_path(&ast)
 }
 
-#[proc_macro_derive(FileOps)]
-pub fn fileops(input: TokenStream) -> TokenStream {
+#[proc_macro_derive(AttachFile)]
+pub fn attach_file(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as DeriveInput);
-    file_ops::impl_file_ops(&ast)
+    attach_file::impl_attach_file(&ast)
 }
 
 #[proc_macro_derive(GetRole)]

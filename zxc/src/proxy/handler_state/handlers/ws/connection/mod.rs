@@ -39,12 +39,6 @@ pub struct WsConn<T, E> {
     history_sendr: Sender<CommanderToHistory>,
 }
 
-impl<T, E> AsMut<BytesMut> for WsConn<T, E> {
-    fn as_mut(&mut self) -> &mut BytesMut {
-        &mut self.buf
-    }
-}
-
 impl<T, E> WsConn<T, E>
 where
     SplitSink<WebSocketStream<E>, Message>: Sink<Message>,

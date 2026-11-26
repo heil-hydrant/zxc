@@ -5,9 +5,12 @@ use crate::commander::CommanderError;
 use crate::interceptor::*;
 use crate::proxy::prelude::*;
 
-// Update whether the response needs to be updated (http only)
+// Trait Update whether the response needs to be updated (http only)
 pub trait UpdateResumeInfo {
-    fn update_resume_info(&mut self, resume_info: &ResumeInfo);
+    fn update_resume_info(
+        &mut self,
+        resume_info: &ResumeInfo,
+    ) -> Result<(), UpdateMsgError>;
 }
 
 pub async fn resume_intercept<T>(
@@ -25,11 +28,11 @@ where
         return Ok(ProxyState::Drop(conn));
     }
     if let Some(resume_info) = Option::<ResumeInfo>::try_from(response)? {
-        conn.update_resume_info(&resume_info);
+        conn.update_resume_info(&resume_info)?;
         if resume_info.modified() {
             trace!("file mod| Y");
             return Ok(ProxyState::ReadModFile(conn, resume_info));
-            // http req only
+            // http/1.1 req only
         } else if let Some(serve_info) = resume_info.into_server_info() {
             trace!("new conn");
             return Ok(ProxyState::NewConnection(conn, serve_info));

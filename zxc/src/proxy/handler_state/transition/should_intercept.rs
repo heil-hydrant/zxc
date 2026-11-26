@@ -5,12 +5,16 @@ use crate::proxy::prelude::*;
 const SHOULD_INTERCEPT_UNREACHABLE: &str =
     "QueryCommanderShouldIntercept only applicable for WebSocket";
 
+// Trait to check if request/response needs to be intercepted
+// for request, always true
+// for response, based on need_response from ui
 pub trait ShouldIntercept {
     #[inline(always)]
     fn should_intercept(&self) -> Option<bool> {
         Some(true)
     }
 
+    // method implemented only for ws response
     async fn query_commander_should_intercept(
         &mut self,
     ) -> Result<bool, ProxyStateError> {

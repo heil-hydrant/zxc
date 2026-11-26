@@ -102,17 +102,18 @@ pub fn get_address(
     }
 }
 
-/*
 #[cfg(test)]
 mod tests {
-    use std::ops::Range;
     use std::str::FromStr;
 
     use bytes::BytesMut;
-    use header_plz::OneInfoLine;
     use http_plz::OneRequest;
 
     use super::*;
+
+    fn build_request(raw: &str) -> OneRequest {
+        OneRequest::try_from(BytesMut::from(raw)).unwrap()
+    }
 
     #[test]
     fn test_address_set_port() {
@@ -126,68 +127,45 @@ mod tests {
 
     #[test]
     fn test_address_from_request_http_ip_get() {
-        let info_line = "GET http://127.0.0.1:8080/echo HTTP/1.1\r\n";
-        let buf = BytesMut::from(info_line);
-        let initial_ptr_range = buf.as_ptr_range();
-        let mut request = OneRequest::build_infoline(buf).unwrap();
-        let address = get_address(&mut request, false).unwrap();
+        let mut request =
+            build_request("GET http://127.0.0.1:8080/echo HTTP/1.1\r\n\r\n");
+        let address =
+            get_address(request.message_head_mut().info_line_mut(), false)
+                .unwrap();
         assert_eq!(
             address,
             Address::Socket(SocketAddr::from_str("127.0.0.1:8080").unwrap())
         );
-        let result = request.into_data();
-        let verify = "GET /echo HTTP/1.1\r\n";
-        assert_eq!(result, BytesMut::from(verify));
-        let final_ptr = result.as_ptr_range();
-        let url = "http://127.0.0.1:8080";
-        // SAFETY: `url` is the prefix removed from `buf`, so `url.len()`
-        // stays within the original allocation, and the buffer is not
-        // reallocated between the two pointer snapshots.
-        let expected_start_ptr =
-            unsafe { initial_ptr_range.start.add(url.len()) };
-
-        let expected_ptr_range = Range {
-            start: expected_start_ptr,
-            end: initial_ptr_range.end,
-        };
-
-        assert_eq!(final_ptr, expected_ptr_range);
+        assert_eq!(
+            request.into_bytes(),
+            BytesMut::from("GET /echo HTTP/1.1\r\n\r\n")
+        );
     }
 
     #[test]
     fn test_address_from_request_http_ip_post() {
-        let info_line = "POST http://127.0.0.1:8080/echo HTTP/1.1\r\n";
-        let buf = BytesMut::from(info_line);
-        let initial_ptr_range = buf.as_ptr_range();
-        let mut request = OneRequest::build_infoline(buf).unwrap();
-        let address = get_address(&mut request, false).unwrap();
+        let mut request =
+            build_request("POST http://127.0.0.1:8080/echo HTTP/1.1\r\n\r\n");
+        let address =
+            get_address(request.message_head_mut().info_line_mut(), false)
+                .unwrap();
         assert_eq!(
             address,
             Address::Socket(SocketAddr::from_str("127.0.0.1:8080").unwrap())
         );
-        let result = request.into_data();
-        let verify = "POST /echo HTTP/1.1\r\n";
-        assert_eq!(result, BytesMut::from(verify));
-        let final_ptr = result.as_ptr_range();
-        let url = "http://127.0.0.1:8080";
-        // SAFETY: `url` is the prefix removed from `buf`, so `url.len()`
-        // stays within the original allocation, and the buffer is not
-        // reallocated between the two pointer snapshots.
-        let expected_start_ptr =
-            unsafe { initial_ptr_range.start.add(url.len()) };
-        let expected_ptr_range = Range {
-            start: expected_start_ptr,
-            end: initial_ptr_range.end,
-        };
-        assert_eq!(final_ptr, expected_ptr_range);
+        assert_eq!(
+            request.into_bytes(),
+            BytesMut::from("POST /echo HTTP/1.1\r\n\r\n")
+        );
     }
 
     #[test]
     fn test_address_from_request_https_ip() {
-        let info_line = "CONNECT 127.0.0.1:8080 HTTP/1.1\r\n";
-        let buf = BytesMut::from(info_line);
-        let mut request = OneRequest::build_infoline(buf).unwrap();
-        let address = get_address(&mut request, true).unwrap();
+        let mut request =
+            build_request("CONNECT 127.0.0.1:8080 HTTP/1.1\r\n\r\n");
+        let address =
+            get_address(request.message_head_mut().info_line_mut(), true)
+                .unwrap();
         assert_eq!(
             address,
             Address::Socket(SocketAddr::from_str("127.0.0.1:8080").unwrap())
@@ -196,19 +174,21 @@ mod tests {
 
     #[test]
     fn test_address_from_request_http_dns() {
-        let info_line = "GET http://www.google.com/echo HTTP/1.1\r\n";
-        let buf = BytesMut::from(info_line);
-        let mut request = OneRequest::build_infoline(buf).unwrap();
-        let address = get_address(&mut request, false).unwrap();
+        let mut request =
+            build_request("GET http://www.google.com/echo HTTP/1.1\r\n\r\n");
+        let address =
+            get_address(request.message_head_mut().info_line_mut(), false)
+                .unwrap();
         assert_eq!(address, Address::Dns(("www.google.com".to_string(), 80)))
     }
 
     #[test]
     fn test_address_from_request_https_dns() {
-        let info_line = "CONNECT www.google.com:443 HTTP/1.1\r\n";
-        let buf = BytesMut::from(info_line);
-        let mut request = OneRequest::build_infoline(buf).unwrap();
-        let address = get_address(&mut request, true).unwrap();
+        let mut request =
+            build_request("CONNECT www.google.com:443 HTTP/1.1\r\n\r\n");
+        let address =
+            get_address(request.message_head_mut().info_line_mut(), true)
+                .unwrap();
         assert_eq!(address, Address::Dns(("www.google.com".to_string(), 443)))
     }
 
@@ -299,4 +279,3 @@ mod tests {
         )
     }
 }
-*/

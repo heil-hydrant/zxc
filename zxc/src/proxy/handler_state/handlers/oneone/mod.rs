@@ -7,6 +7,7 @@ pub use connection::OneOneRWError;
 pub use handle::{handle_http, read_http};
 
 // Compatibility shim for the old module path.
+// TODO: remove
 pub mod oneoneconn {
     pub use super::connection::OneOneConn;
 }

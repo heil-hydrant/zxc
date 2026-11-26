@@ -13,125 +13,9 @@ use super::WsConn;
 use crate::commander::*;
 use crate::history::*;
 use crate::interceptor::*;
-use crate::proxy::handler_state::transition::write_history::WsHistory;
 use crate::proxy::prelude::*;
 
-// --- FileBuf & FileOps ---
-impl<T, E> FileBuf for WsConn<T, E> {
-    fn file_and_buf_as_mut(&mut self) -> (&mut File, &mut BytesMut) {
-        (self.file.as_mut().unwrap(), &mut self.buf)
-    }
-
-    fn file_path(&self) -> &Path {
-        self.path.as_path()
-    }
-}
-
-impl<T, E> FileOps for WsConn<T, E> {
-    fn attach_file(&mut self, file: File) {
-        self.file = Some(file);
-    }
-}
-
-// --- AddRaw ---
-// Blank implementation. No add_raw for ws
-impl<T, E> AddRaw for WsConn<T, E> {
-    #[inline(always)]
-    fn add_raw(&mut self, _: BytesMut) -> Result<(), UpdateMsgError> {
-        panic!("{}", WS_ADD_RAW_PANIC);
-    }
-}
-
-// Converts buffered bytes into a WebSocket message.
-//
-// Only text and binary frames are supported; other frame types return
-// `ProxyUpdateFrameError::InvalidWsFrame`.
-
-impl<T, E> BytesToMsg for WsConn<T, E> {
-    type Msg = Message;
-
-    fn parse_bytes(&self, buf: BytesMut) -> Result<Self::Msg, UpdateMsgError> {
-        // safe to unwrap
-        let new_frame = match self.msg.as_ref().unwrap() {
-            Message::Text(_) => {
-                let bytes = buf.freeze();
-                let utf8 = tungstenite::Utf8Bytes::try_from(bytes.clone())
-                    .unwrap_or_else(|_| {
-                        String::from_utf8_lossy(&bytes)
-                            .into_owned()
-                            .into()
-                    });
-                Message::Text(utf8)
-            }
-            Message::Binary(_) => Message::Binary(buf.freeze()),
-            _ => return Err(UpdateMsgError::InvalidWsFrame),
-        };
-        Ok(new_frame)
-    }
-
-    #[inline(always)]
-    fn add_msg(&mut self, msg: Self::Msg) {
-        self.msg = Some(msg);
-    }
-}
-
-// --- DropMsg ---
-// For websocket, continue to receive message
-impl<T, E> DropMsg for WsConn<T, E> {
-    #[inline(always)]
-    fn continue_on_drop() -> Result<(), ProxyStateError> {
-        Ok(())
-    }
-}
-
-// --- MsgToBytes ---
-// Blanket implementation
-impl<T, E> MsgToBytes for WsConn<T, E> {
-    #[inline(always)]
-    fn msg_to_bytes(&mut self) {}
-}
-
-// --- Intercept ---
-impl<T, E> Intercept for WsConn<T, E> {
-    fn get_inter_info(&self) -> InterToUI {
-        InterToUI::build_ws(
-            self.http_id,
-            self.log_id,
-            &self.role,
-            self.msg.as_ref().unwrap().is_binary(),
-        )
-    }
-}
-
-// --- Log & UpdateLogExt ---
-impl<T, E> Log for WsConn<T, E> {
-    fn path(&self) -> &PathBuf {
-        &self.path
-    }
-
-    fn log_data(&self) -> &[u8] {
-        match self
-            .msg
-            .as_ref()
-            .unwrap() // safe to unwrap
-        {
-            Message::Text(data) => data.as_bytes(),
-            Message::Binary(vec) => vec,
-            _ => unreachable!(),
-        }
-    }
-}
-
-impl<T, E> UpdateLogExt for WsConn<T, E> {
-    fn update_extension(&mut self) {
-        self.path
-            .set_file_name(self.log_id.to_string());
-        self.path
-            .set_extension(self.role.ws_ext());
-    }
-}
-
-// --- ReadWrite ---
+// ReadWrite
 impl<T, E> ReadWrite for WsConn<T, E>
 where
     SplitSink<WebSocketStream<E>, Message>: Sink<Message>,
@@ -165,48 +49,6 @@ where
         }
         trace!("close frame");
         Ok(ProxyState::End(self))
-    }
-}
-
-// --- Rewrite ---
-impl<T, E> Rewrite for WsConn<T, E> {
-    #[inline(always)]
-    fn file_data_and_path(&mut self) -> (&mut File, &[u8], &Path) {
-        panic!("No rewrite for WsHandle");
-    }
-}
-
-// --- ShouldIntercept ---
-#[inline(always)]
-const fn ws_should_intercept(role: &Role) -> Option<bool> {
-    if let Role::Server = role {
-        Some(true)
-    } else {
-        None
-    }
-}
-
-impl<T, E> ShouldIntercept for WsConn<T, E> {
-    #[inline(always)]
-    fn should_intercept(&self) -> Option<bool> {
-        ws_should_intercept(&self.role)
-    }
-
-    async fn query_commander_should_intercept(
-        &mut self,
-    ) -> Result<bool, ProxyStateError> {
-        if let Role::Client = self.role {
-            let req = CommanderRequest::ShouldInterceptWsRespone(self.id);
-            self.commander_sendr.send(req).await?;
-            let result = self
-                .commander_recvr
-                .recv()
-                .await
-                .ok_or(ProxyStateError::WsShouldIntercept)?;
-            Ok(matches!(result, CommanderResponse::WsInterceptReply(true)))
-        } else {
-            Ok(false)
-        }
     }
 }
 
@@ -246,31 +88,14 @@ impl<T, E> ShouldLog for WsConn<T, E> {
     }
 }
 
-// --- ShouldRewrite ---
-// WebSocket frames never rewrite existing files, so this always returns
-// `false`.
-
-impl<T, E> ShouldRewrite for WsConn<T, E> {
-    #[inline(always)]
-    fn should_rewrite(&self, _: &ResumeInfo) -> bool {
-        false
-    }
-}
-
-// --- UpdateResumeInfo ---
+// MsgToBytes
 // Blanket implementation
-impl<T, E> UpdateResumeInfo for WsConn<T, E> {
+impl<T, E> MsgToBytes for WsConn<T, E> {
     #[inline(always)]
-    fn update_resume_info(&mut self, _: &ResumeInfo) {}
+    fn msg_to_bytes(&mut self) {}
 }
 
-// --- History ---
-impl<T, E> SendHistory for WsConn<T, E> {
-    fn get_sender(&self) -> &Sender<CommanderToHistory> {
-        &self.history_sendr
-    }
-}
-
+// GetHistory
 impl<T, E> GetHistory for WsConn<T, E> {
     fn get_history(&self) -> HistoryEnum<'_> {
         let ws_his = WsHistory::new(
@@ -281,5 +106,175 @@ impl<T, E> GetHistory for WsConn<T, E> {
         );
 
         HistoryEnum::WebSocket(self.id, ws_his)
+    }
+}
+
+// SendHistory
+impl<T, E> SendHistory for WsConn<T, E> {
+    fn get_sender(&self) -> &Sender<CommanderToHistory> {
+        &self.history_sendr
+    }
+}
+
+impl<T, E> UpdateLogExt for WsConn<T, E> {
+    fn update_extension(&mut self) {
+        self.path
+            .set_file_name(self.log_id.to_string());
+        self.path
+            .set_extension(self.role.ws_ext());
+    }
+}
+
+// Log
+impl<T, E> Log for WsConn<T, E> {
+    fn path(&self) -> &PathBuf {
+        &self.path
+    }
+
+    fn log_data(&self) -> &[u8] {
+        match self
+            .msg
+            .as_ref()
+            .unwrap() // safe to unwrap
+        {
+            Message::Text(data) => data.as_bytes(),
+            Message::Binary(vec) => vec,
+            _ => unreachable!(),
+        }
+    }
+}
+
+// AttachFile
+impl<T, E> AttachFile for WsConn<T, E> {
+    fn attach_file(&mut self, file: File) {
+        self.file = Some(file);
+    }
+}
+
+// FileBuf
+impl<T, E> FileBuf for WsConn<T, E> {
+    fn file_and_buf_as_mut(&mut self) -> (&mut File, &mut BytesMut) {
+        (self.file.as_mut().unwrap(), &mut self.buf)
+    }
+
+    fn file_path(&self) -> &Path {
+        self.path.as_path()
+    }
+}
+
+// ShouldIntercept
+#[inline(always)]
+const fn ws_should_intercept(role: &Role) -> Option<bool> {
+    if let Role::Server = role {
+        Some(true)
+    } else {
+        None
+    }
+}
+
+impl<T, E> ShouldIntercept for WsConn<T, E> {
+    #[inline(always)]
+    fn should_intercept(&self) -> Option<bool> {
+        ws_should_intercept(&self.role)
+    }
+
+    async fn query_commander_should_intercept(
+        &mut self,
+    ) -> Result<bool, ProxyStateError> {
+        if let Role::Client = self.role {
+            let req = CommanderRequest::ShouldInterceptWsRespone(self.id);
+            self.commander_sendr.send(req).await?;
+            let result = self
+                .commander_recvr
+                .recv()
+                .await
+                .ok_or(ProxyStateError::WsShouldIntercept)?;
+            Ok(matches!(result, CommanderResponse::WsInterceptReply(true)))
+        } else {
+            Ok(false)
+        }
+    }
+}
+
+// Intercept
+impl<T, E> Intercept for WsConn<T, E> {
+    fn get_inter_info(&self) -> InterToUI {
+        InterToUI::build_ws(
+            self.http_id,
+            self.log_id,
+            &self.role,
+            self.msg.as_ref().unwrap().is_binary(),
+        )
+    }
+}
+
+// DropMsg
+// For websocket, continue to receive message
+impl<T, E> DropMsg for WsConn<T, E> {
+    #[inline(always)]
+    fn continue_on_drop() -> Result<(), ProxyStateError> {
+        Ok(())
+    }
+}
+
+// UpdateResumeInfo
+impl<T, E> UpdateResumeInfo for WsConn<T, E> {
+    #[inline(always)]
+    fn update_resume_info(
+        &mut self,
+        _: &ResumeInfo,
+    ) -> Result<(), UpdateMsgError> {
+        Ok(())
+    }
+}
+
+// --- AddRaw ---
+impl<T, E> AddRaw for WsConn<T, E> {
+    #[inline(always)]
+    fn add_raw(&mut self, _: BytesMut) -> Result<(), UpdateMsgError> {
+        panic!("{}", WS_ADD_RAW_PANIC);
+    }
+}
+
+// Converts buffered bytes into a WebSocket message.
+//
+// Only text and binary frames are supported; other frame types return
+// `ProxyUpdateFrameError::InvalidWsFrame`.
+impl<T, E> BytesToMsg for WsConn<T, E> {
+    fn parse_bytes(&mut self, buf: BytesMut) -> Result<(), UpdateMsgError> {
+        let new_frame = match self.msg.as_ref().unwrap() {
+            Message::Text(_) => {
+                let bytes = buf.freeze();
+                let utf8 = tungstenite::Utf8Bytes::try_from(bytes.clone())
+                    .unwrap_or_else(|_| {
+                        String::from_utf8_lossy(&bytes)
+                            .into_owned()
+                            .into()
+                    });
+                Message::Text(utf8)
+            }
+            Message::Binary(_) => Message::Binary(buf.freeze()),
+            _ => return Err(UpdateMsgError::InvalidWsFrame),
+        };
+        self.msg = Some(new_frame);
+        Ok(())
+    }
+}
+
+// ShouldRewrite
+// WebSocket frames never rewrite existing files, so this always returns
+// `false`.
+impl<T, E> ShouldRewrite for WsConn<T, E> {
+    #[inline(always)]
+    fn should_rewrite(&self, _: &ResumeInfo) -> bool {
+        false
+    }
+}
+
+// Rewrite
+impl<T, E> Rewrite for WsConn<T, E> {
+    #[inline(always)]
+    fn file_data_and_path(&mut self) -> (&mut File, &[u8], &Path) {
+        panic!("No rewrite for WsHandle");
     }
 }

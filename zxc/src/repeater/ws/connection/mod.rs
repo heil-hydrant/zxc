@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use bytes::{Bytes, BytesMut};
 use tokio::fs::File;
-use tokio::io::{AsyncRead, AsyncSeekExt, AsyncWrite};
+use tokio::io::AsyncSeekExt;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::task::JoinHandle;
@@ -12,7 +12,6 @@ use tokio_tungstenite::tungstenite::Message;
 use tracing::trace;
 
 use crate::io::*;
-use crate::proxy::handler_state::transition::write_history::WsHistory;
 use crate::proxy::*;
 use crate::repeater::prelude::*;
 
@@ -88,7 +87,8 @@ impl<T> RWebSocket<T> {
         };
 
         let data =
-            WsHistory::new(self.log_id, &role, is_bin, size).to_string();
+            handler_state::WsHistory::new(self.log_id, &role, is_bin, size)
+                .to_string();
         trace!("log| {}", data);
         // increment log_id for next write
         self.log_id += 1;
@@ -114,23 +114,6 @@ impl<T> RWebSocket<T> {
             .map_err(|e| FileErrorInfo::seek_fail(&self.scratch_path, e))?;
         Ok(())
     }
-}
-
-/// Converts connection types into `RepeaterWs` implementations.
-///
-/// A trait instead of a method to leave room for HTTP/2.
-///
-/// # Errors
-///
-/// `WsCreationError`.
-pub trait ToRepeaterWs<T>
-where
-    T: AsyncRead + AsyncWrite + Unpin,
-{
-    async fn to_rws(
-        self,
-        receiver: Receiver<RepeaterWsMsg>,
-    ) -> Result<RWebSocket<T>, RepeaterError>;
 }
 
 /// Handle for a `RepeaterWs` task.

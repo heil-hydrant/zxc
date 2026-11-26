@@ -4,7 +4,6 @@ use crate::proxy::prelude::*;
 
 // Sent and received from ui
 #[cfg_attr(test, derive(Default))]
-// #[derive(Debug, Serialize, Deserialize)]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ServerInfoJson {
     pub host: String,
@@ -29,17 +28,11 @@ impl ServerInfoJson {
 }
 
 // Builds the UI and history JSON view of `ServerInfo`.
-//
-// # Steps
-//
-// 1. Get the host and scheme.
-// 2. For HTTPS where the host differs from the SNI, include the SNI.
-// 3. Build `ServerInfoJson`.
-
 impl From<&ServerInfo> for ServerInfoJson {
     fn from(server_info: &ServerInfo) -> Self {
         let host = server_info.address_to_string();
         let scheme = server_info.scheme();
+        // For HTTPS where the host differs from the SNI, include the SNI.
         let sni = if scheme == Scheme::Https && server_info.should_add_sni() {
             server_info
                 .sni()

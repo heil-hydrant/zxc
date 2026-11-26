@@ -1,6 +1,6 @@
 use super::*;
 
-pub fn impl_file_ops(ast: &syn::DeriveInput) -> TokenStream {
+pub fn impl_attach_file(ast: &syn::DeriveInput) -> TokenStream {
     let name = &ast.ident;
     let (impl_generics, type_generics, where_clause) =
         ast.generics.split_for_impl();
@@ -15,7 +15,7 @@ pub fn impl_file_ops(ast: &syn::DeriveInput) -> TokenStream {
             }
         }
 
-        impl #impl_generics FileOps for #name #type_generics #where_clause {
+        impl #impl_generics AttachFile for #name #type_generics #where_clause {
             fn attach_file(&mut self,file: File) {
                 self.file = Some(file);
             }

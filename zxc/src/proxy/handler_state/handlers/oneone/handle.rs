@@ -12,12 +12,13 @@ use tracing::{error, trace};
 use super::connection::OneOneConn;
 use super::connection::OneOneRWError;
 use super::error::HandleOneOneError;
-use crate::proxy::handler_state::handlers::handle_websocket;
 use crate::CAPACITY_2MB;
 use crate::async_step::async_run;
 use crate::commander::*;
 use crate::interceptor::*;
+use crate::io::file_attr::set_attr;
 use crate::io::socket::fill_buffer;
+use crate::proxy::handler_state::handlers::handle_websocket;
 use crate::proxy::prelude::*;
 use crate::proxy::states::*;
 
@@ -40,10 +41,9 @@ where
 {
     // Try twice to reconnect
     for _ in 0..2 {
-        // 1. handle_one_one
         match handle_one_one(client_state).await {
             Ok(proxy_state) => {
-                // 2. handle ws
+                // handle ws
                 if let ProxyState::SwitchProtocol(mut conn, _) = proxy_state {
                     let req = CommanderRequest::ShouldProxyWs(conn.id);
                     conn.commander_sendr.send(req).await?;
@@ -72,11 +72,6 @@ where
             Err(e) => {
                 client_state = match e {
                     // Sending to the server failed.
-                    //
-                    // # Steps
-                    //
-                    // 1. Reconnect to the server.
-                    // 2. Set `client_state` to `ProxyState::Send`.
                     HandleOneOneError::SendToServer(mut conn, e) => {
                         trace!("send_to_server err| {}", e);
                         conn.reconnect().await?;
@@ -127,47 +122,6 @@ where
 }
 
 /// Runs one HTTP/1.1 client/server cycle.
-///
-/// `client_state` starts as `ProxyState<OneOneHandler<T, E, Request>>`.
-///
-/// # Trait bounds
-///
-/// - `T`, `E`: `AsyncReadExt + AsyncWriteExt + Unpin`.
-/// - `OneOneRequest<T, E>`:
-///   `ReadWrite + Reconnect + Into<OneOneResponse<E, T>>` and
-///   `ReadWrite<State = ClientState<T, E>>`.
-/// - `OneOneResponse<T, E>`: `ReadWrite`.
-///
-/// # Steps
-///
-/// 1. Run `client_state` until it ends.
-/// 2. Convert `ClientState` to `OneOneRequest`.
-///    - `NeedNewConnection` returns `HandleOneOneError::NeedNewConnection`.
-///    - `ServerClose` returns `HandleOneOneError::SendToServer`.
-/// 3. Check whether the client is logged.
-/// 4. If it is logged, set the extended attributes on the request file.
-/// 5. Convert `OneOneRequest` to `OneOneResponse` and create `server_state`
-///    as `ProxyState::Receive`.
-/// 6. Run `server_state` until it ends.
-/// 7. Convert `ServerState` to `OneOneResponse`. `ServerClose` returns
-///    `HandleOneOneError::ReadFromServer`.
-/// 8. Get the status code from `server_state`.
-/// 9. Status `101` returns `ProxyState::SwitchProtocol(Ws)`.
-/// 10. Otherwise return `ProxyState::End`.
-/// 11. If the client was not logged, relay instead.
-///
-/// # Returns
-///
-/// `Ok(ProxyState<OneOneHandler<E, T, Response>>)`.
-///
-/// # Errors
-///
-/// - `HandleOneOneError::ProxyError` [1] [5]
-/// - `HandleOneOneError::SendToServer` [2]
-/// - `HandleOneOneError::NeedNewConnection` [2]
-/// - `HandleOneOneError::ReadFromServer` [7]
-/// - `HandleOneOneError::StatusCode` [8]
-/// - `HandleOneOneError::Relay` [11]
 async fn handle_one_one<T, E>(
     mut client_state: ClientState<T, E>,
 ) -> Result<ServerState<E, T>, HandleOneOneError<T, E>>
@@ -186,7 +140,7 @@ where
     let mut client_conn = OneOneRequest::<T, E>::try_from(client_state)?;
 
     match client_conn.path.is_some() {
-        // 3. client logged
+        // client logged
         true => {
             // set xttr
             let info = ServerInfoJson::from(&client_conn.server_info);
@@ -214,7 +168,7 @@ where
             trace!("end");
             Ok(ProxyState::End(server_conn))
         }
-        // 10. if client not logged, Relay
+        // if client not logged, Relay
         false => {
             trace!("relay");
             let mut reader = BufReader::new(&mut client_conn.writer);

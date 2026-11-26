@@ -51,7 +51,7 @@ impl ServerInfo {
         self.sni = Some(server_name);
     }
 
-    /// Returns the SNI , if one has been set.
+    /// Returns the SNI, if one has been set.
     pub fn sni(&self) -> Option<&ServerName<'static>> {
         self.sni.as_ref()
     }

@@ -4,10 +4,10 @@ pub mod server_info;
 pub mod states;
 
 pub use handler_state::error::ProtocolError;
-pub use handler_state::handlers::OneOneRWError;
 pub use handler_state::handlers::error::WsError;
-pub use handler_state::read_write::ReadWrite;
+pub use handler_state::handlers::{Http2Error, OneOneRWError};
 pub use handler_state::role::Role;
+pub use handler_state::transition::ReadWrite;
 pub use handler_state::transition::{AddRaw, HistoryEnum, UpdateMsgError};
 pub use server_info::{ServerInfo, ServerInfoJson};
 pub use states::ZStream;

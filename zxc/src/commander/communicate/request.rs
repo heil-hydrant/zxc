@@ -25,7 +25,7 @@ pub enum CommanderRequest {
 
     // ----- Should Log -----
     // http
-    ShouldLogHttp(SoldierId, String),
+    ShouldLogHttp(SoldierId, Option<String>),
     ShouldLogHttpCt(SoldierId, ContentType),
     // ws
     WsLog(SoldierId, Role),

@@ -7,20 +7,7 @@ use crate::proxy::prelude::*;
 /// Splits `host[:port]` into a host and a port.
 ///
 /// A missing port becomes `0`; an empty host is an error.
-///
-/// # Steps
-///
-/// 1. `rsplit_once(':')` to get the host and port.
-/// 2. If the host is empty, return an error.
-/// 3. Parse the port as `u16`; if absent, use `0`.
-///
-/// # Errors
-///
-/// - `AddressError::NoHost` [2]
-/// - `AddressError::PortParse` [3]
-fn split_dns_host_and_port(
-    addr: &str,
-) -> Result<(&str, u16), AddressError> {
+fn split_dns_host_and_port(addr: &str) -> Result<(&str, u16), AddressError> {
     let (host, port_str) = addr
         .rsplit_once(':')
         .unwrap_or((addr, ""));
@@ -51,17 +38,14 @@ impl TryFrom<&str> for Address {
     type Error = AddressError;
 
     fn try_from(val: &str) -> Result<Self, Self::Error> {
-        // 1. Try to convert &str to SocketAddr
         if let Ok(socket_addr) = SocketAddr::from_str(val) {
             return Ok(Address::Socket(socket_addr));
         }
 
-        // 2. Check if ipaddress
         if let Ok(ip) = IpAddr::from_str(val) {
             return Ok(Address::Socket(SocketAddr::new(ip, 0)));
         }
 
-        // Else, treat it as DNS (host, port)
         let (host, port) = split_dns_host_and_port(val)?;
         Ok(Address::Dns((host.to_string(), port)))
     }

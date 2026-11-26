@@ -3,7 +3,7 @@ use http_plz::Request;
 use rustc_hash::FxHashMap;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::select;
-use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 use tokio::task::{Id, JoinSet};
 use tracing::{Instrument, error, trace};
@@ -14,11 +14,11 @@ use super::connection::TwoConn;
 use super::error::Http2Error;
 use crate::async_step::async_run;
 use crate::commander::*;
+use crate::io::file_attr::set_h2_attr;
 use crate::proxy::prelude::*;
 
 pub async fn handle_http2<T, E>(
     conn: Connection<T, E>,
-    _recvr: Receiver<CommanderResponse>,
     server_info: ServerInfo,
 ) -> Result<(), Http2Error>
 where
@@ -174,7 +174,7 @@ async fn handle_stream(
 
     let client_state = ProxyState::ShouldLog(h2req);
     let client_state = async_run(client_state).await?;
-    let h2req = match client_state {
+    let req = match client_state {
         ProxyState::End(conn) => conn,
         ProxyState::NewConnection(conn, _) => {
             // HTTP/2 reissue is not implemented yet. Ignore the requested
@@ -188,18 +188,15 @@ async fn handle_stream(
         _ => return Err(Http2Error::UnexpectedState),
     };
 
-    if let Some(path) = h2req.path.as_ref() {
-        let info = ServerInfoJson::from(&h2req.server_info);
-        if let Err(e) = set_attr(path, info).await {
+    if let Some(path) = req.path.as_ref() {
+        let info = ServerInfoJson::from(&req.server_info);
+        if let Err(e) = set_h2_attr(path, info, req.h2_pseudo.as_ref()).await {
             error!("h2 set attr| {e}");
-        }
-        if let Err(e) = set_h2_attr(path, h2req.h2_pseudo.as_ref()).await {
-            error!("h2 set pseudo attr| {e}");
         }
     }
 
-    let h2resp = TwoConn::<ResponseLine>::from(h2req);
-    let server_state = ProxyState::Receive(h2resp);
+    let resp = TwoConn::<ResponseLine>::from(req);
+    let server_state = ProxyState::Receive(resp);
     let _ = async_run(server_state).await?;
 
     Ok(())
